@@ -1,3 +1,13 @@
+> **Fork notice**
+>
+> **LiquidHub** is a derivative work of [RikkaHub](https://github.com/rikkahub/rikkahub), created by
+> AI Hello World. It keeps the original architecture and replaces the UI with a "liquid glass" visual
+> language: Haze backdrop blur, layered gradients, edge highlights and a new **Liquid Glass** theme
+> preset, with a translucent fallback on Android 12 and below.
+>
+> Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). Upstream copyright remains
+> with the RikkaHub authors; see `LICENSE` and the per-file modification notices.
+
 <div align="center">
   <img src="docs/icon.png" alt="App Icon" width="100" />
   <h1>RikkaHub</h1>

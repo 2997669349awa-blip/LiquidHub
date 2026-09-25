@@ -11,3 +11,6 @@ local.properties
 .cursor
 .history
 .kotlin
+
+# Firebase config is supplied per-build, never commit it
+app/google-services.json

@@ -1,3 +1,7 @@
+// Modified by AI Hello World on 2026-09-25.
+// This file is part of LiquidHub, a fork of RikkaHub.
+// Licensed under AGPL-3.0.
+
 package me.rerere.rikkahub.ui.pages.chat
 
 import android.net.Uri
@@ -6,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerState
@@ -46,6 +51,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dokar.sonner.ToastType
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.Job
@@ -61,6 +68,7 @@ import me.rerere.hugeicons.stroke.LeftToRightListBullet
 import me.rerere.hugeicons.stroke.Menu03
 import me.rerere.hugeicons.stroke.MessageAdd01
 import me.rerere.rikkahub.R
+import me.rerere.rikkahub.data.datastore.BackgroundEffectType
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.findProvider
 import me.rerere.rikkahub.data.datastore.getCurrentAssistant
@@ -77,6 +85,8 @@ import me.rerere.rikkahub.ui.components.ai.FilesPicker
 import me.rerere.rikkahub.ui.components.ai.SearchMode
 import me.rerere.rikkahub.ui.components.ai.completion.WorkspaceCompletionProvider
 import me.rerere.rikkahub.ui.components.ai.rememberChatAttachmentPickerActions
+import me.rerere.rikkahub.ui.components.ui.LiquidGlassMode
+import me.rerere.rikkahub.ui.components.ui.liquidGlassHost
 import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.ui.context.LocalToaster
 import me.rerere.rikkahub.ui.context.Navigator
@@ -319,6 +329,7 @@ private fun ChatPageContent(
                     conversation = conversation,
                     bigScreen = bigScreen,
                     drawerState = drawerState,
+                    hazeState = hazeState,
                     previewMode = previewMode,
                     onNewChat = {
                         navigateToChatPage(navController)
@@ -623,6 +634,7 @@ private fun TopBar(
     settings: Settings,
     conversation: Conversation,
     drawerState: DrawerState,
+    hazeState: HazeState,
     bigScreen: Boolean,
     previewMode: Boolean,
     onClickMenu: () -> Unit,
@@ -636,6 +648,16 @@ private fun TopBar(
     }
 
     TopAppBar(
+        modifier = Modifier.liquidGlassHost(
+            input = HazeInput.Sources(hazeState)
+                .takeIf { settings.displaySetting.enableBlurEffect },
+            shape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp),
+            tint = MaterialTheme.colorScheme.surfaceContainerLow,
+            mode = when (settings.displaySetting.backgroundEffectType) {
+                BackgroundEffectType.BLUR -> LiquidGlassMode.BLUR
+                BackgroundEffectType.GLASS -> LiquidGlassMode.GLASS
+            },
+        ),
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
         navigationIcon = {
             if (!bigScreen) {

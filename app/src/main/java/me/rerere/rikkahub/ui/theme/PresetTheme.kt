@@ -1,3 +1,7 @@
+// Modified by AI Hello World on 2026-09-25.
+// This file is part of LiquidHub, a fork of RikkaHub.
+// Licensed under AGPL-3.0.
+
 package me.rerere.rikkahub.ui.theme
 
 import androidx.compose.material3.ColorScheme
@@ -5,6 +9,7 @@ import androidx.compose.runtime.Composable
 import me.rerere.rikkahub.ui.theme.presets.AutumnThemePreset
 import me.rerere.rikkahub.ui.theme.presets.BlackThemePreset
 import me.rerere.rikkahub.ui.theme.presets.ClaudeThemePreset
+import me.rerere.rikkahub.ui.theme.presets.LiquidGlassThemePreset
 import me.rerere.rikkahub.ui.theme.presets.MinimalThemePreset
 import me.rerere.rikkahub.ui.theme.presets.OceanThemePreset
 import me.rerere.rikkahub.ui.theme.presets.SakuraThemePreset
@@ -30,6 +35,7 @@ val PresetThemes by lazy {
         BlackThemePreset,
         MinimalThemePreset,
         ClaudeThemePreset,
+        LiquidGlassThemePreset,
     )
 }
 
