@@ -350,12 +350,12 @@
   </div>
 
   <script>
-    // 本地预览走仓库内 APK；GitHub Pages 上没有该文件，回退到 Release 资源。
+    // 本地预览走仓库内 APK；GitHub Pages 等线上环境直接指向 Release 资源。
     var RELEASE_APK = 'https://github.com/2997669349awa-blip/LiquidHub/releases/download/v0.1.0-data/liquidhub-universal-debug.apk';
-    var apkLink = document.getElementById('apkLink');
-    fetch('downloads/liquidhub-universal-debug.apk', { method: 'HEAD' })
-      .then(function (r) { if (!r.ok) apkLink.href = RELEASE_APK; })
-      .catch(function () { apkLink.href = RELEASE_APK; });
+    var isLocalPreview = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.hostname);
+    if (!isLocalPreview) {
+      document.getElementById('apkLink').href = RELEASE_APK;
+    }
 
     // 非 Android 访问时提示仅支持安卓
     var ua = navigator.userAgent || '';
