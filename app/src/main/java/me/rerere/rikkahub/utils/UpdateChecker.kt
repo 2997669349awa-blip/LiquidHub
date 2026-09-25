@@ -1,3 +1,9 @@
+// Modified by AI Hello World on 2026-09-25.
+// This file is part of LiquidHub, a fork of RikkaHub.
+// Licensed under AGPL-3.0.
+// The update source points at the fork's own manifest so it never offers the
+// upstream RikkaHub build.
+
 package me.rerere.rikkahub.utils
 
 import android.app.DownloadManager
@@ -21,7 +27,7 @@ import me.rerere.rikkahub.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
-private const val API_URL = "https://updates.rikka-ai.com/"
+private const val API_URL = "https://2997669349awa-blip.github.io/LiquidHub/updates.json"
 
 class UpdateChecker(
     private val client: OkHttpClient,
@@ -46,7 +52,7 @@ class UpdateChecker(
                             .get()
                             .addHeader(
                                 "User-Agent",
-                                "RikkaHub ${BuildConfig.VERSION_NAME} #${BuildConfig.VERSION_CODE}"
+                                "LiquidHub ${BuildConfig.VERSION_NAME} #${BuildConfig.VERSION_CODE}"
                             )
                             .build()
                     ).await()

@@ -1,3 +1,9 @@
+// Modified by AI Hello World on 2026-09-25.
+// This file is part of LiquidHub, a fork of RikkaHub.
+// Licensed under AGPL-3.0.
+// The rootfs install dialog offers several minimal distributions instead of a
+// single hard-coded Ubuntu image.
+
 package me.rerere.rikkahub.ui.pages.extensions.workspace
 
 import android.content.Intent
@@ -8,6 +14,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +49,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -560,6 +568,7 @@ private fun InstallRootfsDialog(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
+    var selectedPresetId by rememberSaveable(workspace.id) { mutableStateOf(ROOTFS_PRESETS.first().id) }
     var url by rememberSaveable(workspace.id) { mutableStateOf(DEFAULT_ROOTFS_URL) }
 
     AlertDialog(
@@ -572,6 +581,21 @@ private fun InstallRootfsDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    ROOTFS_PRESETS.forEach { preset ->
+                        FilterChip(
+                            selected = preset.id == selectedPresetId,
+                            onClick = {
+                                selectedPresetId = preset.id
+                                url = preset.urlForCurrentAbi()
+                            },
+                            label = { Text(preset.label) },
+                        )
+                    }
+                }
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
@@ -979,5 +1003,41 @@ internal fun String.toShellStatusLabel(): String = when (this) {
     else -> lowercase()
 }
 
-private const val DEFAULT_ROOTFS_URL =
-    "https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-arm64.tar.gz"
+private data class RootfsPreset(
+    val id: String,
+    val label: String,
+    val arm64Url: String,
+    val x86Url: String,
+)
+
+/**
+ * 可选的精简发行版镜像（体积小、官方源、真实可用）。
+ * 安装器已支持 tar.gz 与 tar.xz；无 bash 的发行版由 runner 回退到 /bin/sh。
+ */
+private val ROOTFS_PRESETS = listOf(
+    RootfsPreset(
+        id = "ubuntu",
+        label = "Ubuntu 24.04",
+        arm64Url = "https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-arm64.tar.gz",
+        x86Url = "https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-amd64.tar.gz",
+    ),
+    RootfsPreset(
+        id = "debian",
+        label = "Debian 12",
+        arm64Url = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-arm64.tar.xz",
+        x86Url = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.tar.xz",
+    ),
+    RootfsPreset(
+        id = "alpine",
+        label = "Alpine 3.20",
+        arm64Url = "https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/aarch64/alpine-minirootfs-3.20.9-aarch64.tar.gz",
+        x86Url = "https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/x86_64/alpine-minirootfs-3.20.9-x86_64.tar.gz",
+    ),
+)
+
+private fun RootfsPreset.urlForCurrentAbi(): String {
+    val firstAbi = android.os.Build.SUPPORTED_ABIS.firstOrNull()?.lowercase().orEmpty()
+    return if (firstAbi.contains("arm")) arm64Url else x86Url
+}
+
+private val DEFAULT_ROOTFS_URL: String = ROOTFS_PRESETS.first().urlForCurrentAbi()

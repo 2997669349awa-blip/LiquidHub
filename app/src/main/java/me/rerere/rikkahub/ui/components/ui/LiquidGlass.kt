@@ -40,12 +40,16 @@ import me.rerere.rikkahub.ui.theme.LocalDarkMode
 object LiquidGlassDefaults {
     /** 连续大圆角，接近 iOS 26 液态玻璃的轮廓。 */
     val Shape: RoundedCornerShape = RoundedCornerShape(28.dp)
-    const val TintAlpha: Float = 0.55f
+    const val TintAlpha: Float = 0.62f
 
     /** Android < 12 无系统级模糊，回退为更实的半透明纯色以保证可读性。 */
     const val FallbackAlpha: Float = 0.92f
-    const val BorderAlpha: Float = 0.34f
-    const val HighlightAlpha: Float = 0.12f
+    const val BorderAlpha: Float = 0.42f
+    const val HighlightAlpha: Float = 0.18f
+
+    /** 玻璃折射/模糊强度，数值越大越明显。 */
+    val BlurRadius: Dp = 26.dp
+    const val GlassDepth: Float = 0.55f
 
     @Composable
     @ReadOnlyComposable
@@ -104,8 +108,8 @@ fun Modifier.liquidGlassHost(
                         ) {
                             optics(
                                 GlassDefaults.optics.copy(
-                                    blurRadius = OpticalSizeValue.Fixed(18.dp),
-                                    depth = OpticalSizeValue.Fixed(0.4f),
+                                    blurRadius = OpticalSizeValue.Fixed(LiquidGlassDefaults.BlurRadius),
+                                    depth = OpticalSizeValue.Fixed(LiquidGlassDefaults.GlassDepth),
                                 ),
                             )
                             shape(shape)
@@ -114,7 +118,7 @@ fun Modifier.liquidGlassHost(
 
                     LiquidGlassMode.BLUR -> Modifier.hazeBlur(
                         input = hazeInput,
-                        style = HazeBlurStyle.Material3 { blurRadius(18.dp) },
+                        style = HazeBlurStyle.Material3 { blurRadius(LiquidGlassDefaults.BlurRadius) },
                     )
                 }
             } else {

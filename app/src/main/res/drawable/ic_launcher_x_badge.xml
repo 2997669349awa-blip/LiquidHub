@@ -4,23 +4,36 @@
   This file is part of LiquidHub, a fork of RikkaHub.
   Licensed under AGPL-3.0.
 
-  二创标记：右下角 X 徽标。位于自适应图标安全区（中央 72x72）内，圆形遮罩下也不会被裁切。
+  二创标记：右下角圆角方形徽标 + 白色 X。
+  位于自适应图标安全区（中央 72x72、圆形遮罩半径 36）内，不会被裁切。
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
     <path
-        android:pathData="M70,70 m-12,0 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0"
-        android:fillColor="#FF7C5CFF" />
+        android:pathData="M62,58 H74 A4,4 0 0 1 78,62 V74 A4,4 0 0 1 74,78 H62 A4,4 0 0 1 58,74 V62 A4,4 0 0 1 62,58 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="58"
+                android:startY="58"
+                android:endX="78"
+                android:endY="78">
+                <item android:color="#FF7C5CFF" android:offset="0" />
+                <item android:color="#FF35D6F0" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
     <path
-        android:pathData="M70,70 m-12,0 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0"
-        android:strokeColor="#B3FFFFFF"
+        android:pathData="M62,58 H74 A4,4 0 0 1 78,62 V74 A4,4 0 0 1 74,78 H62 A4,4 0 0 1 58,74 V62 A4,4 0 0 1 62,58 Z"
+        android:strokeColor="#CCFFFFFF"
         android:strokeWidth="1.5" />
     <path
-        android:pathData="M64.5,64.5 L75.5,75.5 M75.5,64.5 L64.5,75.5"
+        android:pathData="M63.5,63.5 L72.5,72.5 M72.5,63.5 L63.5,72.5"
         android:strokeColor="#FFFFFFFF"
         android:strokeWidth="3"
         android:strokeLineCap="round" />

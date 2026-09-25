@@ -1,3 +1,8 @@
+// Modified by AI Hello World on 2026-09-25.
+// This file is part of LiquidHub, a fork of RikkaHub.
+// Licensed under AGPL-3.0.
+// Falls back to /bin/sh when the rootfs has no bash (e.g. Alpine).
+
 package me.rerere.workspace
 
 import java.io.File
@@ -92,6 +97,15 @@ class ProotShellRunner(
             }
         }
 
+        // 部分发行版（如 Alpine）不预装 bash，回退到 /bin/sh 以保证可用。
+        val hasBash = File(context.linuxDir, "bin/bash").isFile
+        val shell = if (hasBash) "/bin/bash" else "/bin/sh"
+        val shellArgs = if (hasBash) {
+            listOf("-l", "-c", SHELL_SCRIPT)
+        } else {
+            listOf("-c", SHELL_SCRIPT)
+        }
+
         command += listOf(
             "/usr/bin/env",
             "-i",
@@ -104,15 +118,11 @@ class ProotShellRunner(
             "CI=true",
             "NO_COLOR=1",
             "PAGER=cat",
-            "/bin/bash",
-            "-l",
-            "-c",
-            // 命令通过位置参数传入, 避免任何转义; eval "$2" 对命令文本只求值一次, 等价于 bash -c "$cmd"
-            "cd -- \"\$1\" && eval \"\$2\"",
-            "rikkahub",
-            context.prootCwd(),
-            context.command,
+            shell,
         )
+        command += shellArgs
+        // 命令通过位置参数传入, 避免任何转义; eval "$2" 对命令文本只求值一次
+        command += listOf("rikkahub", context.prootCwd(), context.command)
         return command
     }
 
@@ -131,6 +141,7 @@ class ProotShellRunner(
     private companion object {
         private const val PROOT_EXEC = "libproot_exec.so"
         private const val PROOT_LOADER = "libproot_loader.so"
+        private const val SHELL_SCRIPT = "cd -- \"\$1\" && eval \"\$2\""
         private val WORKSPACE_DIR = WorkspaceManager.ROOTFS_WORKSPACE_DIR
     }
 }

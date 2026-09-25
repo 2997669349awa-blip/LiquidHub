@@ -1,3 +1,7 @@
+// Modified by AI Hello World on 2026-09-25.
+// This file is part of LiquidHub, a fork of RikkaHub.
+// Licensed under AGPL-3.0.
+
 package me.rerere.rikkahub.data.model
 
 import kotlinx.serialization.SerialName
@@ -43,7 +47,7 @@ data class Assistant(
     val workspaceId: Uuid? = null,
     val background: String? = null, // 聊天页背景图地址(本地文件 URI 或网络 URL), 为 null 时无背景
     val backgroundOpacity: Float = 1.0f, // 背景图不透明度(0~1)
-    val useGradientBackground: Boolean = false, // 开启后聊天页使用动态渐变背景
+    val useGradientBackground: Boolean = true, // 开启后聊天页使用动态渐变背景（LiquidHub 默认开启，让玻璃效果可见）
     val modeInjectionIds: Set<Uuid> = emptySet(),      // 关联的模式注入 ID
     val lorebookIds: Set<Uuid> = emptySet(),            // 关联的 Lorebook ID
     val enabledSkills: Set<String> = emptySet(),        // 启用的 skill 名称列表
