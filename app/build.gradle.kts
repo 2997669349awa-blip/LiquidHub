@@ -1,3 +1,9 @@
+// Modified by AI Hello World on 2026-09-25.
+// This file is part of LiquidHub, a fork of RikkaHub.
+// Licensed under AGPL-3.0.
+// applicationId is changed to the fork's own package; the Kotlin namespace stays
+// as upstream so source paths and serialized data keep working.
+
 import com.android.build.api.dsl.Packaging
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
@@ -23,11 +29,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "me.rerere.rikkahub"
+        applicationId = "teto.rikkahub.X"
         minSdk = 26
         targetSdk = 37
         versionCode = 189
-        versionName = "2.5.4"
+        versionName = "V0.1.0Data"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
