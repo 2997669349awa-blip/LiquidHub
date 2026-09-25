@@ -259,7 +259,8 @@
       </p>
 
       <div class="download-area" id="download">
-        <a class="btn-download" id="apkLink" href="downloads/liquidhub-universal-debug.apk" download>
+        <a class="btn-download" id="apkLink"
+           href="https://github.com/2997669349awa-blip/LiquidHub/releases/download/v0.1.0-data/liquidhub-universal-debug.apk">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 3v12" />
@@ -271,7 +272,7 @@
 
         <div class="meta">
           <span>版本 <b>V0.1.0Data</b></span>
-          <span>大小 <b id="apkSize">约 90 MB</b></span>
+          <span>大小 <b id="apkSize">约 93 MB</b></span>
           <span>架构 <b>arm64-v8a / x86_64 / 通用</b></span>
           <span>系统 <b>Android 8.0+</b></span>
         </div>
@@ -350,17 +351,6 @@
   </div>
 
   <script>
-    // 读取真实 APK 大小并在页面展示
-    fetch('downloads/liquidhub-universal-debug.apk', { method: 'HEAD' })
-      .then(function (r) {
-        var len = r.headers.get('content-length');
-        if (len) {
-          document.getElementById('apkSize').textContent =
-            (Number(len) / 1024 / 1024).toFixed(1) + ' MB';
-        }
-      })
-      .catch(function () {});
-
     // 非 Android 访问时提示仅支持安卓
     var ua = navigator.userAgent || '';
     var isAndroid = /Android/i.test(ua);
