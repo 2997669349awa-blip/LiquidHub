@@ -259,7 +259,7 @@
       </p>
 
       <div class="download-area" id="download">
-        <a class="btn-download" id="apkLink" href="downloads/liquidhub-universal-debug.apk">
+        <a class="btn-download" id="apkLink" href="downloads/liquidhub-universal-release.apk">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 3v12" />
@@ -271,7 +271,7 @@
 
         <div class="meta">
           <span>版本 <b>V0.1.0Data</b></span>
-          <span>大小 <b id="apkSize">约 93 MB</b></span>
+          <span>大小 <b id="apkSize">约 48 MB</b></span>
           <span>架构 <b>arm64-v8a / x86_64 / 通用</b></span>
           <span>系统 <b>Android 8.0+</b></span>
         </div>
@@ -282,8 +282,7 @@
         </div>
 
         <div class="notice" id="platformNotice">
-          提示：这是 debug 签名版本，安装时需在系统设置中允许「安装未知来源应用」。
-          下载目前仅提供 Android 版。
+          提示：首次安装需在系统设置中允许「安装未知来源应用」。下载目前仅提供 Android 版。
         </div>
       </div>
     </header>
@@ -351,7 +350,7 @@
 
   <script>
     // 本地预览走仓库内 APK；GitHub Pages 等线上环境直接指向 Release 资源。
-    var RELEASE_APK = 'https://github.com/2997669349awa-blip/LiquidHub/releases/download/v0.1.0-data/liquidhub-universal-debug.apk';
+    var RELEASE_APK = 'https://github.com/2997669349awa-blip/LiquidHub/releases/download/v0.1.0-data/liquidhub-universal-release.apk';
     var isLocalPreview = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.hostname);
     if (!isLocalPreview) {
       document.getElementById('apkLink').href = RELEASE_APK;
