@@ -1,3 +1,8 @@
+// Modified by AI Hello World on 2026-09-25.
+// This file is part of LiquidHub, a fork of RikkaHub.
+// Licensed under AGPL-3.0.
+// The default theme/blur values are changed so the liquid glass look is on by default.
+
 package me.rerere.rikkahub.data.datastore
 
 import android.content.Context
@@ -295,8 +300,8 @@ class SettingsStore(
                 } ?: emptyList(),
                 providers = JsonInstant.decodeFromString(preferences[PROVIDERS] ?: "[]"),
                 assistants = JsonInstant.decodeFromString(preferences[ASSISTANTS] ?: "[]"),
-                dynamicColor = preferences[DYNAMIC_COLOR] != false,
-                themeId = preferences[THEME_ID] ?: PresetThemes[0].id,
+                dynamicColor = preferences[DYNAMIC_COLOR] == true,
+                themeId = preferences[THEME_ID] ?: "liquid_glass",
                 customThemes = preferences[CUSTOM_THEMES]?.let {
                     JsonInstant.decodeFromString(it)
                 } ?: emptyList(),
@@ -562,8 +567,8 @@ class SettingsStore(
 data class Settings(
     @Transient
     val init: Boolean = false,
-    val dynamicColor: Boolean = true,
-    val themeId: String = PresetThemes[0].id,
+    val dynamicColor: Boolean = false,
+    val themeId: String = "liquid_glass",
     val customThemes: List<CustomTheme> = emptyList(),
     val developerMode: Boolean = false,
     val displaySetting: DisplaySetting = DisplaySetting(),
@@ -680,8 +685,8 @@ data class DisplaySetting(
     val sendOnEnter: Boolean = false,
     val enableAutoScroll: Boolean = true,
     val enableLatexRendering: Boolean = true,
-    val enableBlurEffect: Boolean = false,
-    val backgroundEffectType: BackgroundEffectType = BackgroundEffectType.BLUR,
+    val enableBlurEffect: Boolean = true,
+    val backgroundEffectType: BackgroundEffectType = BackgroundEffectType.GLASS,
     val chatFontFamily: ChatFontFamily = ChatFontFamily.DEFAULT,
     val chatCustomFontPath: String = "",
     val chatCustomFontName: String = "",
