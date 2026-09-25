@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Modified by AI Hello World on 2026-09-25.
+  This file is part of LiquidHub, a fork of RikkaHub.
+  Licensed under AGPL-3.0.
+
+  在原版前景之上叠加二创 X 角标。
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@mipmap/ic_launcher_foreground" />
+    <item android:drawable="@drawable/ic_launcher_x_badge" />
+</layer-list>

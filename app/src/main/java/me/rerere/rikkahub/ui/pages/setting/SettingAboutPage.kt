@@ -1,3 +1,7 @@
+// Modified by AI Hello World on 2026-09-25.
+// This file is part of LiquidHub, a fork of RikkaHub.
+// Licensed under AGPL-3.0.
+
 package me.rerere.rikkahub.ui.pages.setting
 
 import me.rerere.hugeicons.HugeIcons
@@ -40,7 +44,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import me.rerere.rikkahub.BuildConfig
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.ui.components.nav.BackButton
@@ -149,7 +152,7 @@ fun SettingAboutPage() {
                             ),
                             leadingContent = { Icon(HugeIcons.Code, null) },
                             supportingContent = {
-                                Text("${BuildConfig.VERSION_NAME} / ${BuildConfig.VERSION_CODE}")
+                                Text("V0.1.0Data")
                             },
                             headlineContent = { Text(stringResource(R.string.about_page_version)) },
                         )
@@ -174,9 +177,9 @@ fun SettingAboutPage() {
                             headlineContent = { Text(stringResource(R.string.about_page_website)) },
                         )
                         item(
-                            onClick = { context.openUrl("https://github.com/rikkahub/rikkahub") },
+                            onClick = { context.openUrl("https://github.com/2997669349awa-blip/LiquidHub") },
                             leadingContent = { Icon(HugeIcons.Github, null) },
-                            supportingContent = { Text("https://github.com/rikkahub/rikkahub") },
+                            supportingContent = { Text("https://github.com/2997669349awa-blip/LiquidHub") },
                             headlineContent = { Text(stringResource(R.string.about_page_github)) },
                         )
                         item(

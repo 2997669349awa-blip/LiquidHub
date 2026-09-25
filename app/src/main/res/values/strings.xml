@@ -1,11 +1,16 @@
 <?xml version='1.0' encoding='UTF-8'?>
+<!--
+  Modified by AI Hello World on 2026-09-25.
+  This file is part of LiquidHub, a fork of RikkaHub.
+  Licensed under AGPL-3.0.
+-->
 <resources>
   <string name="about_page_github">Github</string>
   <string name="about_page_license">License</string>
   <string name="about_page_system">System</string>
   <string name="about_page_title">About</string>
   <string name="about_page_version">Version</string>
-  <string name="about_page_website">Website</string>
+  <string name="about_page_website">Original Website</string>
   <string name="add">Add</string>
   <string name="app_name">RikkaHub</string>
   <string name="asr_button_content_description">Speech Recognition</string>
@@ -322,7 +327,7 @@
   <string name="donate_page_donation_methods">Donation Methods</string>
   <string name="donate_page_kofi_desc">For Global Users</string>
   <string name="donate_page_sponsor_list">Sponsor List</string>
-  <string name="donate_page_title">Donate</string>
+  <string name="donate_page_title">Sponsor Original</string>
   <string name="edit">Edit</string>
   <string name="editing">Editing</string>
   <string name="emoji_picker_search_placeholder">Search emojis...</string>
@@ -859,8 +864,8 @@
   <string name="setting_page_preferences_network_auto_retry_desc">Retry model requests up to 3 times when network errors occur.</string>
   <string name="setting_page_documentation">Documentation</string>
   <string name="setting_page_documentation_desc">View app usage instructions and help documentation</string>
-  <string name="setting_page_donate">Donate</string>
-  <string name="setting_page_donate_desc">If you like it, sponsor the author\'s work</string>
+  <string name="setting_page_donate">Sponsor Original</string>
+  <string name="setting_page_donate_desc">If you like it, sponsor the original author\'s work</string>
   <string name="setting_page_dynamic_color">Dynamic Color</string>
   <string name="setting_page_dynamic_color_desc">Generate the app theme colors dynamically from your wallpaper</string>
   <string name="setting_page_extensions">Extensions</string>
@@ -893,7 +898,7 @@
   <string name="setting_page_sponsor_alert_confirm">Donate</string>
   <string name="setting_page_sponsor_alert_desc">You have launched the app over 100 times! If you enjoy using it, please consider supporting the developer.</string>
   <string name="setting_page_sponsor_alert_dismiss">Not Now</string>
-  <string name="setting_page_sponsor_alert_title">Support the Developer</string>
+  <string name="setting_page_sponsor_alert_title">Support the Original Developer</string>
   <string name="setting_page_theme_setting">Theme</string>
   <string name="setting_page_theme_setting_desc">Customize app color scheme</string>
   <string name="setting_theme_page_preset_themes">Preset Themes</string>
