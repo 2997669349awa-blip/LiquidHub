@@ -259,8 +259,7 @@
       </p>
 
       <div class="download-area" id="download">
-        <a class="btn-download" id="apkLink"
-           href="https://github.com/2997669349awa-blip/LiquidHub/releases/download/v0.1.0-data/liquidhub-universal-debug.apk">
+        <a class="btn-download" id="apkLink" href="downloads/liquidhub-universal-debug.apk">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 3v12" />
@@ -351,6 +350,13 @@
   </div>
 
   <script>
+    // 本地预览走仓库内 APK；GitHub Pages 上没有该文件，回退到 Release 资源。
+    var RELEASE_APK = 'https://github.com/2997669349awa-blip/LiquidHub/releases/download/v0.1.0-data/liquidhub-universal-debug.apk';
+    var apkLink = document.getElementById('apkLink');
+    fetch('downloads/liquidhub-universal-debug.apk', { method: 'HEAD' })
+      .then(function (r) { if (!r.ok) apkLink.href = RELEASE_APK; })
+      .catch(function () { apkLink.href = RELEASE_APK; });
+
     // 非 Android 访问时提示仅支持安卓
     var ua = navigator.userAgent || '';
     var isAndroid = /Android/i.test(ua);
