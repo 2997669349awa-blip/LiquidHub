@@ -1,2 +1,3 @@
-# APK 构建产物体积过大，不纳入版本库；发布时改用 GitHub Releases 挂载。
+# APK 不纳入 master 分支；由 gh-pages 分支单独托管，供 Pages 直接下载。
+*.apk
 downloads/
