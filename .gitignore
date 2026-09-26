@@ -13,5 +13,8 @@ local.properties
 .kotlin
 .monkeycode/
 
+# Local release signing material (keystore + passwords), never commit
+signature/
+
 # Firebase config is supplied per-build, never commit it
 app/google-services.json

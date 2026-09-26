@@ -117,25 +117,46 @@ install_pkgs() {
     log "desktop already installed, skipping"
     return 0
   fi
+  RC=0
   if command -v apk >/dev/null 2>&1; then
     log "Alpine: installing desktop packages"
-    apk add --no-cache ca-certificates xvfb x11vnc fluxbox chromium novnc websockify xdotool imagemagick scrot dbus \
-      font-noto font-noto-cjk bash coreutils
+    apk add --no-cache --allow-untrusted ca-certificates xvfb x11vnc fluxbox chromium novnc websockify xdotool imagemagick scrot dbus \
+      font-noto font-noto-cjk bash coreutils || RC=1
   elif command -v apt-get >/dev/null 2>&1; then
     log "Debian/Ubuntu: installing desktop packages"
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update -y -o Acquire::Retries=3
+    # 上一次安装若被中断，apt/dpkg 进程会残留在 rootfs 里一直占着 dpkg 锁，
+    # 导致后续安装一律 "Could not get lock"。先杀掉残留进程并清掉锁文件。
+    for d in /proc/[0-9]*; do
+      c=$(cat "${'$'}d/comm" 2>/dev/null)
+      case "${'$'}c" in
+        apt-get|apt|dpkg|unattended-upgrade) kill -9 "${'$'}{d#/proc/}" 2>/dev/null ;;
+      esac
+    done
+    sleep 1
+    rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock /var/lib/apt/lists/lock 2>/dev/null
+    dpkg --configure -a >/dev/null 2>&1 || true
+    apt-get update -y -o Acquire::Retries=3 || RC=1
     apt-get install -y --no-install-recommends ca-certificates xvfb x11vnc fluxbox xdotool imagemagick scrot \
-      dbus-x11 novnc websockify fonts-noto-cjk
-    apt-get install -y --no-install-recommends chromium 2>/dev/null \
-      || apt-get install -y --no-install-recommends chromium-browser 2>/dev/null \
-      || log "WARN: chromium unavailable in this distro, install a browser manually"
+      dbus-x11 novnc websockify fonts-noto-cjk || RC=1
+    # Ubuntu arm64 的 chromium 只有 snap 包，apt 装不上；依次退回可用的轻量浏览器
+    if ! command -v chromium >/dev/null 2>&1 && ! command -v chromium-browser >/dev/null 2>&1; then
+      apt-get install -y --no-install-recommends chromium 2>/dev/null \
+        || apt-get install -y --no-install-recommends chromium-browser 2>/dev/null \
+        || apt-get install -y --no-install-recommends epiphany-browser 2>/dev/null \
+        || apt-get install -y --no-install-recommends falkon 2>/dev/null \
+        || log "WARN: no chromium/epiphany/falkon available in this distro"
+    fi
     apt-get clean
     rm -rf /var/lib/apt/lists/* 2>/dev/null
   elif command -v pacman >/dev/null 2>&1; then
     log "Arch: installing desktop packages"
+    # Arch 的包用 GPG 签名，老 rootfs 的 keyring 过期会报 key expired / unknown trust
+    pacman-key --init >/dev/null 2>&1 || true
+    pacman-key --populate archlinuxarm >/dev/null 2>&1 || pacman-key --populate archlinux >/dev/null 2>&1 || true
+    pacman -Sy --noconfirm --needed archlinux-keyring >/dev/null 2>&1 || true
     pacman -Sy --noconfirm --needed ca-certificates xorg-server-xvfb x11vnc fluxbox chromium novnc websockify xdotool \
-      imagemagick scrot dbus noto-fonts
+      imagemagick scrot dbus noto-fonts || RC=1
     pacman -Scc --noconfirm 2>/dev/null
   else
     log "ERROR: unsupported package manager"
@@ -145,6 +166,10 @@ install_pkgs() {
   command -v update-ca-certificates >/dev/null 2>&1 && update-ca-certificates 2>/dev/null || true
   command -v update-ca-trust >/dev/null 2>&1 && update-ca-trust 2>/dev/null || true
   command -v trust >/dev/null 2>&1 && trust extract-compat 2>/dev/null || true
+  if [ "${'$'}RC" -ne 0 ]; then
+    log "ERROR: desktop install failed (see the apt/apk/pacman messages above)"
+    return 1
+  fi
   log "install done"
 }
 
@@ -192,18 +217,23 @@ start() {
 
 browser() {
   BIN=""
-  if command -v chromium >/dev/null 2>&1; then BIN=chromium
-  elif command -v chromium-browser >/dev/null 2>&1; then BIN=chromium-browser
-  fi
-  if [ -z "${'$'}BIN" ]; then log "ERROR: chromium not installed"; return 3; fi
+  for c in chromium chromium-browser epiphany epiphany-browser falkon firefox firefox-esr; do
+    if command -v "${'$'}c" >/dev/null 2>&1; then BIN="${'$'}c"; break; fi
+  done
+  if [ -z "${'$'}BIN" ]; then log "ERROR: no browser installed"; return 3; fi
   if pgrep -f "${'$'}BIN" >/dev/null 2>&1; then
     "${'$'}BIN" "${'$'}{1:-about:blank}" >/dev/null 2>&1
     log "BROWSER_NAVIGATED"
     return 0
   fi
-  "${'$'}BIN" --no-sandbox --disable-dev-shm-usage --disable-gpu --no-first-run \
-    --user-data-dir="${'$'}HOME/.chromium" --window-size=1280,720 --window-position=0,0 \
-    "${'$'}{1:-about:blank}" >"${'$'}RUNDIR/chromium.log" 2>&1 &
+  case "${'$'}BIN" in
+    chromium|chromium-browser)
+      "${'$'}BIN" --no-sandbox --disable-dev-shm-usage --disable-gpu --no-first-run \
+        --user-data-dir="${'$'}HOME/.chromium" --window-size=1280,720 --window-position=0,0 \
+        "${'$'}{1:-about:blank}" >"${'$'}RUNDIR/browser.log" 2>&1 & ;;
+    *)
+      "${'$'}BIN" "${'$'}{1:-about:blank}" >"${'$'}RUNDIR/browser.log" 2>&1 & ;;
+  esac
   echo ${'$'}! > "${'$'}RUNDIR/chromium.pid"
   log "BROWSER_STARTED"
 }
