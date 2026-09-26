@@ -1,6 +1,7 @@
 package me.rerere.rikkahub
 
 import android.app.Application
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -54,13 +55,29 @@ const val WEB_SERVER_NOTIFICATION_CHANNEL_ID = "web_server"
 class RikkaHubApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        // Restore files and settings before eager Koin singletons or workers can access them.
-        try {
-            val restored = runBlocking(Dispatchers.IO) {
-                BackupManager.applyPendingRestore(this@RikkaHubApp, JsonInstant)
+        // 提前在 IO 线程触发 SharedPreferences 磁盘加载, 避免首个界面读取时在主线程同步等待
+        Thread {
+            runCatching {
+                getSharedPreferences("rikkahub.preferences", Context.MODE_PRIVATE)
+                    .getString("lastConversationId", null)
             }
-            if (restored) {
-                Toast.makeText(this, R.string.backup_page_restore_success, Toast.LENGTH_LONG).show()
+        }.start()
+        // Restore files and settings before eager Koin singletons or workers can access them.
+        // 仅当确实存在待恢复/中断的恢复时才阻塞主线程, 否则直接跳过 (绝大多数启动)
+        try {
+            val restoreRoot = File(noBackupFilesDir, "backup-restore")
+            val needsRestore = File(restoreRoot, "pending").isDirectory || (
+                restoreRoot.isDirectory && restoreRoot.listFiles()?.any {
+                    it.name.startsWith("completed-") || it.name.startsWith("preparing-")
+                } == true
+                )
+            if (needsRestore) {
+                val restored = runBlocking(Dispatchers.IO) {
+                    BackupManager.applyPendingRestore(this@RikkaHubApp, JsonInstant)
+                }
+                if (restored) {
+                    Toast.makeText(this, R.string.backup_page_restore_success, Toast.LENGTH_LONG).show()
+                }
             }
         } catch (e: RestoreFailedException) {
             Log.e(TAG, "Backup restore rolled back", e)

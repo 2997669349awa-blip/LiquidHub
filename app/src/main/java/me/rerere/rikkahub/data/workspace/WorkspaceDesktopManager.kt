@@ -48,15 +48,18 @@ class WorkspaceDesktopManager internal constructor(
         sessions.remove(root)?.finishIfRunning()
     }
 
-    private fun sessionFor(root: String, shellCompatibilityMode: Boolean): TerminalSession =
-        sessions.getOrPut(root) {
-            createWorkspaceTerminalSession(
-                context = appContext,
-                root = root,
-                client = WorkspaceTerminalSessionClient(appContext, onTitleUpdated = {}, onFinished = {}),
-                shellCompatibilityMode = shellCompatibilityMode,
-            )
-        }
+    private fun sessionFor(root: String, shellCompatibilityMode: Boolean): TerminalSession {
+        val existing = sessions[root]
+        if (existing != null && existing.isRunning) return existing
+        // 会话已退出时重建，否则后续写入会落到一个已结束的 session 上而静默失效
+        existing?.finishIfRunning()
+        return createWorkspaceTerminalSession(
+            context = appContext,
+            root = root,
+            client = WorkspaceTerminalSessionClient(appContext, onTitleUpdated = {}, onFinished = {}),
+            shellCompatibilityMode = shellCompatibilityMode,
+        ).also { sessions[root] = it }
+    }
 
     companion object {
         const val SCRIPT_PATH = ".liquidhub/desktop.sh"
@@ -91,21 +94,30 @@ find_novnc() {
 }
 
 install_pkgs() {
+  if command -v Xvfb >/dev/null 2>&1 && command -v x11vnc >/dev/null 2>&1 && find_novnc; then
+    log "desktop already installed, skipping"
+    return 0
+  fi
   if command -v apk >/dev/null 2>&1; then
     log "Alpine: installing desktop packages"
     apk add --no-cache xvfb x11vnc fluxbox chromium novnc websockify xdotool imagemagick scrot dbus \
       font-noto font-noto-cjk bash coreutils
   elif command -v apt-get >/dev/null 2>&1; then
     log "Debian/Ubuntu: installing desktop packages"
-    DEBIAN_FRONTEND=noninteractive apt-get update -y
-    DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb x11vnc fluxbox xdotool imagemagick scrot \
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -y -o Acquire::Retries=3
+    apt-get install -y --no-install-recommends xvfb x11vnc fluxbox xdotool imagemagick scrot \
       dbus-x11 novnc websockify fonts-noto-cjk
-    apt-get install -y chromium 2>/dev/null || apt-get install -y chromium-browser 2>/dev/null \
+    apt-get install -y --no-install-recommends chromium 2>/dev/null \
+      || apt-get install -y --no-install-recommends chromium-browser 2>/dev/null \
       || log "WARN: chromium unavailable in this distro, install a browser manually"
+    apt-get clean
+    rm -rf /var/lib/apt/lists/* 2>/dev/null
   elif command -v pacman >/dev/null 2>&1; then
     log "Arch: installing desktop packages"
-    pacman -Sy --noconfirm xorg-server-xvfb x11vnc fluxbox chromium novnc websockify xdotool \
+    pacman -Sy --noconfirm --needed xorg-server-xvfb x11vnc fluxbox chromium novnc websockify xdotool \
       imagemagick scrot dbus noto-fonts
+    pacman -Scc --noconfirm 2>/dev/null
   else
     log "ERROR: unsupported package manager"
     return 1

@@ -727,6 +727,7 @@ sealed interface Screen : NavKey {
     @Serializable
     data class WorkspaceTerminal(val id: String) : Screen
 
+    @Serializable
     data class WorkspaceDesktop(val id: String) : Screen
 
     @Serializable

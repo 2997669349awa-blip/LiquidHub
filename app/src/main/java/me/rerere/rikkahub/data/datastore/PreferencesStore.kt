@@ -22,7 +22,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import io.pebbletemplates.pebble.PebbleEngine
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.retryWhen
@@ -457,6 +459,9 @@ class SettingsStore(
 
     val settingsFlow = settingsFlowRaw
         .distinctUntilChanged()
+        // 设置反序列化 (providers/assistants/themes 等 JSON 解析) 可能耗时数百毫秒,
+        // 放到 Default 线程执行, 避免冷启动时阻塞主线程
+        .flowOn(Dispatchers.Default)
         .toMutableStateFlow(scope, Settings.dummy())
 
     suspend fun update(settings: Settings) {
