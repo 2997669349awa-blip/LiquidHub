@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Refresh01
 import me.rerere.rikkahub.data.workspace.WorkspaceDesktopManager
+import me.rerere.rikkahub.BuildConfig
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.theme.CustomColors
 import org.koin.androidx.compose.koinViewModel
@@ -154,6 +155,11 @@ fun WorkspaceDesktopPage(id: String) {
                             "桌面的画面会直接显示在这里（App 内置 VNC 客户端，不经过网页）。" +
                             "AI 也能对同一桌面截图、点击、输入。装坏了可以点「重装」。",
                         style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "构建版本：${BuildConfig.BUILD_STAMP}",
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     InstallLog(state = state, onLoadLogs = { vm.loadLogs() })

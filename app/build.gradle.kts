@@ -8,6 +8,9 @@ import com.android.build.api.dsl.Packaging
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.io.FileInputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.Properties
 
 plugins {
@@ -87,11 +90,21 @@ android {
             }
             buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}\"")
             buildConfigField("String", "VERSION_CODE", "\"${android.defaultConfig.versionCode}\"")
+            buildConfigField(
+                "String",
+                "BUILD_STAMP",
+                "\"${SimpleDateFormat("MMdd-HHmm", Locale.US).format(Date())}\""
+            )
         }
         debug {
             applicationIdSuffix = ".debug"
             buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}\"")
             buildConfigField("String", "VERSION_CODE", "\"${android.defaultConfig.versionCode}\"")
+            buildConfigField(
+                "String",
+                "BUILD_STAMP",
+                "\"${SimpleDateFormat("MMdd-HHmm", Locale.US).format(Date())}\""
+            )
         }
     }
     compileOptions {

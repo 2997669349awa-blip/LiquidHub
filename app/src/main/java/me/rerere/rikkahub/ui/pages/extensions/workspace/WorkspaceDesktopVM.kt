@@ -116,7 +116,7 @@ class WorkspaceDesktopVM(
 
     private fun runAction(action: String, timeoutMillis: Long) {
         if (_state.value.busy) return
-        if (action == "install") resetInstallProgress()
+        if (action == "install" || action == "reinstall") resetInstallProgress()
         _state.update { it.copy(busy = true, error = null) }
         viewModelScope.launch {
             try {
@@ -125,22 +125,24 @@ class WorkspaceDesktopVM(
                     desktopManager.runAction(id, action)
                     delay(2_000)
                 } else {
-                    if (action == "install") {
-                        appendLog("[开始安装环境，下面是实时输出]\n")
-                        pushLog()
-                    }
+                    appendLog("[${if (action == "reinstall") "重装" else "安装"}环境] 开始，下面是实时输出\n")
+                    pushLog()
                     val script = "/workspace/${WorkspaceDesktopManager.SCRIPT_PATH}"
                     // apt/apk 在非 TTY 下会块缓冲输出，用 stdbuf 强制行缓冲，日志才能实时刷新
                     val run = "if command -v stdbuf >/dev/null 2>&1; then " +
                         "stdbuf -oL -eL sh $script $action; else sh $script $action; fi"
+                    val command = "if [ -f $script ]; then $run; else echo SCRIPT_MISSING; fi"
+                    appendLog("[命令] $command\n")
                     val result = repository.executeCommand(
                         id = id,
-                        command = "if [ -f $script ]; then $run; else echo SCRIPT_MISSING; fi",
+                        command = command,
                         timeoutMillis = timeoutMillis,
                         onOutput = ::onOutput,
                     )
                     flushLog(force = true)
-                    appendLog("\n[退出码 ${result.exitCode}]\n")
+                    appendLog(
+                        "\n[退出码 ${result.exitCode} · stdout ${result.stdout.length} 字 · stderr ${result.stderr.length} 字]\n"
+                    )
                     pushLog()
                     if (result.exitCode != 0) {
                         _state.update { it.copy(error = "安装失败（退出码 ${result.exitCode}），详见下方日志") }
@@ -152,6 +154,8 @@ class WorkspaceDesktopVM(
                 throw error
             } catch (error: Throwable) {
                 _state.update { it.copy(error = error.message ?: "执行失败") }
+                appendLog("\n[异常] ${error.message ?: error::class.java.simpleName}\n")
+                pushLog()
             } finally {
                 _state.update { it.copy(busy = false) }
             }
