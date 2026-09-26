@@ -123,7 +123,9 @@ class WorkspaceDesktopVM(
                 desktopManager.ensureScript(id)
                 if (action == "start" || action == "stop") {
                     desktopManager.runAction(id, action)
-                    delay(2_000)
+                    delay(2_500)
+                    // start 的输出走长驻终端会话，拿不到；改拉取服务日志（含 5900 端口/进程状态）
+                    if (action == "start") loadLogs()
                 } else {
                     appendLog("[${if (action == "reinstall") "重装" else "安装"}环境] 开始，下面是实时输出\n")
                     pushLog()

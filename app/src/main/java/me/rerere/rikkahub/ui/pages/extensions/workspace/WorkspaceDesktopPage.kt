@@ -4,6 +4,8 @@
 
 package me.rerere.rikkahub.ui.pages.extensions.workspace
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -35,15 +38,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.hugeicons.HugeIcons
+import me.rerere.hugeicons.stroke.ArrowLeft01
+import me.rerere.hugeicons.stroke.Cursor01
+import me.rerere.hugeicons.stroke.Cursor02
 import me.rerere.hugeicons.stroke.Refresh01
-import me.rerere.rikkahub.data.workspace.WorkspaceDesktopManager
 import me.rerere.rikkahub.BuildConfig
+import me.rerere.rikkahub.data.workspace.WorkspaceDesktopManager
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.theme.CustomColors
 import org.koin.androidx.compose.koinViewModel
@@ -62,6 +69,13 @@ private fun stageLabel(stage: DesktopStage): String = when (stage) {
 fun WorkspaceDesktopPage(id: String) {
     val vm: WorkspaceDesktopVM = koinViewModel(parameters = { parametersOf(id) })
     val state by vm.state.collectAsStateWithLifecycle()
+    var entered by remember { mutableStateOf(false) }
+
+    // 进入桌面：全屏显示
+    if (entered && state.running) {
+        FullScreenDesktop(onExit = { entered = false })
+        return
+    }
 
     Scaffold(
         topBar = {
@@ -94,7 +108,8 @@ fun WorkspaceDesktopPage(id: String) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -110,20 +125,26 @@ fun WorkspaceDesktopPage(id: String) {
                 ) {
                     Text("启动")
                 }
+                Button(
+                    enabled = !state.busy && state.running,
+                    onClick = { entered = true },
+                ) {
+                    Text("进入桌面")
+                }
                 OutlinedButton(enabled = !state.busy && state.shellReady != false, onClick = { vm.stop() }) {
                     Text("停止")
                 }
-                Spacer(Modifier.weight(1f))
-                Text(
-                    text = when {
-                        state.busy -> state.progressText ?: stageLabel(state.stage)
-                        state.running -> "运行中"
-                        else -> "已停止"
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
+            Text(
+                text = when {
+                    state.busy -> "状态：${state.progressText ?: stageLabel(state.stage)}"
+                    state.running -> "状态：桌面已启动（x11vnc 运行中，可进入）"
+                    else -> "状态：已停止"
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 12.dp),
+            )
             if (state.shellReady == false) {
                 Text(
                     text = "该工作区还没有可用的系统（Rootfs），请先到「基本」标签页安装后再回来。",
@@ -140,20 +161,18 @@ fun WorkspaceDesktopPage(id: String) {
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
             }
-            if (state.running) {
-                DesktopSurface()
-            } else {
+
+            if (!state.running) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text("工作区桌面", style = MaterialTheme.typography.titleSmall)
+                    Text("使用步骤", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        text = "首次使用先点「安装环境」（Fluxbox + VNC，Alpine 工作区最省流），完成后点「启动」，" +
-                            "桌面的画面会直接显示在这里（App 内置 VNC 客户端，不经过网页）。" +
-                            "AI 也能对同一桌面截图、点击、输入。装坏了可以点「重装」。",
+                        text = "1) 安装环境 → 2) 启动（会常驻保活）→ 3) 进入桌面（全屏，可直接触控）。\n" +
+                            "桌面里底部工具栏可以按下左键/右键、切换「触屏/触摸板」、发送文字。装坏了点「重装」。",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -169,67 +188,102 @@ fun WorkspaceDesktopPage(id: String) {
     }
 }
 
+/** 全屏桌面：VNC 画面 + 底部操作栏。 */
 @Composable
-private fun DesktopSurface() {
+private fun FullScreenDesktop(onExit: () -> Unit) {
     var vncRef by remember { mutableStateOf<VncView?>(null) }
     var status by remember { mutableStateOf("正在连接桌面…") }
+    var touchpad by remember { mutableStateOf(false) }
     var input by remember { mutableStateOf("") }
+    var showInput by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            text = status,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
-        )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+    ) {
         AndroidView(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
                 VncView(ctx).apply {
                     listener = object : VncView.Listener {
-                        override fun onState(s: String) {
-                            status = s
+                        override fun onState(state: String) {
+                            status = state
                         }
 
                         override fun onError(message: String) {
-                            status = "连接失败：$message"
+                            status = message
                         }
                     }
+                    touchpadMode = touchpad
                     connect()
                 }.also { vncRef = it }
             },
+            update = { it.touchpadMode = touchpad },
             onRelease = {
                 it.disconnect()
                 if (vncRef === it) vncRef = null
             },
         )
-        Row(
+
+        Text(
+            text = status,
+            color = Color.White,
+            style = MaterialTheme.typography.labelSmall,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedTextField(
-                value = input,
-                onValueChange = { input = it },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                label = { Text("输入文字（回车发送）") },
-            )
-            Button(onClick = {
-                vncRef?.sendText(input + "\n")
-                input = ""
-            }) {
-                Text("发送")
+                .align(Alignment.TopStart)
+                .padding(8.dp)
+                .background(Color(0x99000000), RoundedCornerShape(4.dp))
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+        )
+
+        Column(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+            if (showInput) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xE6000000))
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedTextField(
+                        value = input,
+                        onValueChange = { input = it },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        label = { Text("输入文字（回车发送）") },
+                    )
+                    Button(onClick = {
+                        vncRef?.sendText(input + "\n")
+                        input = ""
+                    }) { Text("发送") }
+                }
             }
-            TextButton(onClick = {
-                vncRef?.disconnect()
-                vncRef?.connect()
-            }) {
-                Text("重连")
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xCC000000))
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = { vncRef?.leftClick() }) {
+                    Icon(HugeIcons.Cursor01, contentDescription = "左键", tint = Color.White)
+                }
+                IconButton(onClick = { vncRef?.rightClick() }) {
+                    Icon(HugeIcons.Cursor02, contentDescription = "右键", tint = Color.White)
+                }
+                TextButton(onClick = { touchpad = !touchpad }) {
+                    Text(if (touchpad) "触摸板" else "触屏", color = Color.White)
+                }
+                TextButton(onClick = { showInput = !showInput }) {
+                    Text("输入", color = Color.White)
+                }
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = onExit) {
+                    Icon(HugeIcons.ArrowLeft01, contentDescription = "退出桌面", tint = Color.White)
+                }
             }
         }
     }
@@ -247,7 +301,7 @@ private fun InstallLog(state: WorkspaceDesktopState, onLoadLogs: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = if (state.busy) "安装日志 · ${state.progressText ?: stageLabel(state.stage)}" else "安装日志",
+                text = if (state.busy) "日志 · ${state.progressText ?: stageLabel(state.stage)}" else "日志",
                 style = MaterialTheme.typography.labelLarge,
             )
             Spacer(Modifier.weight(1f))

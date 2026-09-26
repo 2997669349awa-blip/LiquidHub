@@ -282,10 +282,28 @@ status() {
 }
 
 logs() {
-  for f in xvfb fluxbox x11vnc websockify browser; do
+  echo "== VNC 状态 =="
+  if is_vnc_running; then echo "x11vnc: RUNNING"; else echo "x11vnc: STOPPED"; fi
+  if is_x_running; then echo "Xvfb: RUNNING"; else echo "Xvfb: STOPPED"; fi
+  echo "== 端口 5900 =="
+  if [ -r /proc/net/tcp ] && grep -qi ":170C" /proc/net/tcp 2>/dev/null; then
+    echo "5900 LISTENING"
+  else
+    echo "5900 NOT listening"
+  fi
+  echo "== 相关进程 =="
+  found=0
+  for d in /proc/[0-9]*; do
+    c=$(cat "${'$'}d/comm" 2>/dev/null)
+    case "${'$'}c" in
+      Xvfb|x11vnc|fluxbox) echo "${'$'}c pid ${'$'}{d#/proc/}"; found=1 ;;
+    esac
+  done
+  [ "${'$'}found" -eq 0 ] && echo "(无 Xvfb/x11vnc/fluxbox 进程)"
+  for f in xvfb fluxbox x11vnc browser; do
     if [ -f "${'$'}RUNDIR/${'$'}f.log" ]; then
       echo "==== ${'$'}f.log ===="
-      tail -n 30 "${'$'}RUNDIR/${'$'}f.log"
+      tail -n 40 "${'$'}RUNDIR/${'$'}f.log"
     fi
   done
 }

@@ -44,6 +44,15 @@ class VncView @JvmOverloads constructor(
     @Volatile private var running = false
     @Volatile private var frame: IntArray? = null
 
+    /** true = 触摸板（相对移动 + 点击），false = 触屏（绝对坐标） */
+    var touchpadMode: Boolean = false
+    @Volatile private var cursorX = 0
+    @Volatile private var cursorY = 0
+    private var downX = 0f
+    private var downY = 0f
+    private var downAt = 0L
+    private var moved = false
+
     private var worker: Thread? = null
     private var socket: Socket? = null
     private var out: DataOutputStream? = null
@@ -52,7 +61,21 @@ class VncView @JvmOverloads constructor(
     fun connect(host: String = "127.0.0.1", port: Int = 5900) {
         disconnect()
         running = true
-        worker = Thread({ runSession(host, port) }, "vnc-client").apply {
+        worker = Thread({
+            var attempt = 0
+            while (running) {
+                try {
+                    runSession(host, port)
+                    return@Thread
+                } catch (t: Throwable) {
+                    if (!running) return@Thread
+                    attempt++
+                    post { listener?.onError("连接失败(第 $attempt 次)：${t.message ?: t::class.java.simpleName}") }
+                    if (attempt >= 15) return@Thread
+                    runCatching { Thread.sleep(1500) }
+                }
+            }
+        }, "vnc-client").apply {
             isDaemon = true
             start()
         }
@@ -113,6 +136,18 @@ class VncView @JvmOverloads constructor(
         }
     }
 
+    /** 在当前光标处左键单击。 */
+    fun leftClick() {
+        sendPointer(cursorX, cursorY, 1)
+        sendPointer(cursorX, cursorY, 0)
+    }
+
+    /** 在当前光标处右键单击（VNC button mask 4）。 */
+    fun rightClick() {
+        sendPointer(cursorX, cursorY, 4)
+        sendPointer(cursorX, cursorY, 0)
+    }
+
     private fun runSession(host: String, port: Int) {
         try {
             val s = Socket()
@@ -170,6 +205,8 @@ class VncView @JvmOverloads constructor(
 
             val w = frameWidth
             val h = frameHeight
+            cursorX = w / 2
+            cursorY = h / 2
             val colors = IntArray(w * h)
             frame = colors
             val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
@@ -237,11 +274,12 @@ class VncView @JvmOverloads constructor(
                 Thread.sleep(40)
             }
         } catch (t: Throwable) {
-            if (running) {
-                post { listener?.onError(t.message ?: t::class.java.simpleName) }
-            }
+            // 交给外层 connect() 的重试循环
+            if (running) throw t
         } finally {
-            running = false
+            runCatching { socket?.close() }
+            socket = null
+            out = null
         }
     }
 
@@ -277,11 +315,48 @@ class VncView @JvmOverloads constructor(
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (frameWidth == 0 || frameHeight == 0) return false
-        val (fx, fy) = mapToFrame(event.x, event.y)
+
+        if (!touchpadMode) {
+            // 触屏：绝对坐标，按下即在该点按下左键
+            val (fx, fy) = mapToFrame(event.x, event.y)
+            cursorX = fx
+            cursorY = fy
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> sendPointer(fx, fy, 1)
+                MotionEvent.ACTION_MOVE -> sendPointer(fx, fy, 1)
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> sendPointer(fx, fy, 0)
+            }
+            return true
+        }
+
+        // 触摸板：相对移动，单指轻点=左键
         when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> sendPointer(fx, fy, 1)
-            MotionEvent.ACTION_MOVE -> sendPointer(fx, fy, 1)
-            MotionEvent.ACTION_UP -> sendPointer(fx, fy, 0)
+            MotionEvent.ACTION_DOWN -> {
+                downX = event.x
+                downY = event.y
+                downAt = System.currentTimeMillis()
+                moved = false
+            }
+
+            MotionEvent.ACTION_POINTER_DOWN -> moved = true
+
+            MotionEvent.ACTION_MOVE -> {
+                val d = dstRect()
+                val sx = if (d.width() > 0) frameWidth.toFloat() / d.width() else 1f
+                val sy = if (d.height() > 0) frameHeight.toFloat() / d.height() else 1f
+                val dx = (event.x - downX) * sx
+                val dy = (event.y - downY) * sy
+                if (kotlin.math.abs(dx) > 1f || kotlin.math.abs(dy) > 1f) moved = true
+                cursorX = (cursorX + dx).toInt().coerceIn(0, frameWidth - 1)
+                cursorY = (cursorY + dy).toInt().coerceIn(0, frameHeight - 1)
+                downX = event.x
+                downY = event.y
+                sendPointer(cursorX, cursorY, 0)
+            }
+
+            MotionEvent.ACTION_UP -> {
+                if (!moved && System.currentTimeMillis() - downAt < 250) leftClick()
+            }
         }
         return true
     }
