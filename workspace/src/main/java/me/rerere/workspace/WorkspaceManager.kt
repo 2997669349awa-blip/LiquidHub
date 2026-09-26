@@ -5,6 +5,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 
 class WorkspaceManager(
     private val baseDir: File,
@@ -40,7 +41,14 @@ class WorkspaceManager(
 
     fun tempDir(root: String): File = File(workspaceDir(root), TEMP_DIR)
 
-    fun hasRootfs(root: String): Boolean = File(linuxDir(root), "bin/sh").isFile
+    // Alpine 的 /bin/sh 是指向 /bin/busybox 的绝对符号链接，File.isFile 会在宿主机解析而失败，
+    // 因此这里必须把「符号链接」本身也算作存在
+    fun hasRootfs(root: String): Boolean {
+        val linuxDir = linuxDir(root)
+        if (!linuxDir.isDirectory) return false
+        val sh = File(linuxDir, "bin/sh")
+        return sh.isFile || Files.isSymbolicLink(sh.toPath())
+    }
 
     fun deleteWorkspace(root: String): Boolean = workspaceDir(root).deleteRecursively()
 
@@ -195,6 +203,7 @@ class WorkspaceManager(
         timeoutMillis: Long = DEFAULT_COMMAND_TIMEOUT_MS,
         stdin: ByteArray? = null,
         shellCompatibilityMode: Boolean = false,
+        onOutput: ((String) -> Unit)? = null,
     ): WorkspaceCommandResult {
         require(command.isNotBlank()) { "Command is required" }
         val workingDir = fileSystem.resolve(filesDir(root), cwd)
@@ -214,6 +223,7 @@ class WorkspaceManager(
                 stdin = stdin,
                 bindMounts = bindMounts,
                 shellCompatibilityMode = shellCompatibilityMode,
+                onOutput = onOutput,
             )
         )
     }

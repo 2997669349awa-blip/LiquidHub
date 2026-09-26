@@ -5,12 +5,16 @@
 package me.rerere.rikkahub.ui.pages.extensions.workspace
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -18,13 +22,17 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Refresh01
@@ -35,6 +43,15 @@ import me.rerere.rikkahub.ui.components.webview.rememberWebViewState
 import me.rerere.rikkahub.ui.theme.CustomColors
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
+
+private fun stageLabel(stage: DesktopStage): String = when (stage) {
+    DesktopStage.IDLE -> "空闲"
+    DesktopStage.PREPARING -> "处理中"
+    DesktopStage.UPDATING -> "更新软件源"
+    DesktopStage.DOWNLOADING -> "下载中"
+    DesktopStage.UNPACKING -> "安装中"
+    DesktopStage.DONE -> "完成"
+}
 
 @Composable
 fun WorkspaceDesktopPage(id: String) {
@@ -62,7 +79,15 @@ fun WorkspaceDesktopPage(id: String) {
                 .fillMaxSize(),
         ) {
             if (state.busy) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                val progress = state.progress
+                if (progress != null) {
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
             }
             Row(
                 modifier = Modifier
@@ -86,7 +111,7 @@ fun WorkspaceDesktopPage(id: String) {
                 Spacer(Modifier.weight(1f))
                 Text(
                     text = when {
-                        state.busy -> "处理中…"
+                        state.busy -> state.progressText ?: stageLabel(state.stage)
                         state.running -> "运行中"
                         else -> "已停止"
                     },
@@ -130,13 +155,54 @@ fun WorkspaceDesktopPage(id: String) {
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (state.log.isNotBlank()) {
-                        Text(
-                            text = state.log,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    InstallLog(state = state)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InstallLog(state: WorkspaceDesktopState) {
+    val scroll = rememberScrollState()
+    LaunchedEffect(state.log) {
+        scroll.scrollTo(scroll.maxValue)
+    }
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = if (state.busy) "安装日志 · ${state.progressText ?: stageLabel(state.stage)}" else "安装日志",
+                style = MaterialTheme.typography.labelLarge,
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = MaterialTheme.shapes.small,
+        ) {
+            Box(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+                if (state.log.isBlank()) {
+                    Text(
+                        text = "还没有日志。点「安装环境」后会实时显示每一步。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Text(
+                        text = state.log,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(scroll),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

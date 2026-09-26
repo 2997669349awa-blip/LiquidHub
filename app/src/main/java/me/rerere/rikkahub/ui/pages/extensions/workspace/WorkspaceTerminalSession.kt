@@ -19,6 +19,7 @@ import me.rerere.rikkahub.data.files.FileFolders
 import me.rerere.workspace.RootfsPatchOptions
 import me.rerere.workspace.RootfsPatcher
 import java.io.File
+import java.nio.file.Files
 
 internal fun createWorkspaceTerminalSession(
     context: Context,
@@ -55,6 +56,9 @@ internal fun createWorkspaceTerminalSession(
             args += path
         }
     }
+    // Alpine 等发行版不预装 bash，回退到 /bin/sh，否则终端无法启动
+    val hasBash = File(linuxDir, "bin/bash").isFile
+    val loginShell = if (hasBash) "/bin/bash" else "/bin/sh"
     args += listOf(
         "/usr/bin/env",
         "-i",
@@ -64,8 +68,8 @@ internal fun createWorkspaceTerminalSession(
         "LANG=C.UTF-8",
         "LC_ALL=C.UTF-8",
         "USER=root",
-        "SHELL=/bin/bash",
-        "/bin/bash",
+        "SHELL=$loginShell",
+        loginShell,
     )
 
     val env = mutableListOf(
@@ -105,7 +109,11 @@ internal fun prepareWorkspaceTerminalSession(context: Context, root: String) {
 
 internal fun workspaceRootfsReady(context: Context, root: String): Boolean {
     val linuxDir = File(File(File(context.applicationContext.filesDir, "workspaces"), root), "linux")
-    return linuxDir.isDirectory && File(linuxDir, "bin/sh").isFile
+    if (!linuxDir.isDirectory) return false
+    // Alpine 的 /bin/sh 是绝对符号链接（-> /bin/busybox），isFile 会沿宿主机解析而失败，
+    // 必须把符号链接本身也算作「存在」，否则会误判为「没有安装系统」
+    val sh = File(linuxDir, "bin/sh")
+    return sh.isFile || Files.isSymbolicLink(sh.toPath())
 }
 
 internal class WorkspaceTerminalSessionClient(

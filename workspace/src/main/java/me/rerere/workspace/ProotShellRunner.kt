@@ -6,6 +6,7 @@
 package me.rerere.workspace
 
 import java.io.File
+import java.nio.file.Files
 
 data class WorkspaceBindMount(
     val source: File,
@@ -135,8 +136,12 @@ class ProotShellRunner(
         }
     }
 
-    private fun File.hasUsableRootfs(): Boolean =
-        isDirectory && File(this, "bin/sh").isFile
+    private fun File.hasUsableRootfs(): Boolean {
+        if (!isDirectory) return false
+        // Alpine 的 /bin/sh 是绝对符号链接，isFile 在宿主机解析会失败
+        val sh = File(this, "bin/sh")
+        return sh.isFile || Files.isSymbolicLink(sh.toPath())
+    }
 
     private companion object {
         private const val PROOT_EXEC = "libproot_exec.so"

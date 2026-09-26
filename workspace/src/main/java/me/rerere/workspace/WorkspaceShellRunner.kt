@@ -21,6 +21,8 @@ data class WorkspaceShellContext(
     val stdin: ByteArray? = null,
     val bindMounts: List<WorkspaceBindMount> = emptyList(),
     val shellCompatibilityMode: Boolean = false,
+    /** 命令 stdout/stderr 的实时回调（在采集线程上调用，需自行保证线程安全）。 */
+    val onOutput: ((String) -> Unit)? = null,
 )
 
 class HostShellRunner : WorkspaceShellRunner {
@@ -29,7 +31,7 @@ class HostShellRunner : WorkspaceShellRunner {
             .directory(context.workingDir)
             .redirectErrorStream(false)
             .start()
-        return process.readResult(context.timeoutMillis, context.stdin)
+        return process.readResult(context.timeoutMillis, context.stdin, context.onOutput)
     }
 
     private fun defaultShell(): String =
@@ -39,9 +41,13 @@ class HostShellRunner : WorkspaceShellRunner {
 // 单个流保留的最大字符数, 防止命令疯狂输出导致 OOM 或撑爆 LLM 上下文
 const val MAX_OUTPUT_CHARS = 128 * 1024
 
-fun Process.readResult(timeoutMillis: Long, stdin: ByteArray? = null): WorkspaceCommandResult {
-    val stdout = StreamCollector(inputStream)
-    val stderr = StreamCollector(errorStream)
+fun Process.readResult(
+    timeoutMillis: Long,
+    stdin: ByteArray? = null,
+    onOutput: ((String) -> Unit)? = null,
+): WorkspaceCommandResult {
+    val stdout = StreamCollector(inputStream, onOutput = onOutput)
+    val stderr = StreamCollector(errorStream, onOutput = onOutput)
     val stdinWriter = stdin?.let { bytes -> StreamWriter(outputStream, bytes) }
     if (stdinWriter == null) {
         // 没有 stdin 输入时立即关闭管道, 让子进程读到 EOF;
@@ -102,6 +108,7 @@ private class StreamWriter(
 private class StreamCollector(
     stream: InputStream,
     private val maxChars: Int = MAX_OUTPUT_CHARS,
+    private val onOutput: ((String) -> Unit)? = null,
 ) {
     private val builder = StringBuilder()
 
@@ -125,6 +132,10 @@ private class StreamCollector(
                         if (read > remaining) {
                             truncated = true
                         }
+                    }
+                    if (read > 0) {
+                        val chunk = String(buffer, 0, read)
+                        onOutput?.let { callback -> runCatching { callback(chunk) } }
                     }
                 }
             }
