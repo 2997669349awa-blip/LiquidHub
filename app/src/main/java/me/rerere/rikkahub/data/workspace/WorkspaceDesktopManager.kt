@@ -177,26 +177,37 @@ install_pkgs() {
     log "ERROR: desktop install failed (see the apt/apk/pacman messages above)"
     return 1
   fi
+  # 安装后自检：直接看到底装没装上、用的是哪个镜像源
+  log "verify:"
+  for b in Xvfb x11vnc fluxbox xdotool; do
+    command -v "${'$'}b" >/dev/null 2>&1 && echo "[desktop]   OK   ${'$'}b" || echo "[desktop]   MISS ${'$'}b"
+  done
+  if command -v scrot >/dev/null 2>&1 || command -v import >/dev/null 2>&1; then
+    echo "[desktop]   OK   screenshot"
+  else
+    echo "[desktop]   MISS screenshot"
+  fi
+  for b in chromium chromium-browser epiphany falkon; do
+    command -v "${'$'}b" >/dev/null 2>&1 && { echo "[desktop]   OK   browser=${'$'}b"; break; }
+  done
+  if [ -f /etc/apk/repositories ]; then
+    echo "[desktop] mirror: ${'$'}(head -n1 /etc/apk/repositories 2>/dev/null)"
+  fi
+  if [ -f /etc/apt/sources.list ]; then
+    echo "[desktop] mirror: ${'$'}(grep -m1 -E '^(deb|URIs)' /etc/apt/sources.list 2>/dev/null)"
+  fi
   log "install done"
 }
 
-is_running() {
-  # 以 X 服务存活为准，而不是只看 websockify：noVNC 缺失时 websockify 不启动，
-  # 只看 websockify 会误报 STOPPED 并重复拉起 Xvfb/x11vnc
-  for p in x11vnc xvfb; do
-    if [ -f "${'$'}RUNDIR/${'$'}p.pid" ] && kill -0 "${'$'}(cat "${'$'}RUNDIR/${'$'}p.pid")" 2>/dev/null; then
-      return 0
-    fi
-  done
-  return 1
+pid_alive() {
+  [ -f "${'$'}1" ] && kill -0 "${'$'}(cat "${'$'}1")" 2>/dev/null
 }
 
-is_web_running() {
-  if [ -f "${'$'}RUNDIR/websockify.pid" ] && kill -0 "${'$'}(cat "${'$'}RUNDIR/websockify.pid")" 2>/dev/null; then
-    return 0
-  fi
-  return 1
-}
+is_x_running() { pid_alive "${'$'}RUNDIR/xvfb.pid"; }
+is_vnc_running() { pid_alive "${'$'}RUNDIR/x11vnc.pid"; }
+
+# App 内置的 VNC 客户端需要 x11vnc，所以「运行中」以 x11vnc 为准
+is_running() { is_vnc_running; }
 
 start() {
   if is_running; then log "already running"; return 0; fi
@@ -204,23 +215,37 @@ start() {
     log "ERROR: desktop environment not installed, run install first"
     return 2
   fi
-  rm -rf /tmp/.X11-unix/X1 2>/dev/null
+  pkill -f "Xvfb ${'$'}DISP" 2>/dev/null
+  pkill -f "x11vnc" 2>/dev/null
+  rm -f /tmp/.X11-unix/X1 2>/dev/null
+
   log "starting Xvfb"
-  Xvfb "${'$'}DISP" -screen 0 1280x720x24 -nolisten tcp >"${'$'}RUNDIR/xvfb.log" 2>&1 &
+  # -ac 关闭访问控制，避免 rootfs 里没有 xauth/Xauthority 导致 x11vnc 连不上 X
+  Xvfb "${'$'}DISP" -screen 0 1280x720x24 -nolisten tcp -ac >"${'$'}RUNDIR/xvfb.log" 2>&1 &
   echo ${'$'}! > "${'$'}RUNDIR/xvfb.pid"
-  sleep 1
+  i=0
+  while [ ! -e /tmp/.X11-unix/X1 ] && [ ${'$'}i -lt 20 ]; do sleep 0.5 2>/dev/null || sleep 1; i=${'$'}((i+1)); done
+  if ! is_x_running; then
+    log "ERROR: Xvfb 启动失败，日志："
+    tail -n 20 "${'$'}RUNDIR/xvfb.log" 2>/dev/null
+    return 2
+  fi
+
   log "starting fluxbox"
   fluxbox >"${'$'}RUNDIR/fluxbox.log" 2>&1 &
   echo ${'$'}! > "${'$'}RUNDIR/fluxbox.pid"
-  log "starting x11vnc"
-  x11vnc -display "${'$'}DISP" -forever -shared -localhost -rfbport "${'$'}VNC_PORT" -nopw -quiet \
-    >"${'$'}RUNDIR/x11vnc.log" 2>&1 &
+
+  log "starting x11vnc on ${'$'}VNC_PORT"
+  x11vnc -display "${'$'}DISP" -forever -shared -localhost -rfbport "${'$'}VNC_PORT" \
+    -nopw -quiet -noshm >"${'$'}RUNDIR/x11vnc.log" 2>&1 &
   echo ${'$'}! > "${'$'}RUNDIR/x11vnc.pid"
   sleep 1
-  if is_running; then
+  if is_vnc_running; then
     log "STARTED: VNC on 127.0.0.1:${'$'}VNC_PORT"
   else
-    log "FAILED: X server did not stay alive"
+    log "ERROR: x11vnc 启动失败，桌面无法连接。x11vnc 日志："
+    tail -n 30 "${'$'}RUNDIR/x11vnc.log" 2>/dev/null
+    return 3
   fi
 }
 
@@ -262,8 +287,8 @@ stop() {
 }
 
 status() {
-  if is_running; then echo "X_RUNNING"; else echo "X_STOPPED"; fi
-  if is_web_running; then echo "WEB_RUNNING"; else echo "WEB_STOPPED"; fi
+  if is_x_running; then echo "X_RUNNING"; else echo "X_STOPPED"; fi
+  if is_vnc_running; then echo "VNC_RUNNING"; else echo "VNC_STOPPED"; fi
 }
 
 logs() {

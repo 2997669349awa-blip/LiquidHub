@@ -29,7 +29,6 @@ enum class DesktopStage {
 data class WorkspaceDesktopState(
     val busy: Boolean = false,
     val running: Boolean = false,
-    val webReady: Boolean? = null,
     val installed: Boolean? = null,
     val shellReady: Boolean? = null,
     val stage: DesktopStage = DesktopStage.IDLE,
@@ -86,8 +85,7 @@ class WorkspaceDesktopVM(
             _state.update {
                 it.copy(
                     shellReady = true,
-                    running = lines.contains("X_RUNNING"),
-                    webReady = lines.contains("WEB_RUNNING"),
+                    running = lines.contains("VNC_RUNNING"),
                     installed = lines.contains("XVFB_YES"),
                 )
             }
