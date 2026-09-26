@@ -21,6 +21,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -29,18 +30,20 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Refresh01
 import me.rerere.rikkahub.data.workspace.WorkspaceDesktopManager
 import me.rerere.rikkahub.ui.components.nav.BackButton
-import me.rerere.rikkahub.ui.components.webview.WebView
-import me.rerere.rikkahub.ui.components.webview.rememberWebViewState
 import me.rerere.rikkahub.ui.theme.CustomColors
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -82,10 +85,7 @@ fun WorkspaceDesktopPage(id: String) {
             if (state.busy) {
                 val progress = state.progress
                 if (progress != null) {
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
                 } else {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
@@ -100,10 +100,7 @@ fun WorkspaceDesktopPage(id: String) {
                 Button(enabled = !state.busy && state.shellReady != false, onClick = { vm.install() }) {
                     Text("安装环境")
                 }
-                OutlinedButton(
-                    enabled = !state.busy && state.shellReady != false,
-                    onClick = { vm.reinstall() },
-                ) {
+                OutlinedButton(enabled = !state.busy && state.shellReady != false, onClick = { vm.reinstall() }) {
                     Text("重装")
                 }
                 Button(
@@ -142,11 +139,8 @@ fun WorkspaceDesktopPage(id: String) {
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
             }
-            if (state.running && state.webReady == true) {
-                WebView(
-                    state = rememberWebViewState(WorkspaceDesktopManager.NOVNC_URL),
-                    modifier = Modifier.fillMaxSize(),
-                )
+            if (state.running) {
+                DesktopSurface()
             } else {
                 Column(
                     modifier = Modifier
@@ -154,25 +148,82 @@ fun WorkspaceDesktopPage(id: String) {
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    if (state.running && state.webReady != true) {
-                        Text(
-                            text = "桌面(X)已启动，但网页桌面服务(noVNC/websockify)没起来，所以这个网页打不开。" +
-                                "点「查看服务日志」能看到具体原因。",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    Text("网页桌面（noVNC）", style = MaterialTheme.typography.titleSmall)
+                    Text("工作区桌面", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        text = "首次使用先点「安装环境」（安装 Fluxbox、Chromium、VNC 与 noVNC，Alpine 工作区最省流）。" +
-                            "完成后点「启动」，这里会显示可直接操作的桌面网页。" +
-                            "AI 也能对同一桌面截图、点击、输入；遇到登录等需要人操作的情况，你可以在本页面直接接管。" +
-                            "装坏了可以点「重装」强制重来。",
+                        text = "首次使用先点「安装环境」（Fluxbox + VNC，Alpine 工作区最省流），完成后点「启动」，" +
+                            "桌面的画面会直接显示在这里（App 内置 VNC 客户端，不经过网页）。" +
+                            "AI 也能对同一桌面截图、点击、输入。装坏了可以点「重装」。",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     InstallLog(state = state, onLoadLogs = { vm.loadLogs() })
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DesktopSurface() {
+    var vncRef by remember { mutableStateOf<VncView?>(null) }
+    var status by remember { mutableStateOf("正在连接桌面…") }
+    var input by remember { mutableStateOf("") }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Text(
+            text = status,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+        )
+        AndroidView(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            factory = { ctx ->
+                VncView(ctx).apply {
+                    listener = object : VncView.Listener {
+                        override fun onState(s: String) {
+                            status = s
+                        }
+
+                        override fun onError(message: String) {
+                            status = "连接失败：$message"
+                        }
+                    }
+                    connect()
+                }.also { vncRef = it }
+            },
+            onRelease = {
+                it.disconnect()
+                if (vncRef === it) vncRef = null
+            },
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedTextField(
+                value = input,
+                onValueChange = { input = it },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                label = { Text("输入文字（回车发送）") },
+            )
+            Button(onClick = {
+                vncRef?.sendText(input + "\n")
+                input = ""
+            }) {
+                Text("发送")
+            }
+            TextButton(onClick = {
+                vncRef?.disconnect()
+                vncRef?.connect()
+            }) {
+                Text("重连")
             }
         }
     }

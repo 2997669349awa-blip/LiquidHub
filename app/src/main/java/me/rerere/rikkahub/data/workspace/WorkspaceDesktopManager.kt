@@ -118,17 +118,16 @@ find_novnc() {
 install_pkgs() {
   if [ "${'$'}{FORCE_INSTALL:-0}" != "1" ] \
      && command -v Xvfb >/dev/null 2>&1 && command -v x11vnc >/dev/null 2>&1 \
-     && command -v fluxbox >/dev/null 2>&1 && command -v websockify >/dev/null 2>&1 \
+     && command -v fluxbox >/dev/null 2>&1 \
      && command -v xdotool >/dev/null 2>&1 \
-     && { command -v scrot >/dev/null 2>&1 || command -v import >/dev/null 2>&1; } \
-     && find_novnc; then
+     && { command -v scrot >/dev/null 2>&1 || command -v import >/dev/null 2>&1; }; then
     log "desktop already installed, skipping"
     return 0
   fi
   RC=0
   if command -v apk >/dev/null 2>&1; then
     log "Alpine: installing desktop packages"
-    apk add --no-cache --allow-untrusted ca-certificates xvfb x11vnc fluxbox chromium novnc websockify xdotool imagemagick scrot dbus \
+    apk add --no-cache --allow-untrusted ca-certificates xvfb x11vnc fluxbox chromium xdotool imagemagick scrot dbus \
       font-noto font-noto-cjk bash coreutils || RC=1
   elif command -v apt-get >/dev/null 2>&1; then
     log "Debian/Ubuntu: installing desktop packages"
@@ -146,7 +145,7 @@ install_pkgs() {
     dpkg --configure -a >/dev/null 2>&1 || true
     apt-get update -y -o Acquire::Retries=3 || RC=1
     apt-get install -y --no-install-recommends ca-certificates xvfb x11vnc fluxbox xdotool imagemagick scrot \
-      dbus-x11 novnc websockify fonts-noto-cjk || RC=1
+      dbus-x11 fonts-noto-cjk || RC=1
     # Ubuntu arm64 的 chromium 只有 snap 包，apt 装不上；依次退回可用的轻量浏览器
     if ! command -v chromium >/dev/null 2>&1 && ! command -v chromium-browser >/dev/null 2>&1; then
       apt-get install -y --no-install-recommends chromium 2>/dev/null \
@@ -163,7 +162,7 @@ install_pkgs() {
     pacman-key --init >/dev/null 2>&1 || true
     pacman-key --populate archlinuxarm >/dev/null 2>&1 || pacman-key --populate archlinux >/dev/null 2>&1 || true
     pacman -Sy --noconfirm --needed archlinux-keyring >/dev/null 2>&1 || true
-    pacman -Sy --noconfirm --needed ca-certificates xorg-server-xvfb x11vnc fluxbox chromium novnc websockify xdotool \
+    pacman -Sy --noconfirm --needed ca-certificates xorg-server-xvfb x11vnc fluxbox chromium xdotool \
       imagemagick scrot dbus noto-fonts || RC=1
     pacman -Scc --noconfirm 2>/dev/null
   else
@@ -218,17 +217,8 @@ start() {
     >"${'$'}RUNDIR/x11vnc.log" 2>&1 &
   echo ${'$'}! > "${'$'}RUNDIR/x11vnc.pid"
   sleep 1
-  if find_novnc; then
-    log "starting websockify (noVNC on 127.0.0.1:${'$'}WEB_PORT)"
-    websockify --web="${'$'}NOVNC_DIR" "127.0.0.1:${'$'}WEB_PORT" "127.0.0.1:${'$'}VNC_PORT" \
-      >"${'$'}RUNDIR/websockify.log" 2>&1 &
-    echo ${'$'}! > "${'$'}RUNDIR/websockify.pid"
-  else
-    log "WARN: noVNC web directory not found, VNC only on port ${'$'}VNC_PORT"
-  fi
-  sleep 1
   if is_running; then
-    if is_web_running; then log "STARTED"; else log "STARTED_X_ONLY: websockify 未启动，无法打开网页桌面（见 websockify.log）"; fi
+    log "STARTED: VNC on 127.0.0.1:${'$'}VNC_PORT"
   else
     log "FAILED: X server did not stay alive"
   fi
