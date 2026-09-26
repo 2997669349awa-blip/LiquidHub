@@ -180,6 +180,43 @@
     border: 1px solid rgba(53, 214, 240, 0.22);
   }
 
+  /* 体验测试版 */
+  .beta {
+    margin-top: 18px; padding-top: 18px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.16);
+  }
+  .beta-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--muted); margin-bottom: 10px;
+  }
+  .beta-tag {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.4px;
+    padding: 3px 9px; border-radius: 999px; color: #051020;
+    background: linear-gradient(120deg, #ffd36b, #ff9de2);
+  }
+  .btn-beta {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; padding: 14px 20px;
+    border-radius: 16px; font-size: 15px; font-weight: 600; color: var(--text);
+    text-decoration: none; cursor: pointer;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--stroke);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+  }
+  .btn-beta:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(53, 214, 240, 0.55);
+  }
+  .btn-beta:active { transform: translateY(0) scale(0.99); }
+  .btn-beta svg { width: 18px; height: 18px; }
+  .beta-note {
+    margin: 10px 2px 0; color: var(--muted); font-size: 12px; line-height: 1.65;
+  }
+  .beta-note b { color: var(--text); font-weight: 600; }
+
   /* 特性 */
   .features {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
@@ -283,6 +320,27 @@
 
         <div class="notice" id="platformNotice">
           提示：首次安装需在系统设置中允许「安装未知来源应用」。下载目前仅提供 Android 版。
+        </div>
+
+        <div class="beta">
+          <div class="beta-title">
+            <span class="beta-tag">测试</span>
+            想抢先体验未发布的功能？下载体验测试版
+          </div>
+          <a class="btn-beta" href="liquidhub-debug.apk" download>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3v12" />
+              <path d="M7 10l5 5 5-5" />
+              <path d="M5 21h14" />
+            </svg>
+            下载体验测试版 (APK)
+          </a>
+          <p class="beta-note">
+            测试版包含尚未发布的改动：<b>新版图标</b>、工作区<b>国内镜像</b>与<b>远程桌面</b>。
+            稳定性有限，功能可能随时调整。包名为 <b>teto.rikkahub.X.debug</b>，
+            可与正式版同时安装、互不覆盖。
+          </p>
         </div>
       </div>
     </header>
