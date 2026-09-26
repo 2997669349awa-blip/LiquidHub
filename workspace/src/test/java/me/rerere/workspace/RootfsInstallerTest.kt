@@ -49,6 +49,24 @@ class RootfsInstallerTest {
         assertEquals("content", File(target, "dir/file.txt").readText())
     }
 
+    @Test
+    fun `extract skips the root dot entry used by alpine minirootfs`() {
+        // Alpine minirootfs 首条是 "./" 根目录项, 规范化后为空串, 之前会报 path is blank
+        val archive = tmp.newFile("rootfs.tar.gz")
+        GZIPOutputStream(archive.outputStream()).use { out ->
+            out.writeTarEntry("./", '5', ByteArray(0))
+            out.writeTarEntry("./etc/", '5', ByteArray(0))
+            out.writeTarEntry("./etc/hostname", '0', "alpine".toByteArray())
+            out.write(ByteArray(TAR_BLOCK * 2))
+        }
+
+        val target = tmp.newFolder("out")
+        createInstaller().extractTar(archive, target) {}
+
+        assertEquals(true, File(target, "etc").isDirectory)
+        assertEquals("alpine", File(target, "etc/hostname").readText())
+    }
+
     private fun createInstaller() = RootfsInstaller(WorkspaceManager(tmp.newFolder()))
 
     private fun OutputStream.writeTarEntry(name: String, type: Char, data: ByteArray) {

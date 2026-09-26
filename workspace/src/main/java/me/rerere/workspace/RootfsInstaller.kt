@@ -172,7 +172,7 @@ class RootfsInstaller(
                 )
                 pendingName = null
                 pendingLinkName = null
-                if (header.name.isBlank()) {
+                if (header.name.isBlank() || header.name == ROOT_ENTRY) {
                     input.skipFully(header.size.paddedTarSize())
                     continue
                 }
@@ -393,7 +393,9 @@ class RootfsInstaller(
             .trim()
             .trimStart('/')
             .removePrefix("./")
-        require(normalized.isNotBlank()) { "Rootfs entry path is blank" }
+        // Alpine 等 minirootfs 的首条是 "./" 根目录项，规范化后会变成空串。
+        // 统一映射成 "." 由 extractTar 跳过，而不是当成非法路径报错。
+        if (normalized.isBlank() || normalized == ".") return ROOT_ENTRY
         require(!normalized.contains('\u0000')) { "Rootfs entry path contains invalid character" }
         require(normalized.split('/').none { it == ".." }) { "Rootfs entry escapes target directory: $path" }
         return normalized
@@ -470,5 +472,7 @@ class RootfsInstaller(
         private const val CONNECT_TIMEOUT_MS = 30_000
         private const val READ_TIMEOUT_MS = 60_000
         private const val DOWNLOAD_USER_AGENT = "LiquidHub/0.1"
+        // "./" 根目录项规范化后的占位名，extractTar 会跳过
+        private const val ROOT_ENTRY = "."
     }
 }
