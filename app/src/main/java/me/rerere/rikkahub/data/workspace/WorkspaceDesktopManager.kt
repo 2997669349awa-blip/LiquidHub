@@ -115,6 +115,25 @@ find_novnc() {
   return 1
 }
 
+install_browser() {
+  log "installing browser (firefox preferred)"
+  if command -v apk >/dev/null 2>&1; then
+    apk add --no-cache --allow-untrusted firefox 2>/dev/null \
+      || apk add --no-cache --allow-untrusted chromium 2>/dev/null || true
+  elif command -v apt-get >/dev/null 2>&1; then
+    apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true firefox-esr 2>/dev/null \
+      || apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true firefox 2>/dev/null \
+      || apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true chromium 2>/dev/null \
+      || apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true chromium-browser 2>/dev/null \
+      || apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true epiphany-browser 2>/dev/null \
+      || apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true falkon 2>/dev/null \
+      || log "WARN: 没有可用的浏览器（可稍后手动安装）"
+  elif command -v pacman >/dev/null 2>&1; then
+    pacman -Sy --noconfirm --needed firefox 2>/dev/null \
+      || pacman -Sy --noconfirm --needed chromium 2>/dev/null || true
+  fi
+}
+
 install_pkgs() {
   if [ "${'$'}{FORCE_INSTALL:-0}" != "1" ] \
      && command -v Xvfb >/dev/null 2>&1 && command -v x11vnc >/dev/null 2>&1 \
@@ -127,39 +146,35 @@ install_pkgs() {
   RC=0
   if command -v apk >/dev/null 2>&1; then
     log "Alpine: installing desktop packages"
-    apk add --no-cache --allow-untrusted ca-certificates xvfb x11vnc fluxbox chromium xdotool imagemagick scrot dbus \
-      font-noto font-noto-cjk bash coreutils || RC=1
+    apk add --no-cache --allow-untrusted ca-certificates xvfb x11vnc fluxbox xdotool imagemagick scrot dbus \
+      pulseaudio pulseaudio-utils font-noto font-noto-cjk bash coreutils || RC=1
   elif command -v apt-get >/dev/null 2>&1; then
     log "Debian/Ubuntu: installing desktop packages"
     export DEBIAN_FRONTEND=noninteractive
     getent hosts mirrors.tuna.tsinghua.edu.cn >/dev/null 2>&1 || log "WARN: 无法解析镜像域名，DNS 可能有问题"
     apt-get update -y -o Acquire::Retries=5 -o Acquire::ForceIPv4=true || RC=1
     apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true \
-      ca-certificates xvfb x11vnc fluxbox xdotool imagemagick scrot dbus-x11 fonts-noto-cjk || RC=1
-    # Ubuntu arm64 的 chromium 只有 snap 包，apt 装不上；依次退回可用的轻量浏览器
-    if ! command -v chromium >/dev/null 2>&1 && ! command -v chromium-browser >/dev/null 2>&1; then
-      apt-get install -y --no-install-recommends chromium 2>/dev/null \
-        || apt-get install -y --no-install-recommends chromium-browser 2>/dev/null \
-        || apt-get install -y --no-install-recommends epiphany-browser 2>/dev/null \
-        || apt-get install -y --no-install-recommends falkon 2>/dev/null \
-        || log "WARN: no chromium/epiphany/falkon available in this distro"
-    fi
-    apt-get clean
-    rm -rf /var/lib/apt/lists/* 2>/dev/null
+      ca-certificates xvfb x11vnc fluxbox xdotool imagemagick scrot dbus-x11 fonts-noto-cjk \
+      pulseaudio pulseaudio-utils || RC=1
   elif command -v pacman >/dev/null 2>&1; then
     log "Arch: installing desktop packages"
     # Arch 的包用 GPG 签名，老 rootfs 的 keyring 过期会报 key expired / unknown trust
     pacman-key --init >/dev/null 2>&1 || true
     pacman-key --populate archlinuxarm >/dev/null 2>&1 || pacman-key --populate archlinux >/dev/null 2>&1 || true
     pacman -Sy --noconfirm --needed archlinux-keyring >/dev/null 2>&1 || true
-    pacman -Sy --noconfirm --needed ca-certificates xorg-server-xvfb x11vnc fluxbox chromium xdotool \
-      imagemagick scrot dbus noto-fonts || RC=1
-    pacman -Scc --noconfirm 2>/dev/null
+    pacman -Sy --noconfirm --needed ca-certificates xorg-server-xvfb x11vnc fluxbox xdotool \
+      imagemagick scrot dbus noto-fonts pulseaudio || RC=1
   else
     log "ERROR: unsupported package manager"
     return 1
   fi
-  # 刷新根证书：老 rootfs 的 CA 缺失/过期会导致 HTTPS (如 Chromium 浏览网页) 失败
+  # 浏览器单独装：失败也不影响桌面核心
+  install_browser
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get clean
+    rm -rf /var/lib/apt/lists/* 2>/dev/null
+  fi
+  # 刷新根证书：老 rootfs 的 CA 缺失/过期会导致 HTTPS 失败
   command -v update-ca-certificates >/dev/null 2>&1 && update-ca-certificates 2>/dev/null || true
   command -v update-ca-trust >/dev/null 2>&1 && update-ca-trust 2>/dev/null || true
   command -v trust >/dev/null 2>&1 && trust extract-compat 2>/dev/null || true
@@ -177,7 +192,7 @@ install_pkgs() {
   else
     echo "[desktop]   MISS screenshot"
   fi
-  for b in chromium chromium-browser epiphany falkon; do
+  for b in firefox firefox-esr chromium chromium-browser epiphany falkon; do
     command -v "${'$'}b" >/dev/null 2>&1 && { echo "[desktop]   OK   browser=${'$'}b"; break; }
   done
   if [ -f /etc/apk/repositories ]; then
@@ -198,6 +213,31 @@ is_vnc_running() { pid_alive "${'$'}RUNDIR/x11vnc.pid"; }
 
 # App 内置的 VNC 客户端需要 x11vnc，所以「运行中」以 x11vnc 为准
 is_running() { is_vnc_running; }
+
+setup_theme() {
+  mkdir -p "${'$'}HOME/.fluxbox" 2>/dev/null
+  # 渐变壁纸
+  if command -v convert >/dev/null 2>&1; then
+    convert -size 1280x720 gradient:'#0f172a'-'#1d4ed8' "${'$'}RUNDIR/wallpaper.png" 2>/dev/null
+  fi
+  if [ -f "${'$'}RUNDIR/wallpaper.png" ] && command -v display >/dev/null 2>&1; then
+    display -window root "${'$'}RUNDIR/wallpaper.png" >/dev/null 2>&1 &
+  elif command -v xsetroot >/dev/null 2>&1; then
+    xsetroot -solid "#0f172a" 2>/dev/null
+  fi
+  # Fluxbox 配置：显示底部工具栏（工作区 + 时钟），作为美化基础
+  cat > "${'$'}HOME/.fluxbox/init" <<'FBEOF'
+session.screen0.toolbar.visible: true
+session.screen0.toolbar.autoHide: false
+session.screen0.toolbar.placement: BottomCenter
+session.screen0.toolbar.widthPercent: 100
+session.screen0.toolbar.alpha: 200
+session.screen0.toolbar.tools: prevworkspace, workspacename, nextworkspace, iconbar, systemtray, clock
+session.screen0.strftimeFormat: %H:%M
+session.screen0.workspaces: 1
+session.screen0.focusModel: ClickToFocus
+FBEOF
+}
 
 start() {
   if is_running; then log "already running"; return 0; fi
@@ -221,6 +261,7 @@ start() {
     return 2
   fi
 
+  setup_theme
   log "starting fluxbox"
   fluxbox >"${'$'}RUNDIR/fluxbox.log" 2>&1 &
   echo ${'$'}! > "${'$'}RUNDIR/fluxbox.pid"
@@ -237,13 +278,19 @@ start() {
     tail -n 30 "${'$'}RUNDIR/x11vnc.log" 2>/dev/null
     return 3
   fi
+  start_audio
 }
 
 browser() {
+  PREF=""
+  [ -f /workspace/.liquidhub/browser ] && PREF=$(cat /workspace/.liquidhub/browser 2>/dev/null)
   BIN=""
-  for c in chromium chromium-browser epiphany epiphany-browser falkon firefox firefox-esr; do
-    if command -v "${'$'}c" >/dev/null 2>&1; then BIN="${'$'}c"; break; fi
-  done
+  if [ -n "${'$'}PREF" ] && command -v "${'$'}PREF" >/dev/null 2>&1; then BIN="${'$'}PREF"; fi
+  if [ -z "${'$'}BIN" ]; then
+    for c in firefox firefox-esr chromium chromium-browser epiphany epiphany-browser falkon; do
+      if command -v "${'$'}c" >/dev/null 2>&1; then BIN="${'$'}c"; break; fi
+    done
+  fi
   if [ -z "${'$'}BIN" ]; then log "ERROR: no browser installed"; return 3; fi
   if pgrep -f "${'$'}BIN" >/dev/null 2>&1; then
     "${'$'}BIN" "${'$'}{1:-about:blank}" >/dev/null 2>&1
@@ -306,6 +353,26 @@ logs() {
       tail -n 40 "${'$'}RUNDIR/${'$'}f.log"
     fi
   done
+}
+
+start_audio() {
+  command -v pulseaudio >/dev/null 2>&1 || { log "pulseaudio 未安装，跳过音频"; return 0; }
+  if [ -f /workspace/.liquidhub/audio ] && [ "${'$'}(cat /workspace/.liquidhub/audio 2>/dev/null)" = "0" ]; then
+    log "音频已被用户关闭"; return 0
+  fi
+  export PULSE_RUNTIME_PATH="${'$'}RUNDIR/pulse"
+  mkdir -p "${'$'}PULSE_RUNTIME_PATH"
+  pulseaudio --start --exit-idle-time=-1 --disallow-exit >"${'$'}RUNDIR/pulse.log" 2>&1 || true
+  sleep 1
+  pactl load-module module-null-sink sink_name=liquidhub sink_properties=device.description=LiquidHub >/dev/null 2>&1 || true
+  pactl set-default-sink liquidhub >/dev/null 2>&1 || true
+  M="${'$'}(pactl load-module module-simple-protocol-tcp port=4713 source=liquidhub.monitor format=s16le rate=44100 channels=2 2>/dev/null)"
+  if [ -n "${'$'}M" ]; then
+    log "audio: PulseAudio ready on 4713"
+  else
+    log "WARN: 音频服务未就绪（见 pulse.log）"
+    tail -n 15 "${'$'}RUNDIR/pulse.log" 2>/dev/null
+  fi
 }
 
 case "${'$'}{1:-status}" in

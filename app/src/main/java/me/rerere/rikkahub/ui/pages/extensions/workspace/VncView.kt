@@ -317,12 +317,15 @@ class VncView @JvmOverloads constructor(
         if (frameWidth == 0 || frameHeight == 0) return false
 
         if (!touchpadMode) {
-            // 触屏：绝对坐标，按下即在该点按下左键
+            // 触屏：绝对坐标，按下即在该点按下左键（先移动再按下，兼容部分服务端）
             val (fx, fy) = mapToFrame(event.x, event.y)
             cursorX = fx
             cursorY = fy
             when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> sendPointer(fx, fy, 1)
+                MotionEvent.ACTION_DOWN -> {
+                    sendPointer(fx, fy, 0)
+                    sendPointer(fx, fy, 1)
+                }
                 MotionEvent.ACTION_MOVE -> sendPointer(fx, fy, 1)
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> sendPointer(fx, fy, 0)
             }
@@ -342,8 +345,8 @@ class VncView @JvmOverloads constructor(
 
             MotionEvent.ACTION_MOVE -> {
                 val d = dstRect()
-                val sx = if (d.width() > 0) frameWidth.toFloat() / d.width() else 1f
-                val sy = if (d.height() > 0) frameHeight.toFloat() / d.height() else 1f
+                val sx = if (d.width() > 0) frameWidth.toFloat() / d.width() * 1.6f else 1.6f
+                val sy = if (d.height() > 0) frameHeight.toFloat() / d.height() * 1.6f else 1.6f
                 val dx = (event.x - downX) * sx
                 val dy = (event.y - downY) * sy
                 if (kotlin.math.abs(dx) > 1f || kotlin.math.abs(dy) > 1f) moved = true

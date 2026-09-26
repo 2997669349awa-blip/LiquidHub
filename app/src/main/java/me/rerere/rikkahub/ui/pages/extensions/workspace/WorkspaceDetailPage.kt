@@ -497,6 +497,20 @@ private fun WorkspaceToolApprovalCard(
             }
         },
     ) {
+        item(
+            headlineContent = { Text("免批准（全部工具）") },
+            supportingContent = { Text("开启后，本工作区与桌面的所有工具都不再逐次确认") },
+            trailingContent = {
+                val allBypassed = tools.all { !resolveWorkspaceToolApproval(it.first, overrides) }
+                Switch(
+                    checked = allBypassed,
+                    onCheckedChange = { bypass ->
+                        tools.forEach { (name, _) -> onToolApprovalChange(name, !bypass) }
+                    },
+                    enabled = workspace != null,
+                )
+            },
+        )
         tools.forEach { (toolName, label) ->
             item(
                 headlineContent = { Text(label) },
@@ -532,6 +546,7 @@ private fun workspaceToolApprovalItems() = listOf(
     "desktop_type_text" to "桌面: 输入文本",
     "desktop_key" to "桌面: 按键",
     "desktop_browser" to "桌面: 打开网页",
+    "desktop_wait_user" to "桌面: 等待用户接管",
 )
 
 @Composable

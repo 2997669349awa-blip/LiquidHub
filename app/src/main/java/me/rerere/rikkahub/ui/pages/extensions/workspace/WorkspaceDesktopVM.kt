@@ -36,6 +36,8 @@ data class WorkspaceDesktopState(
     val progressText: String? = null,
     val log: String = "",
     val error: String? = null,
+    val browser: String = "auto",
+    val audioEnabled: Boolean = true,
 )
 
 class WorkspaceDesktopVM(
@@ -82,11 +84,22 @@ class WorkspaceDesktopVM(
             }.getOrNull()
             val output = probe?.stdout.orEmpty()
             val lines = output.lineSequence().map { it.trim() }.toList()
+            val browser = lines.firstOrNull { it.startsWith("BROWSER=") }
+                ?.removePrefix("BROWSER=")
+                ?.trim()
+                .orEmpty()
+                .ifBlank { "auto" }
+            val audio = lines.firstOrNull { it.startsWith("AUDIO=") }
+                ?.removePrefix("AUDIO=")
+                ?.trim()
+                ?.let { it != "0" } ?: true
             _state.update {
                 it.copy(
                     shellReady = true,
                     running = lines.contains("VNC_RUNNING"),
                     installed = lines.contains("XVFB_YES"),
+                    browser = browser,
+                    audioEnabled = audio,
                 )
             }
         }
@@ -96,6 +109,33 @@ class WorkspaceDesktopVM(
     fun reinstall() = runAction("reinstall", timeoutMillis = 30 * 60_000L)
     fun start() = runAction("start", timeoutMillis = 60_000L)
     fun stop() = runAction("stop", timeoutMillis = 60_000L)
+
+    /** bin 为空字符串表示自动选择。 */
+    fun setBrowser(bin: String) {
+        viewModelScope.launch {
+            runCatching {
+                repository.executeCommand(
+                    id = id,
+                    command = "mkdir -p /workspace/.liquidhub && printf '%s' '$bin' > /workspace/.liquidhub/browser",
+                    timeoutMillis = 15_000,
+                )
+            }
+            _state.update { it.copy(browser = bin.ifBlank { "auto" }) }
+        }
+    }
+
+    fun setAudio(enabled: Boolean) {
+        viewModelScope.launch {
+            runCatching {
+                repository.executeCommand(
+                    id = id,
+                    command = "mkdir -p /workspace/.liquidhub && printf '%s' '${if (enabled) 1 else 0}' > /workspace/.liquidhub/audio",
+                    timeoutMillis = 15_000,
+                )
+            }
+            _state.update { it.copy(audioEnabled = enabled) }
+        }
+    }
 
     /** 拉取桌面各服务（Xvfb/x11vnc/websockify/browser）的日志，方便排查网页打不开。 */
     fun loadLogs() {
@@ -294,7 +334,9 @@ class WorkspaceDesktopVM(
         const val MAX_LOG_CHARS = 60_000
         const val DESKTOP_PROBE =
             "sh /workspace/${WorkspaceDesktopManager.SCRIPT_PATH} status 2>/dev/null; " +
-                "command -v Xvfb >/dev/null 2>&1 && echo XVFB_YES || echo XVFB_NO"
+                "command -v Xvfb >/dev/null 2>&1 && echo XVFB_YES || echo XVFB_NO; " +
+                "echo BROWSER=$(cat /workspace/.liquidhub/browser 2>/dev/null); " +
+                "echo AUDIO=$(cat /workspace/.liquidhub/audio 2>/dev/null)"
         val APT_NEED = Regex("Need to get ([\\d.,]+)\\s*([kKmMgG]?B)", RegexOption.IGNORE_CASE)
         val APT_GET = Regex("Get:(\\d+)\\s+\\S+.*?\\[([\\d.,]+)\\s*([kKmMgG]?B)\\]", RegexOption.IGNORE_CASE)
         val COUNT = Regex("\\((\\d+)\\s*/\\s*(\\d+)\\)")

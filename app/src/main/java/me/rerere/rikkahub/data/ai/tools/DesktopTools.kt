@@ -33,6 +33,7 @@ val DesktopToolDefaultApprovals: Map<String, Boolean> = mapOf(
     "desktop_type_text" to true,
     "desktop_key" to true,
     "desktop_browser" to true,
+    "desktop_wait_user" to false,
 )
 
 internal suspend fun createDesktopTools(
@@ -50,6 +51,7 @@ internal suspend fun createDesktopTools(
         createDesktopTypeTool(workspaceId, workspaceRepository, ::needsApproval),
         createDesktopKeyTool(workspaceId, workspaceRepository, ::needsApproval),
         createDesktopBrowserTool(workspaceId, workspaceRepository, desktopManager, ::needsApproval),
+        createDesktopWaitUserTool(::needsApproval),
     )
 }
 
@@ -321,6 +323,41 @@ private fun createDesktopBrowserTool(
                 buildJsonObject {
                     put("ok", true)
                     put("message", "Chromium is opening $url. Wait a few seconds and screenshot.")
+                }.toString()
+            )
+        )
+    },
+)
+
+private fun createDesktopWaitUserTool(
+    needsApproval: (String) -> Boolean,
+) = Tool(
+    name = "desktop_wait_user",
+    description = "Call this when the user must take over the remote desktop by hand (login, 2FA, " +
+        "captcha, payment...). In your reply clearly tell the user what to do, then STOP and wait " +
+        "for their next message. Do not keep calling desktop tools until the user says they are done.",
+    parameters = {
+        InputSchema.Obj(
+            properties = buildJsonObject {
+                put(
+                    "reason",
+                    buildJsonObject {
+                        put("type", "string")
+                        put("description", "Why the user needs to take over")
+                    }
+                )
+            },
+            required = listOf("reason"),
+        )
+    },
+    needsApproval = { needsApproval("desktop_wait_user") },
+    execute = {
+        val reason = it.jsonObject.stringValue("reason") ?: "需要用户接管桌面"
+        listOf(
+            UIMessagePart.Text(
+                buildJsonObject {
+                    put("ok", true)
+                    put("message", "已请求用户接管桌面（$reason）。现在停止操作，等待用户回复后再继续。")
                 }.toString()
             )
         )

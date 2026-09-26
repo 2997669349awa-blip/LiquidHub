@@ -9,16 +9,20 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -27,10 +31,12 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -65,6 +71,7 @@ private fun stageLabel(stage: DesktopStage): String = when (stage) {
     DesktopStage.DONE -> "完成"
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun WorkspaceDesktopPage(id: String) {
     val vm: WorkspaceDesktopVM = koinViewModel(parameters = { parametersOf(id) })
@@ -73,7 +80,7 @@ fun WorkspaceDesktopPage(id: String) {
 
     // 进入桌面：全屏显示
     if (entered && state.running) {
-        FullScreenDesktop(onExit = { entered = false })
+        FullScreenDesktop(audioEnabled = state.audioEnabled, onExit = { entered = false })
         return
     }
 
@@ -181,6 +188,37 @@ fun WorkspaceDesktopPage(id: String) {
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Text("浏览器（AI 打开网页时使用）", style = MaterialTheme.typography.titleSmall)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            "auto" to "自动",
+                            "firefox" to "火狐",
+                            "chromium" to "Chrome",
+                            "falkon" to "Falkon",
+                        ).forEach { (bin, label) ->
+                            FilterChip(
+                                selected = state.browser == bin,
+                                onClick = { vm.setBrowser(if (bin == "auto") "" else bin) },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("播放桌面声音", style = MaterialTheme.typography.bodyLarge)
+                        Spacer(Modifier.width(6.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.tertiaryContainer,
+                            shape = RoundedCornerShape(4.dp),
+                        ) {
+                            Text(
+                                "实验性",
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
+                        Spacer(Modifier.weight(1f))
+                        Switch(checked = state.audioEnabled, onCheckedChange = { vm.setAudio(it) })
+                    }
                     InstallLog(state = state, onLoadLogs = { vm.loadLogs() })
                 }
             }
@@ -189,13 +227,24 @@ fun WorkspaceDesktopPage(id: String) {
 }
 
 /** 全屏桌面：VNC 画面 + 底部操作栏。 */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FullScreenDesktop(onExit: () -> Unit) {
+private fun FullScreenDesktop(audioEnabled: Boolean, onExit: () -> Unit) {
     var vncRef by remember { mutableStateOf<VncView?>(null) }
     var status by remember { mutableStateOf("正在连接桌面…") }
     var touchpad by remember { mutableStateOf(false) }
     var input by remember { mutableStateOf("") }
     var showInput by remember { mutableStateOf(false) }
+
+    val audioPlayer = remember { PulseAudioPlayer() }
+    var audioState by remember { mutableStateOf("") }
+    LaunchedEffect(audioEnabled) {
+        audioPlayer.listener = PulseAudioPlayer.Listener { audioState = it }
+        if (audioEnabled) audioPlayer.start() else audioPlayer.stop()
+    }
+    DisposableEffect(Unit) {
+        onDispose { audioPlayer.stop() }
+    }
 
     Box(
         modifier = Modifier
@@ -227,7 +276,7 @@ private fun FullScreenDesktop(onExit: () -> Unit) {
         )
 
         Text(
-            text = status,
+            text = if (audioState.isBlank()) status else "$status\n$audioState",
             color = Color.White,
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier
@@ -260,13 +309,13 @@ private fun FullScreenDesktop(onExit: () -> Unit) {
                     }) { Text("发送") }
                 }
             }
-            Row(
+            FlowRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color(0xCC000000))
                     .padding(horizontal = 6.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 IconButton(onClick = { vncRef?.leftClick() }) {
                     Icon(HugeIcons.Cursor01, contentDescription = "左键", tint = Color.White)
@@ -280,9 +329,11 @@ private fun FullScreenDesktop(onExit: () -> Unit) {
                 TextButton(onClick = { showInput = !showInput }) {
                     Text("输入", color = Color.White)
                 }
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = onExit) {
-                    Icon(HugeIcons.ArrowLeft01, contentDescription = "退出桌面", tint = Color.White)
+                TextButton(onClick = { vncRef?.sendText("\u000d") }) {
+                    Text("回车", color = Color.White)
+                }
+                TextButton(onClick = onExit) {
+                    Text("退出", color = Color.White)
                 }
             }
         }
