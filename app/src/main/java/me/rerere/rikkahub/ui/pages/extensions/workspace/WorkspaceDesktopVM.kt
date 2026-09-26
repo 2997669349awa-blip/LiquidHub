@@ -38,6 +38,7 @@ data class WorkspaceDesktopState(
     val error: String? = null,
     val browser: String = "auto",
     val audioEnabled: Boolean = true,
+    val resolution: String = "1280x720",
 )
 
 class WorkspaceDesktopVM(
@@ -93,6 +94,11 @@ class WorkspaceDesktopVM(
                 ?.removePrefix("AUDIO=")
                 ?.trim()
                 ?.let { it != "0" } ?: true
+            val resolution = lines.firstOrNull { it.startsWith("RESOLUTION=") }
+                ?.removePrefix("RESOLUTION=")
+                ?.trim()
+                .orEmpty()
+                .ifBlank { "1280x720" }
             _state.update {
                 it.copy(
                     shellReady = true,
@@ -100,6 +106,7 @@ class WorkspaceDesktopVM(
                     installed = lines.contains("XVFB_YES"),
                     browser = browser,
                     audioEnabled = audio,
+                    resolution = resolution,
                 )
             }
         }
@@ -134,6 +141,19 @@ class WorkspaceDesktopVM(
                 )
             }
             _state.update { it.copy(audioEnabled = enabled) }
+        }
+    }
+
+    fun setResolution(res: String) {
+        viewModelScope.launch {
+            runCatching {
+                repository.executeCommand(
+                    id = id,
+                    command = "mkdir -p /workspace/.liquidhub && printf '%s' '$res' > /workspace/.liquidhub/resolution",
+                    timeoutMillis = 15_000,
+                )
+            }
+            _state.update { it.copy(resolution = res) }
         }
     }
 
@@ -336,7 +356,8 @@ class WorkspaceDesktopVM(
             "sh /workspace/${WorkspaceDesktopManager.SCRIPT_PATH} status 2>/dev/null; " +
                 "command -v Xvfb >/dev/null 2>&1 && echo XVFB_YES || echo XVFB_NO; " +
                 "echo BROWSER=$(cat /workspace/.liquidhub/browser 2>/dev/null); " +
-                "echo AUDIO=$(cat /workspace/.liquidhub/audio 2>/dev/null)"
+                "echo AUDIO=$(cat /workspace/.liquidhub/audio 2>/dev/null); " +
+                "echo RESOLUTION=$(cat /workspace/.liquidhub/resolution 2>/dev/null)"
         val APT_NEED = Regex("Need to get ([\\d.,]+)\\s*([kKmMgG]?B)", RegexOption.IGNORE_CASE)
         val APT_GET = Regex("Get:(\\d+)\\s+\\S+.*?\\[([\\d.,]+)\\s*([kKmMgG]?B)\\]", RegexOption.IGNORE_CASE)
         val COUNT = Regex("\\((\\d+)\\s*/\\s*(\\d+)\\)")

@@ -203,6 +203,20 @@ fun WorkspaceDesktopPage(id: String) {
                             )
                         }
                     }
+                    Text("分辨率（越高越清晰、也越吃性能）", style = MaterialTheme.typography.titleSmall)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            "1280x720" to "720p 流畅",
+                            "1600x900" to "900p",
+                            "1920x1080" to "1080p 清晰",
+                        ).forEach { (res, label) ->
+                            FilterChip(
+                                selected = state.resolution == res,
+                                onClick = { vm.setResolution(res) },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("播放桌面声音", style = MaterialTheme.typography.bodyLarge)
                         Spacer(Modifier.width(6.dp))

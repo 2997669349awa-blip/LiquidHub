@@ -38,6 +38,11 @@ class VncView @JvmOverloads constructor(
     var listener: Listener? = null
 
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+    private val cursorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFF5252.toInt()
+        style = Paint.Style.STROKE
+        strokeWidth = 4f
+    }
     @Volatile private var bitmap: Bitmap? = null
     @Volatile private var frameWidth = 0
     @Volatile private var frameHeight = 0
@@ -207,6 +212,7 @@ class VncView @JvmOverloads constructor(
             val h = frameHeight
             cursorX = w / 2
             cursorY = h / 2
+            sendPointer(cursorX, cursorY, 0)
             val colors = IntArray(w * h)
             frame = colors
             val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
@@ -252,9 +258,12 @@ class VncView @JvmOverloads constructor(
                                 }
                                 yy++
                             }
+                            // 只把变化的矩形写回 Bitmap，避免每次整屏 setPixels 造成卡顿
+                            synchronized(bmp) {
+                                bmp.setPixels(colors, y * w + x, w, x, y, rw, rh)
+                            }
                         }
                         if (rects > 0) {
-                            synchronized(bmp) { bmp.setPixels(colors, 0, w, 0, 0, w, h) }
                             postInvalidateOnAnimation()
                         }
                     }
@@ -311,10 +320,15 @@ class VncView @JvmOverloads constructor(
         val dst = dstRect()
         if (dst.width() <= 0) return
         synchronized(bmp) { canvas.drawBitmap(bmp, null, dst, paint) }
+        // 自绘光标：否则触摸板模式下指针不可见，看起来像“没动”
+        val cx = dst.left + cursorX.toFloat() / frameWidth * dst.width()
+        val cy = dst.top + cursorY.toFloat() / frameHeight * dst.height()
+        canvas.drawCircle(cx, cy, 14f, cursorPaint)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (frameWidth == 0 || frameHeight == 0) return false
+        parent?.requestDisallowInterceptTouchEvent(true)
 
         if (!touchpadMode) {
             // 触屏：绝对坐标，按下即在该点按下左键（先移动再按下，兼容部分服务端）
