@@ -6,6 +6,7 @@ package me.rerere.rikkahub.ui.pages.extensions.workspace
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -92,6 +93,8 @@ class WorkspaceDesktopVM(
                         _state.update { it.copy(error = "命令退出码 ${result.exitCode}") }
                     }
                 }
+            } catch (error: CancellationException) {
+                throw error
             } catch (error: Throwable) {
                 _state.update { it.copy(error = error.message ?: "执行失败") }
             } finally {

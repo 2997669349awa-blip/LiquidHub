@@ -190,7 +190,14 @@ function describeTarget(target) {
 
 function question(rl, prompt) {
   return new Promise((resolve) => {
-    rl.question(prompt, (answer) => resolve(answer))
-    rl.once('close', () => resolve(null))
+    const onClose = () => {
+      rl.off('close', onClose)
+      resolve(null)
+    }
+    rl.once('close', onClose)
+    rl.question(prompt, (answer) => {
+      rl.off('close', onClose)
+      resolve(answer)
+    })
   })
 }

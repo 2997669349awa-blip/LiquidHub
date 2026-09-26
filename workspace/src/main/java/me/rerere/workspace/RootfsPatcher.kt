@@ -24,6 +24,9 @@ class RootfsPatcher {
     /**
      * 把 rootfs 里默认的官方包管理器源换成国内镜像。发行版自带的官方源在国内下载
      * `apt/apk/pacman install` 时非常慢，是「安装远程桌面」耗时的主要来源。
+     *
+     * 使用 `http://` 而非 `https://`：老 rootfs 的根证书常常缺失/失效，走 TLS 会直接
+     * 报「certificate not found / expired」使包管理器完全不可用；清华镜像同时提供 http。
      */
     private fun ensurePackageMirrors(etcDir: File) {
         rewriteMirrorHosts(File(etcDir, "apk/repositories"))
@@ -209,7 +212,7 @@ class RootfsPatcher {
     private companion object {
         private const val MAX_DNS_SERVERS = 3
         private const val DEFAULT_HOSTNAME = "localhost"
-        private const val TUNA_MIRROR = "https://mirrors.tuna.tsinghua.edu.cn"
+        private const val TUNA_MIRROR = "http://mirrors.tuna.tsinghua.edu.cn"
         private val URI_HOST_REGEX = Regex("https?://([^/\\s]+)")
         private val PACKAGE_MIRROR_HOSTS = setOf(
             // Ubuntu (x86 / arm64 ports)

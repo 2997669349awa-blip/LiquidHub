@@ -55,7 +55,11 @@ fun TerminalProviderPrompt(
             .firstOrNull { it.id == LOCAL_AI_PROVIDER_ID }
             ?.models
             ?.isNotEmpty() == true
-        if (alreadyHasModels) return@LaunchedEffect
+        if (alreadyHasModels) {
+            // 已导入过就不再每次冷启动重复探测
+            markHandled()
+            return@LaunchedEffect
+        }
         val models = LocalAiScanner.listModels()
         if (models.isNotEmpty()) {
             found = models

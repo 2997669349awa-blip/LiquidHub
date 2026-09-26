@@ -32,6 +32,7 @@ import me.rerere.rikkahub.di.repositoryModule
 import me.rerere.rikkahub.di.viewModelModule
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.datastore.SettingsStore
+import me.rerere.rikkahub.data.db.fts.SimpleDictManager
 import me.rerere.rikkahub.data.sync.BackupManager
 import me.rerere.rikkahub.data.sync.RestoreFailedException
 import me.rerere.rikkahub.utils.JsonInstant
@@ -99,6 +100,12 @@ class RikkaHubApp : Application() {
 
         // delete temp files
         deleteTempFiles()
+
+        // 提前解压 jieba 词典 (约 14MB), 避免数据库首次打开时才拷贝而拖慢首屏
+        get<AppScope>().launch(Dispatchers.IO) {
+            runCatching { SimpleDictManager.extractDict(this@RikkaHubApp) }
+                .onFailure { Log.e(TAG, "prewarm simple_dict failed", it) }
+        }
 
         // cleanup stale tool output files
         cleanupToolOutputs()

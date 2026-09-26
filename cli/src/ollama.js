@@ -30,7 +30,9 @@ export async function isServerUp(timeoutMillis = 800) {
 }
 
 export async function listModels() {
-  const response = await fetch(`${OLLAMA_BASE}/api/tags`)
+  const response = await fetch(`${OLLAMA_BASE}/api/tags`, {
+    signal: AbortSignal.timeout(4000)
+  })
   if (!response.ok) throw new Error(`Ollama 返回 HTTP ${response.status}`)
   const data = await response.json()
   return (data.models || []).map((item) => item.name).filter(Boolean)
@@ -63,11 +65,17 @@ export async function startServer({ quiet = true } = {}) {
   }
 
   const logFd = fs.openSync(OLLAMA_LOG, 'a')
-  const child = spawn('ollama', ['serve'], {
-    detached: true,
-    stdio: ['ignore', logFd, logFd],
-    env: { ...process.env, OLLAMA_HOST: `${OLLAMA_HOST}:${OLLAMA_PORT}` }
-  })
+  let child
+  try {
+    child = spawn('ollama', ['serve'], {
+      detached: true,
+      stdio: ['ignore', logFd, logFd],
+      env: { ...process.env, OLLAMA_HOST: `${OLLAMA_HOST}:${OLLAMA_PORT}` }
+    })
+  } finally {
+    // 子进程已继承该 fd，父进程必须关闭，否则每次启动泄漏一个 fd
+    fs.closeSync(logFd)
+  }
   child.unref()
   fs.writeFileSync(OLLAMA_PID, String(child.pid))
 

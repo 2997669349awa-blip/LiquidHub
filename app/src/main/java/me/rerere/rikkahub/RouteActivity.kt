@@ -226,7 +226,9 @@ class RouteActivity : ComponentActivity() {
             Intent.ACTION_PROCESS_TEXT -> Screen.ShareHandler(
                 text = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString().orEmpty(),
             )
-            else -> intent.getStringExtra("conversationId")?.let { Screen.Chat(it) }
+            else -> intent.getStringExtra("conversationId")
+                ?.takeIf { runCatching { Uuid.parse(it) }.isSuccess }
+                ?.let { Screen.Chat(it) }
         }
         if (destination != null && backStack.lastOrNull() != destination) {
             backStack.add(destination)

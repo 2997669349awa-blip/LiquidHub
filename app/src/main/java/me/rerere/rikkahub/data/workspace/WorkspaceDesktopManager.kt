@@ -37,28 +37,43 @@ class WorkspaceDesktopManager internal constructor(
         ensureScript(workspaceId)
         val workspace = workspaceRepository.getById(workspaceId)
             ?: error("Workspace not found: $workspaceId")
-        val session = withContext(Dispatchers.Main.immediate) {
+        // updateSize() 会 fork/exec proot 启动 shell，放在 IO 线程执行，避免阻塞主线程
+        val session = withContext(Dispatchers.IO) {
             sessionFor(workspace.root, workspace.shellCompatibilityMode)
         }
         val bytes = "sh /workspace/$SCRIPT_PATH $action\n".toByteArray(Charsets.UTF_8)
-        session.write(bytes, 0, bytes.size)
+        withContext(Dispatchers.Main.immediate) {
+            session.write(bytes, 0, bytes.size)
+        }
     }
 
     fun closeWorkspace(root: String) {
-        sessions.remove(root)?.finishIfRunning()
+        sessions.remove(root)?.let { session ->
+            // emulator 为 null 表示进程从未启动 (mShellPid == 0)，此时 finishIfRunning()
+            // 会执行 kill(0, SIGKILL)，即向整个进程组发 SIGKILL 并杀掉 App 自身
+            if (session.emulator != null) {
+                runCatching { session.finishIfRunning() }
+            }
+        }
     }
 
     private fun sessionFor(root: String, shellCompatibilityMode: Boolean): TerminalSession {
         val existing = sessions[root]
-        if (existing != null && existing.isRunning) return existing
-        // 会话已退出时重建，否则后续写入会落到一个已结束的 session 上而静默失效
-        existing?.finishIfRunning()
-        return createWorkspaceTerminalSession(
+        if (existing != null && existing.emulator != null && existing.isRunning) return existing
+        if (existing != null && existing.emulator != null) {
+            runCatching { existing.finishIfRunning() }
+        }
+        val session = createWorkspaceTerminalSession(
             context = appContext,
             root = root,
             client = WorkspaceTerminalSessionClient(appContext, onTitleUpdated = {}, onFinished = {}),
             shellCompatibilityMode = shellCompatibilityMode,
-        ).also { sessions[root] = it }
+        )
+        // 该 session 不绑定 TerminalView，必须显式初始化：否则不会 fork 出 proot 进程，
+        // write() 因 mShellPid <= 0 而被静默丢弃，桌面 start/stop/browser 全部失效
+        session.updateSize(80, 24)
+        sessions[root] = session
+        return session
     }
 
     companion object {
@@ -94,19 +109,23 @@ find_novnc() {
 }
 
 install_pkgs() {
-  if command -v Xvfb >/dev/null 2>&1 && command -v x11vnc >/dev/null 2>&1 && find_novnc; then
+  if command -v Xvfb >/dev/null 2>&1 && command -v x11vnc >/dev/null 2>&1 \
+     && command -v fluxbox >/dev/null 2>&1 && command -v websockify >/dev/null 2>&1 \
+     && command -v xdotool >/dev/null 2>&1 \
+     && { command -v scrot >/dev/null 2>&1 || command -v import >/dev/null 2>&1; } \
+     && find_novnc; then
     log "desktop already installed, skipping"
     return 0
   fi
   if command -v apk >/dev/null 2>&1; then
     log "Alpine: installing desktop packages"
-    apk add --no-cache xvfb x11vnc fluxbox chromium novnc websockify xdotool imagemagick scrot dbus \
+    apk add --no-cache ca-certificates xvfb x11vnc fluxbox chromium novnc websockify xdotool imagemagick scrot dbus \
       font-noto font-noto-cjk bash coreutils
   elif command -v apt-get >/dev/null 2>&1; then
     log "Debian/Ubuntu: installing desktop packages"
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -y -o Acquire::Retries=3
-    apt-get install -y --no-install-recommends xvfb x11vnc fluxbox xdotool imagemagick scrot \
+    apt-get install -y --no-install-recommends ca-certificates xvfb x11vnc fluxbox xdotool imagemagick scrot \
       dbus-x11 novnc websockify fonts-noto-cjk
     apt-get install -y --no-install-recommends chromium 2>/dev/null \
       || apt-get install -y --no-install-recommends chromium-browser 2>/dev/null \
@@ -115,19 +134,29 @@ install_pkgs() {
     rm -rf /var/lib/apt/lists/* 2>/dev/null
   elif command -v pacman >/dev/null 2>&1; then
     log "Arch: installing desktop packages"
-    pacman -Sy --noconfirm --needed xorg-server-xvfb x11vnc fluxbox chromium novnc websockify xdotool \
+    pacman -Sy --noconfirm --needed ca-certificates xorg-server-xvfb x11vnc fluxbox chromium novnc websockify xdotool \
       imagemagick scrot dbus noto-fonts
     pacman -Scc --noconfirm 2>/dev/null
   else
     log "ERROR: unsupported package manager"
     return 1
   fi
+  # 刷新根证书：老 rootfs 的 CA 缺失/过期会导致 HTTPS (如 Chromium 浏览网页) 失败
+  command -v update-ca-certificates >/dev/null 2>&1 && update-ca-certificates 2>/dev/null || true
+  command -v update-ca-trust >/dev/null 2>&1 && update-ca-trust 2>/dev/null || true
+  command -v trust >/dev/null 2>&1 && trust extract-compat 2>/dev/null || true
   log "install done"
 }
 
 is_running() {
-  [ -f "${'$'}RUNDIR/websockify.pid" ] || return 1
-  kill -0 "${'$'}(cat "${'$'}RUNDIR/websockify.pid")" 2>/dev/null
+  # 以 X 服务存活为准，而不是只看 websockify：noVNC 缺失时 websockify 不启动，
+  # 只看 websockify 会误报 STOPPED 并重复拉起 Xvfb/x11vnc
+  for p in x11vnc xvfb; do
+    if [ -f "${'$'}RUNDIR/${'$'}p.pid" ] && kill -0 "${'$'}(cat "${'$'}RUNDIR/${'$'}p.pid")" 2>/dev/null; then
+      return 0
+    fi
+  done
+  return 1
 }
 
 start() {

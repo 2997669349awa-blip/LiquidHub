@@ -272,8 +272,14 @@ class WorkspaceDetailVM(
     fun setToolApproval(toolName: String, needsApproval: Boolean) {
         viewModelScope.launch {
             val workspace = state.value.workspace ?: return@launch
-            repository.setToolApproval(workspace.id, toolName, needsApproval)
-            loadWorkspace()
+            try {
+                repository.setToolApproval(workspace.id, toolName, needsApproval)
+                loadWorkspace()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                _settingsError.value = error.message.orEmpty()
+            }
         }
     }
 
@@ -351,8 +357,14 @@ class WorkspaceDetailVM(
 
     private fun loadWorkspace() {
         viewModelScope.launch {
-            val workspace = repository.getById(id)
-            _state.update { it.copy(workspace = workspace) }
+            try {
+                val workspace = repository.getById(id)
+                _state.update { it.copy(workspace = workspace) }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                _settingsError.value = error.message.orEmpty()
+            }
         }
     }
 }
