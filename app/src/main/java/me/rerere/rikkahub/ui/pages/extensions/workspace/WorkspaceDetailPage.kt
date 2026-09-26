@@ -220,6 +220,7 @@ fun WorkspaceDetailPage(id: String) {
                     installProgress = installProgress,
                     onInstallRootfs = { showInstallDialog = true },
                     onToolApprovalChange = vm::setToolApproval,
+                    onBypassAll = vm::setAllToolApprovals,
                     onShellCompatibilityModeChange = vm::setShellCompatibilityMode,
                 )
 
@@ -378,6 +379,7 @@ private fun WorkspaceBasicPage(
     installProgress: RootfsInstallProgress?,
     onInstallRootfs: () -> Unit,
     onToolApprovalChange: (String, Boolean) -> Unit,
+    onBypassAll: (Boolean) -> Unit,
     onShellCompatibilityModeChange: (Boolean) -> Unit,
 ) {
     val shellStatus = workspace?.shellStatus
@@ -472,6 +474,7 @@ private fun WorkspaceBasicPage(
             WorkspaceToolApprovalCard(
                 workspace = workspace,
                 onToolApprovalChange = onToolApprovalChange,
+                onBypassAll = onBypassAll,
             )
         }
     }
@@ -481,6 +484,7 @@ private fun WorkspaceBasicPage(
 private fun WorkspaceToolApprovalCard(
     workspace: WorkspaceEntity?,
     onToolApprovalChange: (String, Boolean) -> Unit,
+    onBypassAll: (Boolean) -> Unit,
 ) {
     val overrides = workspace?.toolApprovalOverrides().orEmpty()
     val tools = workspaceToolApprovalItems()
@@ -504,9 +508,7 @@ private fun WorkspaceToolApprovalCard(
                 val allBypassed = tools.all { !resolveWorkspaceToolApproval(it.first, overrides) }
                 Switch(
                     checked = allBypassed,
-                    onCheckedChange = { bypass ->
-                        tools.forEach { (name, _) -> onToolApprovalChange(name, !bypass) }
-                    },
+                    onCheckedChange = { bypass -> onBypassAll(!bypass) },
                     enabled = workspace != null,
                 )
             },

@@ -7,6 +7,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
+import me.rerere.rikkahub.data.ai.tools.WorkspaceApprovalToolNames
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.db.dao.WorkspaceDAO
 import me.rerere.rikkahub.data.db.entity.WorkspaceEntity
@@ -104,6 +105,20 @@ class WorkspaceRepository(
     suspend fun setToolApproval(id: String, toolName: String, needsApproval: Boolean): Boolean {
         val workspace = dao.getById(id) ?: return false
         val overrides = workspace.toolApprovalOverrides() + (toolName to needsApproval)
+        dao.upsert(
+            workspace.copy(
+                toolApprovals = JsonInstant.encodeToString(overrides),
+                updatedAt = System.currentTimeMillis(),
+            )
+        )
+        return true
+    }
+
+    /** 一次性设置所有工具是否需要批准（“免批准全部”开关用，避免多次写库）。 */
+    suspend fun setAllToolApprovals(id: String, needsApproval: Boolean): Boolean {
+        val workspace = dao.getById(id) ?: return false
+        val overrides = workspace.toolApprovalOverrides().toMutableMap()
+        WorkspaceApprovalToolNames.forEach { overrides[it] = needsApproval }
         dao.upsert(
             workspace.copy(
                 toolApprovals = JsonInstant.encodeToString(overrides),

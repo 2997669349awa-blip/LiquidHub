@@ -48,7 +48,10 @@ class WorkspaceDesktopManager internal constructor(
         val session = withContext(sessionDispatcher) {
             sessionFor(workspace.root, workspace.shellCompatibilityMode)
         }
-        val bytes = "sh /workspace/$SCRIPT_PATH $action\n".toByteArray(Charsets.UTF_8)
+        val cmd = "mkdir -p /tmp/.liquidhub-desktop; " +
+            "sh /workspace/$SCRIPT_PATH $action > /tmp/.liquidhub-desktop/last.log 2>&1; " +
+            "cat /tmp/.liquidhub-desktop/last.log\n"
+        val bytes = cmd.toByteArray(Charsets.UTF_8)
         session.write(bytes, 0, bytes.size)
     }
 
@@ -355,6 +358,10 @@ logs() {
       tail -n 40 "${'$'}RUNDIR/${'$'}f.log"
     fi
   done
+  if [ -f "${'$'}RUNDIR/last.log" ]; then
+    echo "==== last.log (最近一次 启动/停止 输出) ===="
+    tail -n 50 "${'$'}RUNDIR/last.log"
+  fi
 }
 
 start_audio() {

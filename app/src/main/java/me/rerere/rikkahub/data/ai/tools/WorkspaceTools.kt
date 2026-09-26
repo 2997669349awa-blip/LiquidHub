@@ -30,6 +30,22 @@ val WorkspaceToolDefaultApprovals: Map<String, Boolean> = mapOf(
     "workspace_shell" to true,
 )
 
+/** 工作区 + 桌面里所有可设置「是否需要批准」的工具名。 */
+val WorkspaceApprovalToolNames: List<String> = listOf(
+    "workspace_read_file",
+    "workspace_write_file",
+    "workspace_edit_file",
+    "workspace_shell",
+    "desktop_start",
+    "desktop_stop",
+    "desktop_screenshot",
+    "desktop_click",
+    "desktop_type_text",
+    "desktop_key",
+    "desktop_browser",
+    "desktop_wait_user",
+)
+
 fun resolveWorkspaceToolApproval(name: String, overrides: Map<String, Boolean>): Boolean =
     overrides[name] ?: WorkspaceToolDefaultApprovals[name] ?: DesktopToolDefaultApprovals[name] ?: false
 

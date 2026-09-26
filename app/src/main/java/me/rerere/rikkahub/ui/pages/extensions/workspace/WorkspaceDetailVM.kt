@@ -283,6 +283,20 @@ class WorkspaceDetailVM(
         }
     }
 
+    fun setAllToolApprovals(needsApproval: Boolean) {
+        viewModelScope.launch {
+            val workspace = state.value.workspace ?: return@launch
+            try {
+                repository.setAllToolApprovals(workspace.id, needsApproval)
+                loadWorkspace()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                _settingsError.value = error.message.orEmpty()
+            }
+        }
+    }
+
     fun installRootfs(url: String) {
         viewModelScope.launch {
             _installError.value = null
