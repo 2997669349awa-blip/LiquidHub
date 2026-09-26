@@ -24,6 +24,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -99,6 +100,12 @@ fun WorkspaceDesktopPage(id: String) {
                 Button(enabled = !state.busy && state.shellReady != false, onClick = { vm.install() }) {
                     Text("安装环境")
                 }
+                OutlinedButton(
+                    enabled = !state.busy && state.shellReady != false,
+                    onClick = { vm.reinstall() },
+                ) {
+                    Text("重装")
+                }
                 Button(
                     enabled = !state.busy && state.installed == true && state.shellReady != false,
                     onClick = { vm.start() },
@@ -135,7 +142,7 @@ fun WorkspaceDesktopPage(id: String) {
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
             }
-            if (state.running) {
+            if (state.running && state.webReady == true) {
                 WebView(
                     state = rememberWebViewState(WorkspaceDesktopManager.NOVNC_URL),
                     modifier = Modifier.fillMaxSize(),
@@ -147,15 +154,24 @@ fun WorkspaceDesktopPage(id: String) {
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    if (state.running && state.webReady != true) {
+                        Text(
+                            text = "桌面(X)已启动，但网页桌面服务(noVNC/websockify)没起来，所以这个网页打不开。" +
+                                "点「查看服务日志」能看到具体原因。",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                     Text("网页桌面（noVNC）", style = MaterialTheme.typography.titleSmall)
                     Text(
                         text = "首次使用先点「安装环境」（安装 Fluxbox、Chromium、VNC 与 noVNC，Alpine 工作区最省流）。" +
                             "完成后点「启动」，这里会显示可直接操作的桌面网页。" +
-                            "AI 也能对同一桌面截图、点击、输入；遇到登录等需要人操作的情况，你可以在本页面直接接管。",
+                            "AI 也能对同一桌面截图、点击、输入；遇到登录等需要人操作的情况，你可以在本页面直接接管。" +
+                            "装坏了可以点「重装」强制重来。",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    InstallLog(state = state)
+                    InstallLog(state = state, onLoadLogs = { vm.loadLogs() })
                 }
             }
         }
@@ -163,7 +179,7 @@ fun WorkspaceDesktopPage(id: String) {
 }
 
 @Composable
-private fun InstallLog(state: WorkspaceDesktopState) {
+private fun InstallLog(state: WorkspaceDesktopState, onLoadLogs: () -> Unit) {
     val scroll = rememberScrollState()
     LaunchedEffect(state.log) {
         scroll.scrollTo(scroll.maxValue)
@@ -177,6 +193,8 @@ private fun InstallLog(state: WorkspaceDesktopState) {
                 text = if (state.busy) "安装日志 · ${state.progressText ?: stageLabel(state.stage)}" else "安装日志",
                 style = MaterialTheme.typography.labelLarge,
             )
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onLoadLogs) { Text("查看服务日志") }
         }
         Spacer(Modifier.height(4.dp))
         Surface(

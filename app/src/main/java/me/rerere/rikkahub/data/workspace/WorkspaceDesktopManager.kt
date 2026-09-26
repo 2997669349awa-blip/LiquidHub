@@ -98,6 +98,7 @@ VNC_PORT=5900
 WEB_PORT=6080
 RUNDIR=/tmp/.liquidhub-desktop
 NOVNC_DIR=""
+FORCE_INSTALL=0
 
 export DISPLAY="${'$'}DISP"
 export HOME="${'$'}{HOME:-/root}"
@@ -115,7 +116,8 @@ find_novnc() {
 }
 
 install_pkgs() {
-  if command -v Xvfb >/dev/null 2>&1 && command -v x11vnc >/dev/null 2>&1 \
+  if [ "${'$'}{FORCE_INSTALL:-0}" != "1" ] \
+     && command -v Xvfb >/dev/null 2>&1 && command -v x11vnc >/dev/null 2>&1 \
      && command -v fluxbox >/dev/null 2>&1 && command -v websockify >/dev/null 2>&1 \
      && command -v xdotool >/dev/null 2>&1 \
      && { command -v scrot >/dev/null 2>&1 || command -v import >/dev/null 2>&1; } \
@@ -190,6 +192,13 @@ is_running() {
   return 1
 }
 
+is_web_running() {
+  if [ -f "${'$'}RUNDIR/websockify.pid" ] && kill -0 "${'$'}(cat "${'$'}RUNDIR/websockify.pid")" 2>/dev/null; then
+    return 0
+  fi
+  return 1
+}
+
 start() {
   if is_running; then log "already running"; return 0; fi
   if ! command -v Xvfb >/dev/null 2>&1; then
@@ -218,7 +227,11 @@ start() {
     log "WARN: noVNC web directory not found, VNC only on port ${'$'}VNC_PORT"
   fi
   sleep 1
-  if is_running; then log "STARTED"; else log "FAILED: websockify did not stay alive"; fi
+  if is_running; then
+    if is_web_running; then log "STARTED"; else log "STARTED_X_ONLY: websockify 未启动，无法打开网页桌面（见 websockify.log）"; fi
+  else
+    log "FAILED: X server did not stay alive"
+  fi
 }
 
 browser() {
@@ -259,16 +272,28 @@ stop() {
 }
 
 status() {
-  if is_running; then log "RUNNING"; else log "STOPPED"; fi
+  if is_running; then echo "X_RUNNING"; else echo "X_STOPPED"; fi
+  if is_web_running; then echo "WEB_RUNNING"; else echo "WEB_STOPPED"; fi
+}
+
+logs() {
+  for f in xvfb fluxbox x11vnc websockify browser; do
+    if [ -f "${'$'}RUNDIR/${'$'}f.log" ]; then
+      echo "==== ${'$'}f.log ===="
+      tail -n 30 "${'$'}RUNDIR/${'$'}f.log"
+    fi
+  done
 }
 
 case "${'$'}{1:-status}" in
   install) install_pkgs ;;
+  reinstall) FORCE_INSTALL=1; stop; install_pkgs ;;
   start) start ;;
   stop) stop ;;
   restart) stop; sleep 1; start ;;
   status) status ;;
+  logs) logs ;;
   browser) browser "${'$'}{2:-about:blank}" ;;
-  *) log "usage: ${'$'}0 {install|start|stop|restart|status|browser [url]}"; exit 1 ;;
+  *) log "usage: ${'$'}0 {install|reinstall|start|stop|restart|status|logs|browser [url]}"; exit 1 ;;
 esac
 """

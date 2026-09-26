@@ -29,6 +29,7 @@ enum class DesktopStage {
 data class WorkspaceDesktopState(
     val busy: Boolean = false,
     val running: Boolean = false,
+    val webReady: Boolean? = null,
     val installed: Boolean? = null,
     val shellReady: Boolean? = null,
     val stage: DesktopStage = DesktopStage.IDLE,
@@ -81,19 +82,39 @@ class WorkspaceDesktopVM(
                 )
             }.getOrNull()
             val output = probe?.stdout.orEmpty()
+            val lines = output.lineSequence().map { it.trim() }.toList()
             _state.update {
                 it.copy(
                     shellReady = true,
-                    running = output.contains("RUNNING"),
-                    installed = output.contains("XVFB_YES"),
+                    running = lines.contains("X_RUNNING"),
+                    webReady = lines.contains("WEB_RUNNING"),
+                    installed = lines.contains("XVFB_YES"),
                 )
             }
         }
     }
 
     fun install() = runAction("install", timeoutMillis = 30 * 60_000L)
+    fun reinstall() = runAction("reinstall", timeoutMillis = 30 * 60_000L)
     fun start() = runAction("start", timeoutMillis = 60_000L)
     fun stop() = runAction("stop", timeoutMillis = 60_000L)
+
+    /** 拉取桌面各服务（Xvfb/x11vnc/websockify/browser）的日志，方便排查网页打不开。 */
+    fun loadLogs() {
+        viewModelScope.launch {
+            val result = runCatching {
+                repository.executeCommand(
+                    id = id,
+                    command = "sh /workspace/${WorkspaceDesktopManager.SCRIPT_PATH} logs",
+                    timeoutMillis = 15_000,
+                )
+            }.getOrNull() ?: return@launch
+            val text = (result.stdout + "\n" + result.stderr).trim()
+            if (text.isNotBlank()) {
+                _state.update { it.copy(log = text.takeLast(MAX_LOG_CHARS)) }
+            }
+        }
+    }
 
     private fun runAction(action: String, timeoutMillis: Long) {
         if (_state.value.busy) return
@@ -268,7 +289,7 @@ class WorkspaceDesktopVM(
     private companion object {
         const val MAX_LOG_CHARS = 60_000
         const val DESKTOP_PROBE =
-            "sh /workspace/${WorkspaceDesktopManager.SCRIPT_PATH} status 2>/dev/null || echo STOPPED; " +
+            "sh /workspace/${WorkspaceDesktopManager.SCRIPT_PATH} status 2>/dev/null; " +
                 "command -v Xvfb >/dev/null 2>&1 && echo XVFB_YES || echo XVFB_NO"
         val APT_NEED = Regex("Need to get ([\\d.,]+)\\s*([kKmMgG]?B)", RegexOption.IGNORE_CASE)
         val APT_GET = Regex("Get:(\\d+)\\s+\\S+.*?\\[([\\d.,]+)\\s*([kKmMgG]?B)\\]", RegexOption.IGNORE_CASE)
