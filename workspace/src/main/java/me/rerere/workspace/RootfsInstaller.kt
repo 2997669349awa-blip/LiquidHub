@@ -32,7 +32,7 @@ class RootfsInstaller(
         try {
             stagingDir.deleteRecursively()
             stagingDir.mkdirs()
-            download(url, archive, onProgress)
+            download(candidateUrls(url), archive, onProgress)
             extractTar(archive, stagingDir, format, onProgress)
             linuxDir.deleteRecursively()
             require(stagingDir.renameTo(linuxDir)) {
@@ -46,7 +46,58 @@ class RootfsInstaller(
         }
     }
 
+    /**
+     * 主镜像失败时依次回退到等价镜像（仅限已知互为镜像的路径）。
+     */
+    private fun candidateUrls(url: String): List<String> {
+        val mirror = when {
+            url.contains("mirrors.tuna.tsinghua.edu.cn/archlinuxarm/") ->
+                url.replace(
+                    "mirrors.tuna.tsinghua.edu.cn/archlinuxarm/",
+                    "mirror.iscas.ac.cn/archlinuxarm/",
+                )
+
+            url.contains("mirrors.tuna.tsinghua.edu.cn/") ->
+                url.replace("mirrors.tuna.tsinghua.edu.cn/", "mirrors.aliyun.com/")
+
+            url.contains("mirrors.aliyun.com/") ->
+                url.replace("mirrors.aliyun.com/", "mirrors.tuna.tsinghua.edu.cn/")
+
+            else -> null
+        }
+        return if (mirror != null && mirror != url) listOf(url, mirror) else listOf(url)
+    }
+
     private fun download(
+        urls: List<String>,
+        target: File,
+        onProgress: (RootfsInstallProgress) -> Unit,
+    ) {
+        var lastError: Throwable? = null
+        urls.forEachIndexed { index, url ->
+            try {
+                downloadOnce(url, target, onProgress)
+                return
+            } catch (error: InterruptedException) {
+                throw error
+            } catch (error: Throwable) {
+                lastError = error
+                target.delete()
+                if (index < urls.lastIndex) {
+                    onProgress(
+                        RootfsInstallProgress(
+                            stage = RootfsInstallStage.DOWNLOADING,
+                            bytesRead = 0,
+                            totalBytes = null,
+                        )
+                    )
+                }
+            }
+        }
+        throw IOException("Rootfs download failed: ${lastError?.message}", lastError)
+    }
+
+    private fun downloadOnce(
         url: String,
         target: File,
         onProgress: (RootfsInstallProgress) -> Unit,
@@ -55,6 +106,10 @@ class RootfsInstaller(
         connection.connectTimeout = CONNECT_TIMEOUT_MS
         connection.readTimeout = READ_TIMEOUT_MS
         connection.instanceFollowRedirects = true
+        // 清华 / 阿里云等镜像的 WAF 会拦截 Android 默认的 Dalvik UA 并返回 403，
+        // 必须显式指定一个被放行的 UA。
+        connection.setRequestProperty("User-Agent", DOWNLOAD_USER_AGENT)
+        connection.setRequestProperty("Accept", "*/*")
         try {
             val code = connection.responseCode
             require(code in 200..299) { "Rootfs download failed: HTTP $code" }
@@ -414,5 +469,6 @@ class RootfsInstaller(
         private const val PROGRESS_STEP_BYTES = 512 * 1024
         private const val CONNECT_TIMEOUT_MS = 30_000
         private const val READ_TIMEOUT_MS = 60_000
+        private const val DOWNLOAD_USER_AGENT = "LiquidHub/0.1"
     }
 }
