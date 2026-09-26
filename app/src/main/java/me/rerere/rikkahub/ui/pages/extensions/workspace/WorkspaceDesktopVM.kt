@@ -106,16 +106,23 @@ class WorkspaceDesktopVM(
                     desktopManager.runAction(id, action)
                     delay(2_000)
                 } else {
+                    if (action == "install") {
+                        appendLog("[开始安装环境，下面是实时输出]\n")
+                        pushLog()
+                    }
+                    val script = "/workspace/${WorkspaceDesktopManager.SCRIPT_PATH}"
+                    // apt/apk 在非 TTY 下会块缓冲输出，用 stdbuf 强制行缓冲，日志才能实时刷新
+                    val run = "if command -v stdbuf >/dev/null 2>&1; then " +
+                        "stdbuf -oL -eL sh $script $action; else sh $script $action; fi"
                     val result = repository.executeCommand(
                         id = id,
-                        command = "if [ -f /workspace/${WorkspaceDesktopManager.SCRIPT_PATH} ]; " +
-                            "then sh /workspace/${WorkspaceDesktopManager.SCRIPT_PATH} $action; " +
-                            "else echo SCRIPT_MISSING; fi",
+                        command = "if [ -f $script ]; then $run; else echo SCRIPT_MISSING; fi",
                         timeoutMillis = timeoutMillis,
                         onOutput = ::onOutput,
                     )
-                    flushLog()
+                    flushLog(force = true)
                     appendLog("\n[退出码 ${result.exitCode}]\n")
+                    pushLog()
                     if (result.exitCode != 0) {
                         _state.update { it.copy(error = "安装失败（退出码 ${result.exitCode}），详见下方日志") }
                     } else {
@@ -220,9 +227,9 @@ class WorkspaceDesktopVM(
         }
     }
 
-    private fun flushLog() {
+    private fun flushLog(force: Boolean = false) {
         val now = System.currentTimeMillis()
-        if (now - lastPushAt < 120) return
+        if (!force && now - lastPushAt < 120) return
         lastPushAt = now
         pushLog()
     }

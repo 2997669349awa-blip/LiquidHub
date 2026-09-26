@@ -6,8 +6,10 @@
 package me.rerere.rikkahub.data.workspace
 
 import android.content.Context
+import android.os.Handler
+import android.os.HandlerThread
 import com.termux.terminal.TerminalSession
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.android.asCoroutineDispatcher
 import kotlinx.coroutines.withContext
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
 import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceTerminalSessionClient
@@ -28,6 +30,11 @@ class WorkspaceDesktopManager internal constructor(
     private val appContext = context.applicationContext
     private val sessions = mutableMapOf<String, TerminalSession>()
 
+    // TerminalSession 的构造函数内部会 new Handler()，用的是「当前线程的 Looper」。
+    // 因此必须在有 Looper 的线程上创建；用专用 HandlerThread 既满足要求又不阻塞主线程。
+    private val sessionThread = HandlerThread("liquidhub-desktop-session").apply { start() }
+    private val sessionDispatcher = Handler(sessionThread.looper).asCoroutineDispatcher()
+
     /** Writes the helper script into the workspace files area (bind mounted at /workspace). */
     suspend fun ensureScript(workspaceId: String) {
         workspaceRepository.writeText(workspaceId, SCRIPT_PATH, DESKTOP_SCRIPT, overwrite = true)
@@ -37,43 +44,42 @@ class WorkspaceDesktopManager internal constructor(
         ensureScript(workspaceId)
         val workspace = workspaceRepository.getById(workspaceId)
             ?: error("Workspace not found: $workspaceId")
-        // updateSize() 会 fork/exec proot 启动 shell，放在 IO 线程执行，避免阻塞主线程
-        val session = withContext(Dispatchers.IO) {
+        // 会话创建 + updateSize()（fork/exec proot）都放在有 Looper 的后台线程上
+        val session = withContext(sessionDispatcher) {
             sessionFor(workspace.root, workspace.shellCompatibilityMode)
         }
         val bytes = "sh /workspace/$SCRIPT_PATH $action\n".toByteArray(Charsets.UTF_8)
-        withContext(Dispatchers.Main.immediate) {
-            session.write(bytes, 0, bytes.size)
-        }
+        session.write(bytes, 0, bytes.size)
     }
 
     fun closeWorkspace(root: String) {
-        sessions.remove(root)?.let { session ->
-            // emulator 为 null 表示进程从未启动 (mShellPid == 0)，此时 finishIfRunning()
-            // 会执行 kill(0, SIGKILL)，即向整个进程组发 SIGKILL 并杀掉 App 自身
-            if (session.emulator != null) {
-                runCatching { session.finishIfRunning() }
-            }
+        val session = synchronized(sessions) { sessions.remove(root) } ?: return
+        // emulator 为 null 表示进程从未启动 (mShellPid == 0)，此时 finishIfRunning()
+        // 会执行 kill(0, SIGKILL)，即向整个进程组发 SIGKILL 并杀掉 App 自身
+        if (session.emulator != null) {
+            runCatching { session.finishIfRunning() }
         }
     }
 
     private fun sessionFor(root: String, shellCompatibilityMode: Boolean): TerminalSession {
-        val existing = sessions[root]
-        if (existing != null && existing.emulator != null && existing.isRunning) return existing
-        if (existing != null && existing.emulator != null) {
-            runCatching { existing.finishIfRunning() }
+        synchronized(sessions) {
+            val existing = sessions[root]
+            if (existing != null && existing.emulator != null && existing.isRunning) return existing
+            if (existing != null && existing.emulator != null) {
+                runCatching { existing.finishIfRunning() }
+            }
+            val session = createWorkspaceTerminalSession(
+                context = appContext,
+                root = root,
+                client = WorkspaceTerminalSessionClient(appContext, onTitleUpdated = {}, onFinished = {}),
+                shellCompatibilityMode = shellCompatibilityMode,
+            )
+            // 该 session 不绑定 TerminalView，必须显式初始化：否则不会 fork 出 proot 进程，
+            // write() 因 mShellPid <= 0 而被静默丢弃，桌面 start/stop/browser 全部失效
+            session.updateSize(80, 24)
+            sessions[root] = session
+            return session
         }
-        val session = createWorkspaceTerminalSession(
-            context = appContext,
-            root = root,
-            client = WorkspaceTerminalSessionClient(appContext, onTitleUpdated = {}, onFinished = {}),
-            shellCompatibilityMode = shellCompatibilityMode,
-        )
-        // 该 session 不绑定 TerminalView，必须显式初始化：否则不会 fork 出 proot 进程，
-        // write() 因 mShellPid <= 0 而被静默丢弃，桌面 start/stop/browser 全部失效
-        session.updateSize(80, 24)
-        sessions[root] = session
-        return session
     }
 
     companion object {
