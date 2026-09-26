@@ -118,6 +118,7 @@ import me.rerere.rikkahub.ui.pages.setting.SettingMcpPage
 import me.rerere.rikkahub.ui.pages.setting.SettingModelPage
 import me.rerere.rikkahub.ui.pages.setting.SettingPage
 import me.rerere.rikkahub.ui.pages.setting.SettingProviderDetailPage
+import me.rerere.rikkahub.ui.pages.setting.LocalModelsPage
 import me.rerere.rikkahub.ui.pages.setting.SettingProviderPage
 import me.rerere.rikkahub.ui.pages.setting.SettingSearchDetailPage
 import me.rerere.rikkahub.ui.pages.setting.SettingSearchPage
@@ -479,6 +480,10 @@ class RouteActivity : ComponentActivity() {
                                 SettingWebPage()
                             }
 
+                            entry<Screen.LocalModels> {
+                                LocalModelsPage()
+                            }
+
                             entry<Screen.Debug> {
                                 DebugPage()
                             }
@@ -701,6 +706,9 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data object SettingWeb : Screen
+
+    @Serializable
+    data object LocalModels : Screen
 
     @Serializable
     data object Debug : Screen

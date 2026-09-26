@@ -252,6 +252,12 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                         supportingContent = { Text(stringResource(R.string.setting_page_web_server_desc)) },
                         headlineContent = { Text(stringResource(R.string.setting_page_web_server)) },
                     )
+                    item(
+                        onClick = { navController.navigate(Screen.LocalModels) },
+                        leadingContent = { Icon(HugeIcons.Brain02, null) },
+                        supportingContent = { Text("下载并管理本机开源模型（Qwen、DeepSeek 等），走国内镜像") },
+                        headlineContent = { Text("本地AI") },
+                    )
                 }
             }
 

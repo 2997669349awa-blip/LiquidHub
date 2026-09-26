@@ -132,20 +132,10 @@ install_pkgs() {
   elif command -v apt-get >/dev/null 2>&1; then
     log "Debian/Ubuntu: installing desktop packages"
     export DEBIAN_FRONTEND=noninteractive
-    # 上一次安装若被中断，apt/dpkg 进程会残留在 rootfs 里一直占着 dpkg 锁，
-    # 导致后续安装一律 "Could not get lock"。先杀掉残留进程并清掉锁文件。
-    for d in /proc/[0-9]*; do
-      c=$(cat "${'$'}d/comm" 2>/dev/null)
-      case "${'$'}c" in
-        apt-get|apt|dpkg|unattended-upgrade) kill -9 "${'$'}{d#/proc/}" 2>/dev/null ;;
-      esac
-    done
-    sleep 1
-    rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock /var/lib/apt/lists/lock 2>/dev/null
-    dpkg --configure -a >/dev/null 2>&1 || true
-    apt-get update -y -o Acquire::Retries=3 || RC=1
-    apt-get install -y --no-install-recommends ca-certificates xvfb x11vnc fluxbox xdotool imagemagick scrot \
-      dbus-x11 fonts-noto-cjk || RC=1
+    getent hosts mirrors.tuna.tsinghua.edu.cn >/dev/null 2>&1 || log "WARN: 无法解析镜像域名，DNS 可能有问题"
+    apt-get update -y -o Acquire::Retries=5 -o Acquire::ForceIPv4=true || RC=1
+    apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true \
+      ca-certificates xvfb x11vnc fluxbox xdotool imagemagick scrot dbus-x11 fonts-noto-cjk || RC=1
     # Ubuntu arm64 的 chromium 只有 snap 包，apt 装不上；依次退回可用的轻量浏览器
     if ! command -v chromium >/dev/null 2>&1 && ! command -v chromium-browser >/dev/null 2>&1; then
       apt-get install -y --no-install-recommends chromium 2>/dev/null \

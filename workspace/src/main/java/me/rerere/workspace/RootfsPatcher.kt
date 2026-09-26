@@ -86,11 +86,11 @@ class RootfsPatcher {
             resolvConf.delete()
         }
 
-        val servers = nameservers
+        val servers = (PREFERRED_DNS_SERVERS + nameservers)
             .filter { it.isNotBlank() }
             .distinct()
             .take(MAX_DNS_SERVERS)
-            .ifEmpty { DEFAULT_DNS_SERVERS }
+            .ifEmpty { PREFERRED_DNS_SERVERS }
 
         resolvConf.writeText(
             buildString {
@@ -235,9 +235,15 @@ class RootfsPatcher {
             "::1",
         )
         private val DEFAULT_DNS_SERVERS = listOf(
-            "1.1.1.1",
-            "8.8.8.8",
             "223.5.5.5",
+            "119.29.29.29",
+            "114.114.114.114",
+        )
+        // 国内优先：1.1.1.1/8.8.8.8 在国内常被墙，放前面会导致 apt/apk 解析超时
+        private val PREFERRED_DNS_SERVERS = listOf(
+            "223.5.5.5",
+            "119.29.29.29",
+            "114.114.114.114",
         )
     }
 }
