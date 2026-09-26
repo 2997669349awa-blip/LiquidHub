@@ -14,6 +14,7 @@ import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.repository.ConversationRepository
 import me.rerere.rikkahub.data.repository.MemoryRepository
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
+import me.rerere.rikkahub.data.workspace.WorkspaceDesktopManager
 import me.rerere.workspace.WorkspaceShellStatus
 
 private const val TAG = "ChatToolFactory"
@@ -34,6 +35,7 @@ class ChatToolFactory(
     private val mcpManager: McpManager,
     private val skillManager: SkillManager,
     private val workspaceRepository: WorkspaceRepository,
+    private val workspaceDesktopManager: WorkspaceDesktopManager,
 ) {
     suspend fun createTools(
         settings: Settings,
@@ -104,6 +106,7 @@ class ChatToolFactory(
             )
             return emptyList()
         }
-        return createWorkspaceTools(workspaceId, workspaceRepository, cwd)
+        return createWorkspaceTools(workspaceId, workspaceRepository, cwd) +
+            createDesktopTools(workspaceId, workspaceRepository, workspaceDesktopManager)
     }
 }

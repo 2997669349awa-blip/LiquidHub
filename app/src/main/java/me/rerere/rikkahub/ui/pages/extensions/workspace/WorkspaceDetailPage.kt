@@ -77,6 +77,7 @@ import kotlinx.coroutines.launch
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.ArrowTurnBackward
 import me.rerere.hugeicons.stroke.Bash
+import me.rerere.hugeicons.stroke.ComputerDesk01
 import me.rerere.hugeicons.stroke.ComputerTerminal01
 import me.rerere.hugeicons.stroke.Delete01
 import me.rerere.hugeicons.stroke.File02
@@ -178,6 +179,9 @@ fun WorkspaceDetailPage(id: String) {
                         Icon(HugeIcons.Refresh01, contentDescription = null)
                     }
                     if (state.workspace?.shellStatus != WorkspaceShellStatus.DISABLED.name) {
+                        IconButton(onClick = { navController.navigate(Screen.WorkspaceDesktop(id)) }) {
+                            Icon(HugeIcons.ComputerDesk01, contentDescription = "远程桌面")
+                        }
                         IconButton(onClick = { navController.navigate(Screen.WorkspaceTerminal(id)) }) {
                             Icon(HugeIcons.ComputerTerminal01, contentDescription = null)
                         }
@@ -521,6 +525,13 @@ private fun workspaceToolApprovalItems() = listOf(
     "workspace_write_file" to stringResource(R.string.workspace_detail_tool_write_file),
     "workspace_edit_file" to stringResource(R.string.workspace_detail_tool_edit_file),
     "workspace_shell" to stringResource(R.string.workspace_detail_tool_shell),
+    "desktop_start" to "桌面: 启动",
+    "desktop_stop" to "桌面: 停止",
+    "desktop_screenshot" to "桌面: 截图",
+    "desktop_click" to "桌面: 点击",
+    "desktop_type_text" to "桌面: 输入文本",
+    "desktop_key" to "桌面: 按键",
+    "desktop_browser" to "桌面: 打开网页",
 )
 
 @Composable
@@ -570,31 +581,55 @@ private fun InstallRootfsDialog(
 ) {
     var selectedPresetId by rememberSaveable(workspace.id) { mutableStateOf(ROOTFS_PRESETS.first().id) }
     var url by rememberSaveable(workspace.id) { mutableStateOf(DEFAULT_ROOTFS_URL) }
+    val selectedPreset = ROOTFS_PRESETS.firstOrNull { it.id == selectedPresetId }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.workspace_detail_install_rootfs)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 Text(
                     text = stringResource(R.string.workspace_detail_install_rootfs_desc, workspace.name),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    ROOTFS_PRESETS.forEach { preset ->
-                        FilterChip(
-                            selected = preset.id == selectedPresetId,
-                            onClick = {
-                                selectedPresetId = preset.id
-                                url = preset.urlForCurrentAbi()
-                            },
-                            label = { Text(preset.label) },
-                        )
+                ROOTFS_PRESETS.groupBy { it.series }.forEach { (series, presets) ->
+                    Text(
+                        text = series,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        presets.forEach { preset ->
+                            val presetUrl = preset.urlForCurrentAbi()
+                            FilterChip(
+                                selected = preset.id == selectedPresetId,
+                                enabled = presetUrl != null,
+                                onClick = {
+                                    selectedPresetId = preset.id
+                                    presetUrl?.let { url = it }
+                                },
+                                label = {
+                                    Text(
+                                        if (presetUrl == null) "${preset.label} (仅ARM)" else preset.label
+                                    )
+                                },
+                            )
+                        }
                     }
+                }
+                selectedPreset?.note?.takeIf { it.isNotBlank() }?.let { note ->
+                    Text(
+                        text = "$note · 清华大学 TUNA 镜像",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 OutlinedTextField(
                     value = url,
@@ -1006,38 +1041,82 @@ internal fun String.toShellStatusLabel(): String = when (this) {
 private data class RootfsPreset(
     val id: String,
     val label: String,
-    val arm64Url: String,
-    val x86Url: String,
+    val series: String,
+    val arm64Url: String?,
+    val x86Url: String?,
+    val note: String = "",
 )
 
+// 国内镜像走清华 TUNA，实测均为 200 且下载快；官方源在国内普遍较慢
+private const val MIRROR_TUNA = "https://mirrors.tuna.tsinghua.edu.cn"
+
 /**
- * 可选的精简发行版镜像（体积小、官方源、真实可用）。
- * 安装器已支持 tar.gz 与 tar.xz；无 bash 的发行版由 runner 回退到 /bin/sh。
+ * 可选发行版镜像，按系列分组。全部使用清华 TUNA 镜像。
+ * 安装器支持 tar.gz 与 tar.xz；无 bash 的发行版由 runner 回退到 /bin/sh。
  */
 private val ROOTFS_PRESETS = listOf(
     RootfsPreset(
-        id = "ubuntu",
+        id = "ubuntu-2404",
         label = "Ubuntu 24.04",
-        arm64Url = "https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-arm64.tar.gz",
-        x86Url = "https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-amd64.tar.gz",
+        series = "Ubuntu 系列",
+        arm64Url = "$MIRROR_TUNA/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-arm64.tar.gz",
+        x86Url = "$MIRROR_TUNA/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-amd64.tar.gz",
+        note = "约 30MB",
     ),
     RootfsPreset(
-        id = "debian",
-        label = "Debian 12",
-        arm64Url = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-arm64.tar.xz",
-        x86Url = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.tar.xz",
+        id = "ubuntu-2204",
+        label = "Ubuntu 22.04",
+        series = "Ubuntu 系列",
+        arm64Url = "$MIRROR_TUNA/ubuntu-cdimage/ubuntu-base/releases/22.04/release/ubuntu-base-22.04.5-base-arm64.tar.gz",
+        x86Url = "$MIRROR_TUNA/ubuntu-cdimage/ubuntu-base/releases/22.04/release/ubuntu-base-22.04.5-base-amd64.tar.gz",
+        note = "约 30MB",
     ),
     RootfsPreset(
-        id = "alpine",
+        id = "ubuntu-2004",
+        label = "Ubuntu 20.04",
+        series = "Ubuntu 系列",
+        arm64Url = "$MIRROR_TUNA/ubuntu-cdimage/ubuntu-base/releases/20.04/release/ubuntu-base-20.04.5-base-arm64.tar.gz",
+        x86Url = "$MIRROR_TUNA/ubuntu-cdimage/ubuntu-base/releases/20.04/release/ubuntu-base-20.04.5-base-amd64.tar.gz",
+        note = "约 30MB",
+    ),
+    RootfsPreset(
+        id = "alpine-321",
+        label = "Alpine 3.21",
+        series = "Alpine 系列",
+        arm64Url = "$MIRROR_TUNA/alpine/v3.21/releases/aarch64/alpine-minirootfs-3.21.3-aarch64.tar.gz",
+        x86Url = "$MIRROR_TUNA/alpine/v3.21/releases/x86_64/alpine-minirootfs-3.21.3-x86_64.tar.gz",
+        note = "约 4MB，最省流",
+    ),
+    RootfsPreset(
+        id = "alpine-320",
         label = "Alpine 3.20",
-        arm64Url = "https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/aarch64/alpine-minirootfs-3.20.9-aarch64.tar.gz",
-        x86Url = "https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/x86_64/alpine-minirootfs-3.20.9-x86_64.tar.gz",
+        series = "Alpine 系列",
+        arm64Url = "$MIRROR_TUNA/alpine/v3.20/releases/aarch64/alpine-minirootfs-3.20.9-aarch64.tar.gz",
+        x86Url = "$MIRROR_TUNA/alpine/v3.20/releases/x86_64/alpine-minirootfs-3.20.9-x86_64.tar.gz",
+        note = "约 4MB，最省流",
+    ),
+    RootfsPreset(
+        id = "alpine-319",
+        label = "Alpine 3.19",
+        series = "Alpine 系列",
+        arm64Url = "$MIRROR_TUNA/alpine/v3.19/releases/aarch64/alpine-minirootfs-3.19.8-aarch64.tar.gz",
+        x86Url = "$MIRROR_TUNA/alpine/v3.19/releases/x86_64/alpine-minirootfs-3.19.8-x86_64.tar.gz",
+        note = "约 4MB，最省流",
+    ),
+    RootfsPreset(
+        id = "archarm",
+        label = "Arch ARM",
+        series = "其他系列",
+        arm64Url = "$MIRROR_TUNA/archlinuxarm/os/ArchLinuxARM-aarch64-latest.tar.gz",
+        x86Url = null,
+        note = "约 800MB，仅 ARM，安装耗时较长",
     ),
 )
 
-private fun RootfsPreset.urlForCurrentAbi(): String {
+private fun RootfsPreset.urlForCurrentAbi(): String? {
     val firstAbi = android.os.Build.SUPPORTED_ABIS.firstOrNull()?.lowercase().orEmpty()
     return if (firstAbi.contains("arm")) arm64Url else x86Url
 }
 
-private val DEFAULT_ROOTFS_URL: String = ROOTFS_PRESETS.first().urlForCurrentAbi()
+private val DEFAULT_ROOTFS_URL: String =
+    ROOTFS_PRESETS.firstNotNullOf { it.urlForCurrentAbi() }

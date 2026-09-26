@@ -1,3 +1,8 @@
+// Modified by AI Hello World on 2026-09-26.
+// This file is part of LiquidHub, a fork of RikkaHub.
+// Licensed under AGPL-3.0.
+// The built-in "likkahub本地AI" provider reuses the app launcher icon.
+
 package me.rerere.rikkahub.utils
 
 private val iconCache = mutableMapOf<String, String>()
@@ -68,6 +73,15 @@ fun computeAIIconByName(name: String): String? {
     result?.let { iconCache[name] = it }
     return result
 }
+
+/**
+ * 本地 AI 提供商（终端里的 likkahub）使用应用自身的启动图标，
+ * 这样就不需要在 assets/icons 里再放一份。
+ */
+fun isLiquidHubProvider(name: String): Boolean =
+    PATTERN_LIKKAHUB.containsMatchIn(name.lowercase())
+
+private val PATTERN_LIKKAHUB = Regex("likkahub|liquidhub")
 
 private val PATTERN_RIKKAHUB = Regex("rikka|auto")
 private val PATTERN_OPENAI = Regex("(gpt|openai|o\\d)")

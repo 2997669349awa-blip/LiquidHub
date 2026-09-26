@@ -1,3 +1,9 @@
+// Modified by AI Hello World on 2026-09-26.
+// This file is part of LiquidHub, a fork of RikkaHub.
+// Licensed under AGPL-3.0.
+// Adds the built-in "likkahub本地AI" provider that points at the local Ollama
+// instance exposed by the terminal likkahub CLI on 127.0.0.1:11434.
+
 package me.rerere.rikkahub.data.datastore
 
 import androidx.compose.material3.MaterialTheme
@@ -15,6 +21,9 @@ import me.rerere.rikkahub.ui.components.richtext.MarkdownBlock
 import kotlin.uuid.Uuid
 
 val DEFAULT_AUTO_MODEL_ID = Uuid.parse("b7055fb4-39f9-4042-a88a-0d80ed76cf08")
+
+/** 终端本地AI 提供商的固定 id，扫描到本机模型时把模型写进这一项。 */
+val LOCAL_AI_PROVIDER_ID = Uuid.parse("c71d3a52-8f4b-4e0a-9c6d-2b5e8f1a7c40")
 
 val DEFAULT_PROVIDERS = listOf(
     ProviderSetting.OpenAI(
@@ -292,5 +301,23 @@ val DEFAULT_PROVIDERS = listOf(
         apiKey = "",
         enabled = false,
         builtIn = true,
+    ),
+    ProviderSetting.OpenAI(
+        id = LOCAL_AI_PROVIDER_ID,
+        name = "likkahub本地AI",
+        baseUrl = "http://127.0.0.1:11434/v1",
+        apiKey = "",
+        enabled = true,
+        builtIn = true,
+        description = {
+            Text(
+                text = "在终端中的likkahub本地AI无需联网就可以调用。\n" +
+                    "先在 Termux 里运行：pkg install nodejs ollama，再 npm i -g likkahub，然后用 likkahub go 在终端中对话。\n" +
+                    "终端服务启动后，本提供商即可直接调用其中的 Ollama 模型（默认地址 http://127.0.0.1:11434/v1）。"
+            )
+        },
+        shortDescription = {
+            Text(text = "在终端中的likkahub本地AI无需联网就可以调用")
+        },
     ),
 )

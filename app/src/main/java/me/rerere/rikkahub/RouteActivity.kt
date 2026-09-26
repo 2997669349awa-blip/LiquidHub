@@ -63,6 +63,7 @@ import me.rerere.rikkahub.data.db.MigrationState
 import me.rerere.rikkahub.data.event.AppEvent
 import me.rerere.rikkahub.data.event.AppEventBus
 import me.rerere.rikkahub.ui.activity.SafeModeActivity
+import me.rerere.rikkahub.ui.components.ai.TerminalProviderPrompt
 import me.rerere.rikkahub.ui.components.ui.TTSController
 import me.rerere.rikkahub.ui.context.LocalASRState
 import me.rerere.rikkahub.ui.context.LocalNavController
@@ -94,6 +95,7 @@ import me.rerere.rikkahub.ui.pages.extensions.skills.SkillDetailPage
 import me.rerere.rikkahub.ui.pages.extensions.skills.SkillsPage
 import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspacePage
 import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceDetailPage
+import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceDesktopPage
 import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceFileEditorPage
 import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceTerminalPage
 import me.rerere.workspace.WorkspaceStorageArea
@@ -287,6 +289,7 @@ class RouteActivity : ComponentActivity() {
                     showCloseButton = true,
                 )
                 TTSController()
+                TerminalProviderPrompt(settings = settings, settingsStore = settingsStore)
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -510,6 +513,10 @@ class RouteActivity : ComponentActivity() {
                                 WorkspaceTerminalPage(key.id)
                             }
 
+                            entry<Screen.WorkspaceDesktop> { key ->
+                                WorkspaceDesktopPage(key.id)
+                            }
+
                             entry<Screen.WorkspaceFileEditor> { key ->
                                 WorkspaceFileEditorPage(
                                     id = key.id,
@@ -719,6 +726,8 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data class WorkspaceTerminal(val id: String) : Screen
+
+    data class WorkspaceDesktop(val id: String) : Screen
 
     @Serializable
     data class WorkspaceFileEditor(val id: String, val area: String, val path: String) : Screen

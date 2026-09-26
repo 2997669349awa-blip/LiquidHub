@@ -1,0 +1,36 @@
+{
+  "name": "likkahub",
+  "version": "0.1.0",
+  "description": "在手机终端里使用 likkahub 本地AI与云端模型（Termux 下的 CLI/TUI 客户端，内置 Ollama 管理）",
+  "type": "module",
+  "bin": {
+    "likkahub": "bin/likkahub.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "install.sh",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node bin/likkahub.js go"
+  },
+  "keywords": [
+    "llm",
+    "ollama",
+    "termux",
+    "cli",
+    "tui",
+    "rikkahub",
+    "likkahub"
+  ],
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/2997669349awa-blip/LiquidHub.git",
+    "directory": "cli"
+  }
+}

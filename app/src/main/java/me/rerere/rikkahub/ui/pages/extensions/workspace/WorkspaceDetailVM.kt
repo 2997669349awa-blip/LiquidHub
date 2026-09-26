@@ -30,6 +30,7 @@ class WorkspaceDetailVM(
     private val id: String,
     private val repository: WorkspaceRepository,
     private val terminalSessionManager: WorkspaceTerminalSessionManager,
+    private val desktopManager: me.rerere.rikkahub.data.workspace.WorkspaceDesktopManager,
 ) : ViewModel() {
     private val _state = MutableStateFlow(WorkspaceDetailState())
     val state = _state.asStateFlow()
@@ -283,6 +284,7 @@ class WorkspaceDetailVM(
             _installProgress.value = RootfsInstallProgress(stage = RootfsInstallStage.DOWNLOADING)
             try {
                 terminalSessionManager.closeWorkspace(workspace.root)
+                desktopManager.closeWorkspace(workspace.root)
                 repository.installRootfs(workspace.id, url) { progress ->
                     _installProgress.value = progress
                 }

@@ -20,6 +20,7 @@ import me.rerere.rikkahub.R
 import me.rerere.rikkahub.ui.hooks.rememberAvatarShape
 import me.rerere.rikkahub.ui.theme.LocalDarkMode
 import me.rerere.rikkahub.utils.computeAIIconByName
+import me.rerere.rikkahub.utils.isLiquidHubProvider
 import me.rerere.rikkahub.utils.toCssHex
 
 @Composable
@@ -64,6 +65,21 @@ fun AutoAIIcon(
     loading: Boolean = false,
     color: Color = MaterialTheme.colorScheme.secondaryContainer,
 ) {
+    // 终端本地AI 提供商直接用应用图标
+    if (remember(name) { isLiquidHubProvider(name) }) {
+        Surface(
+            modifier = modifier.size(24.dp),
+            shape = rememberAvatarShape(loading),
+            color = color,
+        ) {
+            AsyncImage(
+                model = R.mipmap.ic_launcher,
+                contentDescription = name,
+                modifier = Modifier.padding(2.dp),
+            )
+        }
+        return
+    }
     val path = remember(name) { computeAIIconByName(name) } ?: run {
         TextAvatar(text = name, modifier = modifier, loading = loading, color = color)
         return

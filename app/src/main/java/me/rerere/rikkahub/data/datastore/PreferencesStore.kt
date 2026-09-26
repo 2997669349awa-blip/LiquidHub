@@ -189,6 +189,9 @@ class SettingsStore(
         // 赞助提醒
         val SPONSOR_ALERT_DISMISSED_AT = intPreferencesKey("sponsor_alert_dismissed_at")
 
+        // 终端本地AI 提供商的一次性提示是否已处理
+        val TERMINAL_PROVIDER_PROMPT_HANDLED = booleanPreferencesKey("terminal_provider_prompt_handled")
+
         // Uses the same DataStore singleton without starting settings flows or requiring Koin.
         internal suspend fun restoreBeforeInitialization(context: Context, settings: Settings) {
             require(!settings.init) { "Cannot restore uninitialized settings" }
@@ -253,6 +256,7 @@ class SettingsStore(
                 preferences[BACKUP_REMINDER_CONFIG] = JsonInstant.encodeToString(settings.backupReminderConfig)
                 preferences[LAUNCH_COUNT] = settings.launchCount
                 preferences[SPONSOR_ALERT_DISMISSED_AT] = settings.sponsorAlertDismissedAt
+                preferences[TERMINAL_PROVIDER_PROMPT_HANDLED] = settings.terminalProviderPromptHandled
             }
         }
     }
@@ -353,6 +357,7 @@ class SettingsStore(
                 } ?: BackupReminderConfig(),
                 launchCount = preferences[LAUNCH_COUNT] ?: 0,
                 sponsorAlertDismissedAt = preferences[SPONSOR_ALERT_DISMISSED_AT] ?: 0,
+                terminalProviderPromptHandled = preferences[TERMINAL_PROVIDER_PROMPT_HANDLED] == true,
             )
         }
         .map {
@@ -614,6 +619,7 @@ data class Settings(
     val backupReminderConfig: BackupReminderConfig = BackupReminderConfig(),
     val launchCount: Int = 0,
     val sponsorAlertDismissedAt: Int = 0,
+    val terminalProviderPromptHandled: Boolean = false,
 ) {
     companion object {
         // 构造一个用于初始化的settings, 但它不能用于保存，防止使用初始值存储

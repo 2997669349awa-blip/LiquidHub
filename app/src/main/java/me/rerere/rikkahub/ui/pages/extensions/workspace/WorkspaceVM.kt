@@ -11,11 +11,13 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import me.rerere.rikkahub.data.db.entity.WorkspaceEntity
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
+import me.rerere.rikkahub.data.workspace.WorkspaceDesktopManager
 import me.rerere.workspace.RootfsInstallProgress
 
 class WorkspaceVM(
     private val repository: WorkspaceRepository,
     private val terminalSessionManager: WorkspaceTerminalSessionManager,
+    private val desktopManager: WorkspaceDesktopManager,
 ) : ViewModel() {
     val workspaces = repository.listFlow()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
@@ -35,6 +37,7 @@ class WorkspaceVM(
     fun delete(workspace: WorkspaceEntity) {
         viewModelScope.launch {
             terminalSessionManager.closeWorkspace(workspace.root)
+            desktopManager.closeWorkspace(workspace.root)
             repository.delete(workspace.id)
         }
     }

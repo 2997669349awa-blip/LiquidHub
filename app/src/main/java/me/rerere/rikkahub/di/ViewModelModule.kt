@@ -72,6 +72,14 @@ val viewModelModule = module {
             id = it.get(),
             repository = get(),
             terminalSessionManager = get(),
+            desktopManager = get(),
+        )
+    }
+    viewModel<me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceDesktopVM> {
+        me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceDesktopVM(
+            id = it.get(),
+            repository = get(),
+            desktopManager = get(),
         )
     }
     viewModelOf(::FavoriteVM)
