@@ -150,6 +150,13 @@ install_browser() {
 install_pkgs() {
   TIER=$(read_tier)
   log "system tier: ${'$'}TIER"
+  log "disk:"
+  df -h / 2>/dev/null
+  AVAIL=$(df -Pk / 2>/dev/null | awk 'NR==2{print $4}')
+  if [ -n "${'$'}AVAIL" ] && [ "${'$'}AVAIL" -lt 500000 ]; then
+    log "ERROR: 磁盘空间不足（剩余约 ${'$'}((AVAIL/1024)) MB），无法安装桌面，请清理空间后重试"
+    return 1
+  fi
   export TIER
   if [ "${'$'}{FORCE_INSTALL:-0}" != "1" ] \
      && command -v Xvfb >/dev/null 2>&1 && command -v x11vnc >/dev/null 2>&1 \

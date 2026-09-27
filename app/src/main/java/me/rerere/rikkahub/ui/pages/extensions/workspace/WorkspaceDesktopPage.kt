@@ -54,6 +54,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.ArrowLeft01
@@ -82,6 +84,7 @@ fun WorkspaceDesktopPage(id: String) {
     val vm: WorkspaceDesktopVM = koinViewModel(parameters = { parametersOf(id) })
     val state by vm.state.collectAsStateWithLifecycle()
     var entered by remember { mutableStateOf(false) }
+    var showFullLog by remember { mutableStateOf(false) }
 
     // 进入桌面：全屏显示
     if (entered && state.running) {
@@ -252,7 +255,37 @@ fun WorkspaceDesktopPage(id: String) {
                         Spacer(Modifier.weight(1f))
                         Switch(checked = state.audioEnabled, onCheckedChange = { vm.setAudio(it) })
                     }
-                    InstallLog(state = state, onLoadLogs = { vm.loadLogs() })
+                    InstallLog(
+                        state = state,
+                        onLoadLogs = { vm.loadLogs() },
+                        onFullscreen = { showFullLog = true },
+                    )
+                }
+            }
+        }
+    }
+
+    if (showFullLog) {
+        Dialog(
+            onDismissRequest = { showFullLog = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            Surface(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("安装日志", style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.weight(1f))
+                        TextButton(onClick = { showFullLog = false }) { Text("关闭") }
+                    }
+                    Text(
+                        text = state.log.ifBlank { "（暂无日志）" },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState()),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
                 }
             }
         }
@@ -385,7 +418,7 @@ private fun FullScreenDesktop(audioEnabled: Boolean, onExit: () -> Unit) {
 }
 
 @Composable
-private fun InstallLog(state: WorkspaceDesktopState, onLoadLogs: () -> Unit) {
+private fun InstallLog(state: WorkspaceDesktopState, onLoadLogs: () -> Unit, onFullscreen: () -> Unit) {
     val scroll = rememberScrollState()
     LaunchedEffect(state.log) {
         scroll.scrollTo(scroll.maxValue)
@@ -400,6 +433,7 @@ private fun InstallLog(state: WorkspaceDesktopState, onLoadLogs: () -> Unit) {
                 style = MaterialTheme.typography.labelLarge,
             )
             Spacer(Modifier.weight(1f))
+            TextButton(onClick = onFullscreen) { Text("全屏") }
             TextButton(onClick = onLoadLogs) { Text("查看服务日志") }
         }
         Spacer(Modifier.height(4.dp))

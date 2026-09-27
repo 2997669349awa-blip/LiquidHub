@@ -214,7 +214,13 @@ class WorkspaceDesktopVM(
                     // apt/apk 在非 TTY 下会块缓冲输出，用 stdbuf 强制行缓冲，日志才能实时刷新
                     val run = "if command -v stdbuf >/dev/null 2>&1; then " +
                         "stdbuf -oL -eL sh $script $action; else sh $script $action; fi"
-                    val command = "if [ -f $script ]; then $run; else echo SCRIPT_MISSING; fi"
+                    // 强制自检：即使脚本静默失败，也能看到路径/解释器/磁盘
+                    val diag = "echo \"[自检] script=$script\"; " +
+                        "ls -l $script 2>&1 | head -n 1; " +
+                        "echo \"[自检] sh=$(command -v sh) | stdbuf=$(command -v stdbuf)\"; " +
+                        "echo \"[自检] disk:\"; df -h / 2>/dev/null | tail -n 1; " +
+                        "echo \"--- 脚本输出 ---\"; "
+                    val command = diag + "if [ -f $script ]; then $run; else echo SCRIPT_MISSING; fi"
                     appendLog("[命令] $command\n")
                     val result = repository.executeCommand(
                         id = id,
