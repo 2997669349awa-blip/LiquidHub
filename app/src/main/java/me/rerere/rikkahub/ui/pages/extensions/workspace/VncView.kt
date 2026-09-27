@@ -283,9 +283,11 @@ class VncView @JvmOverloads constructor(
     }
 
     private fun cpixel(input: DataInputStream): Int {
+        // Raw/Hextile 的像素是 bytesPerPixel（32bpp -> 4 字节，小端 B,G,R,pad）
         val b = input.readUnsignedByte()
         val g = input.readUnsignedByte()
         val r = input.readUnsignedByte()
+        input.readUnsignedByte()
         return (0xFF shl 24) or (r shl 16) or (g shl 8) or b
     }
 
