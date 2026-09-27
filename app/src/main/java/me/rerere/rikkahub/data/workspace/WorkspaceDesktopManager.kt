@@ -172,10 +172,20 @@ install_pkgs() {
   elif command -v apt-get >/dev/null 2>&1; then
     log "Debian/Ubuntu(apt): installing desktop packages"
     export DEBIAN_FRONTEND=noninteractive
+    ensure_universe
     getent hosts mirrors.tuna.tsinghua.edu.cn >/dev/null 2>&1 || log "WARN: 无法解析镜像域名，DNS 可能有问题"
-    apt-get update -y -o Acquire::Retries=5 -o Acquire::ForceIPv4=true || RC=1
-    apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true \
-      ca-certificates xvfb x11vnc fluxbox xdotool || RC=1
+    apt-get update -y -o Acquire::Retries=5 -o Acquire::ForceIPv4=true || log "WARN: apt-get update 失败，继续尝试"
+    apt-cache policy xvfb x11vnc fluxbox xdotool 2>/dev/null | head -n 30
+    if ! apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true \
+        ca-certificates xvfb x11vnc fluxbox xdotool; then
+      log "核心包整体安装失败，逐包重试定位："
+      for p in ca-certificates xvfb x11vnc fluxbox xdotool; do
+        apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true "${'$'}p" || echo "[desktop]   FAIL ${'$'}p"
+      done
+    fi
+    for p in Xvfb x11vnc fluxbox xdotool; do
+      command -v "${'$'}p" >/dev/null 2>&1 || RC=1
+    done
     if [ "${'$'}TIER" != "mini" ]; then
       apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true \
         xterm imagemagick scrot dbus-x11 fonts-noto-cjk pulseaudio pulseaudio-utils \
@@ -416,6 +426,24 @@ set_background() {
   if command -v xsetroot >/dev/null 2>&1; then
     xsetroot -solid "#0f172a" 2>/dev/null
   fi
+}
+
+ensure_universe() {
+  # Ubuntu base 默认只有 main/restricted，而 fluxbox/x11vnc/xterm 都在 universe
+  if [ -f /etc/apt/sources.list ]; then
+    if ! grep -q universe /etc/apt/sources.list 2>/dev/null; then
+      sed -i 's/ main$/ main universe/' /etc/apt/sources.list 2>/dev/null
+      sed -i 's/ main restricted$/ main restricted universe multiverse/' /etc/apt/sources.list 2>/dev/null
+    fi
+  fi
+  for f in /etc/apt/sources.list.d/*.sources; do
+    [ -f "${'$'}f" ] || continue
+    grep -q universe "${'$'}f" 2>/dev/null || sed -i 's/^Components:.*/Components: main restricted universe multiverse/' "${'$'}f" 2>/dev/null
+  done
+  for f in /etc/apt/sources.list.d/*.list; do
+    [ -f "${'$'}f" ] || continue
+    grep -q universe "${'$'}f" 2>/dev/null || sed -i 's/ main$/ main universe/' "${'$'}f" 2>/dev/null
+  done
 }
 
 start_audio() {

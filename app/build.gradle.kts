@@ -95,6 +95,11 @@ android {
                 "BUILD_STAMP",
                 "\"${SimpleDateFormat("MMdd-HHmm", Locale.US).format(Date())}\""
             )
+            buildConfigField(
+                "String",
+                "APP_VERSION",
+                "\"${rootProject.file("version.txt").takeIf { it.exists() }?.readText()?.trim() ?: "0.1.0Data"}\""
+            )
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -104,6 +109,11 @@ android {
                 "String",
                 "BUILD_STAMP",
                 "\"${SimpleDateFormat("MMdd-HHmm", Locale.US).format(Date())}\""
+            )
+            buildConfigField(
+                "String",
+                "APP_VERSION",
+                "\"${rootProject.file("version.txt").takeIf { it.exists() }?.readText()?.trim() ?: "0.1.0Data"}\""
             )
         }
     }
