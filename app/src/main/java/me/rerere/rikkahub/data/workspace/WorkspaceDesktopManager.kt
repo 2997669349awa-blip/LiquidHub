@@ -174,7 +174,7 @@ install_pkgs() {
   RC=0
   if command -v apk >/dev/null 2>&1; then
     log "Alpine(apk): installing desktop packages"
-    apk add --no-cache --allow-untrusted ca-certificates xvfb x11vnc fluxbox xdotool bash coreutils || RC=1
+    apk add --no-cache --allow-untrusted ca-certificates xvfb x11vnc fluxbox openbox xdotool bash coreutils || RC=1
     if [ "${'$'}TIER" != "mini" ]; then
       apk add --no-cache --allow-untrusted xterm imagemagick scrot dbus font-noto font-noto-cjk \
         pulseaudio pulseaudio-utils ffmpeg || log "WARN: 部分可选组件安装失败（不影响桌面）"
@@ -190,9 +190,9 @@ install_pkgs() {
     apt-get update -y -o Acquire::Retries=5 -o Acquire::ForceIPv4=true || log "WARN: apt-get update 失败，继续尝试"
     apt-cache policy xvfb x11vnc fluxbox xdotool 2>/dev/null | head -n 30
     if ! apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true \
-        ca-certificates xvfb x11vnc fluxbox xdotool; then
+        ca-certificates xvfb x11vnc fluxbox openbox xdotool; then
       log "核心包整体安装失败，逐包重试定位："
-      for p in ca-certificates xvfb x11vnc fluxbox xdotool; do
+      for p in ca-certificates xvfb x11vnc fluxbox openbox xdotool; do
         apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true "${'$'}p" || echo "[desktop]   FAIL ${'$'}p"
       done
     fi
@@ -212,7 +212,7 @@ install_pkgs() {
     pacman-key --init >/dev/null 2>&1 || true
     pacman-key --populate archlinuxarm >/dev/null 2>&1 || pacman-key --populate archlinux >/dev/null 2>&1 || true
     pacman -Sy --noconfirm --needed archlinux-keyring >/dev/null 2>&1 || true
-    pacman -Sy --noconfirm --needed ca-certificates xorg-server-xvfb x11vnc fluxbox xdotool || RC=1
+    pacman -Sy --noconfirm --needed ca-certificates xorg-server-xvfb x11vnc fluxbox openbox xdotool || RC=1
     if [ "${'$'}TIER" != "mini" ]; then
       pacman -Sy --noconfirm --needed xterm imagemagick scrot dbus noto-fonts pulseaudio \
         || log "WARN: 部分可选组件安装失败（不影响桌面）"
@@ -324,7 +324,7 @@ start() {
   # -ac 关闭访问控制，避免 rootfs 里没有 xauth/Xauthority 导致 x11vnc 连不上 X
   RES=$(cat /workspace/.liquidhub/resolution 2>/dev/null)
   [ -z "${'$'}RES" ] && RES=1280x720
-  Xvfb "${'$'}DISP" -screen 0 "${'$'}{RES}x24" -nolisten tcp -ac >"${'$'}RUNDIR/xvfb.log" 2>&1 &
+  Xvfb "${'$'}DISP" -screen 0 "${'$'}{RES}x24" -nolisten tcp -ac -extension MIT-SHM +extension XTEST +extension RANDR >"${'$'}RUNDIR/xvfb.log" 2>&1 &
   echo ${'$'}! > "${'$'}RUNDIR/xvfb.pid"
   i=0
   while [ ! -e /tmp/.X11-unix/X1 ] && [ ${'$'}i -lt 20 ]; do sleep 0.5 2>/dev/null || sleep 1; i=${'$'}((i+1)); done
@@ -335,9 +335,17 @@ start() {
   fi
 
   setup_theme
-  log "starting fluxbox"
-  fluxbox >"${'$'}RUNDIR/fluxbox.log" 2>&1 &
-  echo ${'$'}! > "${'$'}RUNDIR/fluxbox.pid"
+  # 优先 openbox：它的鼠标事件处理稳定，不像 fluxbox 会因 keys 配置吞掉点击
+  if command -v openbox >/dev/null 2>&1; then
+    log "starting openbox"
+    openbox >"${'$'}RUNDIR/fluxbox.log" 2>&1 &
+    echo ${'$'}! > "${'$'}RUNDIR/fluxbox.pid"
+  else
+    log "starting fluxbox"
+    fluxbox >"${'$'}RUNDIR/fluxbox.log" 2>&1 &
+    echo ${'$'}! > "${'$'}RUNDIR/fluxbox.pid"
+  fi
+  sleep 1
   # 自动开一个终端，桌面不至于空无一物
   if command -v xterm >/dev/null 2>&1; then
     xterm >"${'$'}RUNDIR/xterm.log" 2>&1 &
@@ -345,10 +353,19 @@ start() {
   set_background
 
   log "starting x11vnc on ${'$'}VNC_PORT"
+  # -xkb 正确加载键盘布局；-noxdamage 避免 XDAMAGE 影响输入；绝不用 -viewonly
   x11vnc -display "${'$'}DISP" -forever -shared -localhost -rfbport "${'$'}VNC_PORT" \
-    -nopw -quiet -noshm >"${'$'}RUNDIR/x11vnc.log" 2>&1 &
+    -nopw -quiet -xkb -noxdamage >"${'$'}RUNDIR/x11vnc.log" 2>&1 &
   echo ${'$'}! > "${'$'}RUNDIR/x11vnc.pid"
   sleep 1
+  if ! is_vnc_running; then
+    log "x11vnc 首次未就绪，等待 X 后重试…"
+    sleep 2
+    x11vnc -display "${'$'}DISP" -forever -shared -localhost -rfbport "${'$'}VNC_PORT" \
+      -nopw -quiet -xkb -noxdamage >"${'$'}RUNDIR/x11vnc.log" 2>&1 &
+    echo ${'$'}! > "${'$'}RUNDIR/x11vnc.pid"
+    sleep 1
+  fi
   if is_vnc_running; then
     log "STARTED: VNC on 127.0.0.1:${'$'}VNC_PORT"
   else
@@ -397,6 +414,7 @@ stop() {
   pkill -f websockify 2>/dev/null
   pkill -f x11vnc 2>/dev/null
   pkill -f fluxbox 2>/dev/null
+  pkill -f openbox 2>/dev/null
   pkill -f Xvfb 2>/dev/null
   log "STOPPED"
 }

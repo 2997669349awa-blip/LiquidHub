@@ -149,8 +149,9 @@ object NeteaseApi {
             ?: ""
         val album = o["al"]?.jsonObject?.get("name")?.jsonPrimitive?.content
             ?: o["album"]?.jsonObject?.get("name")?.jsonPrimitive?.content ?: ""
-        val cover = o["al"]?.jsonObject?.get("picUrl")?.jsonPrimitive?.content
-            ?: o["album"]?.jsonObject?.get("picUrl")?.jsonPrimitive?.content ?: ""
+        val cover = (o["al"]?.jsonObject?.get("picUrl")?.jsonPrimitive?.content
+            ?: o["album"]?.jsonObject?.get("picUrl")?.jsonPrimitive?.content ?: "")
+            .replaceFirst("http://", "https://")
         return MusicSong(id, name, artist, album, cover)
     }
 
