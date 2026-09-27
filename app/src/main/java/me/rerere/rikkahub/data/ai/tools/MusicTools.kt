@@ -5,14 +5,7 @@
 
 package me.rerere.rikkahub.data.ai.tools
 
-import android.content.ComponentName
-import android.content.Context
-import androidx.media3.common.MediaItem
-import androidx.media3.session.MediaController
-import androidx.media3.session.SessionToken
-import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -23,14 +16,14 @@ import kotlinx.serialization.json.put
 import me.rerere.ai.core.InputSchema
 import me.rerere.ai.core.Tool
 import me.rerere.ai.ui.UIMessagePart
+import me.rerere.rikkahub.data.music.MusicControllerHolder
+import me.rerere.rikkahub.data.music.MusicSong
 import me.rerere.rikkahub.data.music.NeteaseApi
-import me.rerere.rikkahub.service.MusicPlaybackService
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
-import kotlin.coroutines.resume
 
 private object MusicToolKoin : KoinComponent {
-    val context: Context get() = get()
+    val context: android.content.Context get() = get()
 }
 
 fun createMusicTools(): List<Tool> = listOf(
@@ -100,66 +93,35 @@ fun createMusicTools(): List<Tool> = listOf(
                         put("type", "string")
                         put("description", "Optional artist for display")
                     })
+                    put("cover", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Optional album cover URL for display")
+                    })
                 },
                 required = listOf("id")
             )
         },
         execute = {
             val id = it.jsonObject["id"]?.jsonPrimitive?.contentOrNull ?: error("id is required")
-            val name = it.jsonObject["name"]?.jsonPrimitive?.contentOrNull.orEmpty()
+            val name = it.jsonObject["name"]?.jsonPrimitive?.contentOrNull.orEmpty().ifBlank { "Song" }
             val artist = it.jsonObject["artist"]?.jsonPrimitive?.contentOrNull.orEmpty()
-            val context = MusicToolKoin.context
-            val url = withContext(Dispatchers.IO) {
-                runCatching { NeteaseApi.songUrl(id) }.getOrNull()
-            } ?: "https://music.163.com/song/media/outer/url?id=$id.mp3"
-            val controller = awaitController(context)
-            if (controller == null) {
-                return@Tool listOf(
-                    UIMessagePart.Text(
-                        buildJsonObject {
-                            put("ok", false)
-                            put("error", "Could not connect to the music player session")
-                        }.toString()
-                    )
-                )
-            }
-            runCatching {
-                controller.setMediaItem(
-                    MediaItem.Builder()
-                        .setUri(url)
-                        .setMediaId(id)
-                        .setMediaMetadata(
-                            androidx.media3.common.MediaMetadata.Builder()
-                                .setTitle(name.ifBlank { "Song" })
-                                .setArtist(artist)
-                                .build()
-                        )
-                        .build()
-                )
-                controller.prepare()
-                controller.play()
-            }
-            runCatching { controller.release() }
+            val cover = it.jsonObject["cover"]?.jsonPrimitive?.contentOrNull.orEmpty()
+            val song = MusicSong(id = id, name = name, artist = artist, album = "", cover = cover)
+            val controller = runCatching {
+                MusicControllerHolder.playQueue(MusicToolKoin.context, listOf(song), 0)
+            }.getOrNull()
             listOf(
                 UIMessagePart.Text(
                     buildJsonObject {
-                        put("ok", true)
-                        put("playing", "$name - $artist".trim().trimStart('-').trim())
+                        put("ok", controller != null)
+                        if (controller == null) {
+                            put("error", "Could not connect to the music player session")
+                        } else {
+                            put("playing", "$name - $artist".trim().trimStart('-').trim())
+                        }
                     }.toString()
                 )
             )
         }
     ),
 )
-
-private suspend fun awaitController(context: Context): MediaController? =
-    suspendCancellableCoroutine { cont ->
-        runCatching {
-            val token = SessionToken(context, ComponentName(context, MusicPlaybackService::class.java))
-            val future = MediaController.Builder(context, token).buildAsync()
-            future.addListener({
-                runCatching { cont.resume(future.get()) }.onFailure { cont.resume(null) }
-            }, MoreExecutors.directExecutor())
-            cont.invokeOnCancellation { runCatching { MediaController.releaseFuture(future) } }
-        }.onFailure { cont.resume(null) }
-    }

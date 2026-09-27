@@ -299,6 +299,15 @@ FBEOF
   [exit] (退出)
 [end]
 FBMENU
+  # 自带 ~/.fluxbox/keys 的鼠标绑定在部分版本会刷 "Invalid key/modifier" 告警，
+  # 这里用一份最小且兼容的绑定覆盖它。
+  cat > "${'$'}HOME/.fluxbox/keys" <<'FBKEYS'
+OnDesktop Mouse1 :HideMenus
+OnDesktop Mouse2 :WorkspaceMenu
+OnDesktop Mouse3 :RootMenu
+OnTitlebar Mouse1 :Raise
+OnTitlebar Mouse3 :WindowMenu
+FBKEYS
 }
 
 start() {
@@ -463,21 +472,26 @@ start_stream() {
   command -v ffmpeg >/dev/null 2>&1 || { log "ffmpeg 未安装，跳过 H.264 串流"; return 0; }
   RES=$(cat /workspace/.liquidhub/resolution 2>/dev/null)
   [ -z "${'$'}RES" ] && RES=1280x720
+  FPS=$(cat /workspace/.liquidhub/fps 2>/dev/null)
+  [ -z "${'$'}FPS" ] && FPS=60
   pkill -f "x11grab" 2>/dev/null
   sleep 1
   # -listen 1 只接受一个客户端；用循环在客户端断开后自动重听，保证再次进入也能连上
+  # ultrafast + zerolatency + sliced-threads 降低编码延迟，尽量冲高帧率
   (
     while true; do
-      ffmpeg -loglevel error -f x11grab -draw_mouse 1 -framerate 30 -video_size "${'$'}RES" -i "${'$'}DISP" \
-        -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -g 15 \
-        -b:v 5M -maxrate 5M -bufsize 10M \
+      ffmpeg -loglevel error -f x11grab -draw_mouse 1 -framerate "${'$'}FPS" -video_size "${'$'}RES" -i "${'$'}DISP" \
+        -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p \
+        -g "${'$'}FPS" -keyint_min "${'$'}FPS" -sc_threshold 0 \
+        -x264-params "sliced-threads=1:sync-lookahead=0:rc-lookahead=0:bframes=0:ref=1:me=dia:subme=0:trellis=0:weightp=0:8x8dct=0:cabac=0" \
+        -b:v 4M -maxrate 4M -bufsize 8M -threads 4 \
         -fflags nobuffer -f mpegts -listen 1 "http://127.0.0.1:${'$'}H264_PORT/live.ts" || true
       sleep 1
     done
   ) >"${'$'}RUNDIR/ffmpeg.log" 2>&1 &
   echo ${'$'}! > "${'$'}RUNDIR/ffmpeg.pid"
   sleep 1
-  log "H.264 stream (auto-restart on disconnect): http://127.0.0.1:${'$'}H264_PORT/live.ts"
+  log "H.264 stream ${'$'}RES@${'$'}FPS (auto-restart on disconnect): http://127.0.0.1:${'$'}H264_PORT/live.ts"
 }
 
 start_audio() {

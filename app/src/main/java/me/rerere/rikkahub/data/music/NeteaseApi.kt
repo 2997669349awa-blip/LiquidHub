@@ -28,6 +28,7 @@ data class MusicSong(
     val name: String,
     val artist: String,
     val album: String,
+    val cover: String = "",
 )
 
 data class MusicUser(
@@ -148,7 +149,9 @@ object NeteaseApi {
             ?: ""
         val album = o["al"]?.jsonObject?.get("name")?.jsonPrimitive?.content
             ?: o["album"]?.jsonObject?.get("name")?.jsonPrimitive?.content ?: ""
-        return MusicSong(id, name, artist, album)
+        val cover = o["al"]?.jsonObject?.get("picUrl")?.jsonPrimitive?.content
+            ?: o["album"]?.jsonObject?.get("picUrl")?.jsonPrimitive?.content ?: ""
+        return MusicSong(id, name, artist, album, cover)
     }
 
     /** 返回可完整播放的音频 URL（非 VIP 一般为标准音质）。 */
