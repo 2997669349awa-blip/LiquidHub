@@ -30,11 +30,18 @@ fun DesktopH264View(
 ) {
     val context = LocalContext.current
     val player = remember {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(url))
-            playWhenReady = true
-            prepare()
-        }
+        // 低延迟缓冲，缩短首帧/重连时间
+        val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+            .setBufferDurationsMs(800, 2000, 400, 800)
+            .build()
+        ExoPlayer.Builder(context)
+            .setLoadControl(loadControl)
+            .build()
+            .apply {
+                setMediaItem(MediaItem.fromUri(url))
+                playWhenReady = true
+                prepare()
+            }
     }
 
     DisposableEffect(Unit) {

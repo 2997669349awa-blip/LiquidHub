@@ -124,6 +124,7 @@ import me.rerere.rikkahub.ui.pages.setting.SettingModelPage
 import me.rerere.rikkahub.ui.pages.setting.SettingPage
 import me.rerere.rikkahub.ui.pages.setting.SettingProviderDetailPage
 import me.rerere.rikkahub.ui.pages.setting.LocalModelsPage
+import me.rerere.rikkahub.ui.pages.setting.MusicPage
 import me.rerere.rikkahub.ui.pages.setting.SettingProviderPage
 import me.rerere.rikkahub.ui.pages.setting.SettingSearchDetailPage
 import me.rerere.rikkahub.ui.pages.setting.SettingSearchPage
@@ -499,6 +500,10 @@ class RouteActivity : ComponentActivity() {
                                 LocalModelsPage()
                             }
 
+                            entry<Screen.Music> {
+                                MusicPage()
+                            }
+
                             entry<Screen.Debug> {
                                 DebugPage()
                             }
@@ -724,6 +729,9 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data object LocalModels : Screen
+
+    @Serializable
+    data object Music : Screen
 
     @Serializable
     data object Debug : Screen

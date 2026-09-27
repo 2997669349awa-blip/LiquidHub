@@ -462,19 +462,19 @@ start_stream() {
   [ -z "${'$'}RES" ] && RES=1280x720
   pkill -f "x11grab" 2>/dev/null
   sleep 1
-  ffmpeg -loglevel error -f x11grab -framerate 30 -video_size "${'$'}RES" -i "${'$'}DISP" \
-    -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -g 30 \
-    -b:v 4M -maxrate 4M -bufsize 8M \
-    -f mpegts -listen 1 "http://127.0.0.1:${'$'}H264_PORT/live.ts" \
-    >"${'$'}RUNDIR/ffmpeg.log" 2>&1 &
+  # -listen 1 只接受一个客户端；用循环在客户端断开后自动重听，保证再次进入也能连上
+  (
+    while true; do
+      ffmpeg -loglevel error -f x11grab -draw_mouse 1 -framerate 30 -video_size "${'$'}RES" -i "${'$'}DISP" \
+        -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -g 15 \
+        -b:v 5M -maxrate 5M -bufsize 10M \
+        -fflags nobuffer -f mpegts -listen 1 "http://127.0.0.1:${'$'}H264_PORT/live.ts" || true
+      sleep 1
+    done
+  ) >"${'$'}RUNDIR/ffmpeg.log" 2>&1 &
   echo ${'$'}! > "${'$'}RUNDIR/ffmpeg.pid"
   sleep 1
-  if kill -0 "${'$'}(cat "${'$'}RUNDIR/ffmpeg.pid")" 2>/dev/null; then
-    log "H.264 stream: http://127.0.0.1:${'$'}H264_PORT/live.ts"
-  else
-    log "WARN: ffmpeg 未启动，详见 ffmpeg.log"
-    tail -n 15 "${'$'}RUNDIR/ffmpeg.log" 2>/dev/null
-  fi
+  log "H.264 stream (auto-restart on disconnect): http://127.0.0.1:${'$'}H264_PORT/live.ts"
 }
 
 start_audio() {

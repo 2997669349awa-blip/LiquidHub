@@ -60,6 +60,7 @@ import me.rerere.hugeicons.stroke.InLove
 import me.rerere.hugeicons.stroke.LookTop
 import me.rerere.hugeicons.stroke.McpServer
 import me.rerere.hugeicons.stroke.Megaphone01
+import me.rerere.hugeicons.stroke.MusicNote01
 import me.rerere.hugeicons.stroke.Package
 import me.rerere.hugeicons.stroke.ServerStack01
 import me.rerere.hugeicons.stroke.Settings03
@@ -272,6 +273,20 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                         },
                         supportingContent = { Text("下载并管理本机开源模型（Qwen、DeepSeek 等），走国内镜像") },
                         headlineContent = { Text("本地AI") },
+                    )
+                }
+            }
+
+            item("otherSettings") {
+                CardGroup(
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                    title = { Text("其他") },
+                ) {
+                    item(
+                        onClick = { navController.navigate(Screen.Music) },
+                        leadingContent = { Icon(HugeIcons.MusicNote01, null) },
+                        supportingContent = { Text("AI 搜索/播放音乐、歌词、喜欢（网易云）") },
+                        headlineContent = { Text("音乐") },
                     )
                 }
             }
