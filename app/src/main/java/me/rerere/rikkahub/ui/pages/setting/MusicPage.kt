@@ -6,6 +6,9 @@
 package me.rerere.rikkahub.ui.pages.setting
 
 import android.graphics.BitmapFactory
+import android.webkit.CookieManager
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +51,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.Dispatchers
@@ -80,6 +84,7 @@ fun MusicPage() {
     var nowPlaying by remember { mutableStateOf<String?>(null) }
     var lyrics by remember { mutableStateOf<String?>(null) }
     var showQr by remember { mutableStateOf(false) }
+    var showWebLogin by remember { mutableStateOf(false) }
     var showPhone by remember { mutableStateOf(false) }
 
     val player = remember { ExoPlayer.Builder(context).build() }
@@ -154,7 +159,7 @@ fun MusicPage() {
                 navigationIcon = { BackButton() },
                 actions = {
                     if (user == null) {
-                        TextButton(onClick = { showQr = true }) { Text("扫码登录") }
+                        TextButton(onClick = { showWebLogin = true }) { Text("网页登录") }
                         TextButton(onClick = { showPhone = true }) { Text("手机号") }
                     } else {
                         Text(
@@ -232,10 +237,10 @@ fun MusicPage() {
         }
     }
 
-    if (showQr) {
-        QrLoginDialog(
-            onDismiss = { showQr = false },
-            onLoggedIn = { showQr = false; afterLogin() },
+    if (showWebLogin) {
+        WebLoginDialog(
+            onDismiss = { showWebLogin = false },
+            onLoggedIn = { showWebLogin = false; afterLogin() },
         )
     }
     if (showPhone) {
@@ -257,6 +262,44 @@ fun MusicPage() {
             confirmButton = { TextButton(onClick = { lyrics = null }) { Text("关闭") } },
         )
     }
+}
+
+@Composable
+private fun WebLoginDialog(onDismiss: () -> Unit, onLoggedIn: () -> Unit) {
+    var status by remember { mutableStateOf("在下方网页登录（扫码/账号），完成后点“我已登录，抓取”") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("网易云网页登录") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                AndroidView(
+                    modifier = Modifier.fillMaxWidth().height(420.dp),
+                    factory = { ctx ->
+                        WebView(ctx).apply {
+                            settings.javaScriptEnabled = true
+                            settings.domStorageEnabled = true
+                            webViewClient = WebViewClient()
+                            loadUrl("https://music.163.com/#/login")
+                        }
+                    },
+                )
+                Text(status, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val cookie = CookieManager.getInstance().getCookie("https://music.163.com").orEmpty()
+                if (cookie.contains("MUSIC_U=")) {
+                    NeteaseApi.cookie = cookie
+                    runCatching { CookieManager.getInstance().flush() }
+                    onLoggedIn()
+                } else {
+                    status = "还没检测到登录，请先在网页里完成登录"
+                }
+            }) { Text("我已登录，抓取") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+    )
 }
 
 @Composable
