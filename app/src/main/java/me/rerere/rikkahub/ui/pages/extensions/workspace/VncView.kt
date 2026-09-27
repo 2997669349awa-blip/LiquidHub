@@ -55,6 +55,9 @@ class VncView @JvmOverloads constructor(
 
     /** true = 触摸板（相对移动 + 点击），false = 触屏（绝对坐标） */
     var touchpadMode: Boolean = false
+
+    /** true = 只作为输入通道（不接收/渲染画面），画面由 ExoPlayer 硬解 H.264 提供 */
+    var inputOnly: Boolean = false
     @Volatile private var cursorX = 0
     @Volatile private var cursorY = 0
     private var downX = 0f
@@ -219,6 +222,13 @@ class VncView @JvmOverloads constructor(
             cursorX = w / 2
             cursorY = h / 2
             sendPointer(cursorX, cursorY, 0)
+            if (inputOnly) {
+                post { listener?.onState("输入通道已连接 ${w}x$h") }
+                while (running) {
+                    runCatching { Thread.sleep(500) }
+                }
+                return
+            }
             val colors = IntArray(w * h)
             frame = colors
             val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
@@ -402,6 +412,7 @@ class VncView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        if (inputOnly) return
         val bmp = bitmap ?: return
         val dst = dstRect()
         if (dst.width() <= 0) return

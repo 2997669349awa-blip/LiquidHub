@@ -330,21 +330,23 @@ private fun FullScreenDesktop(audioEnabled: Boolean, onExit: () -> Unit) {
             .fillMaxSize()
             .background(Color.Black),
     ) {
+        // 画面：ExoPlayer 硬解 H.264（目标 30+ FPS）
+        DesktopH264View(
+            url = WorkspaceDesktopManager.H264_URL,
+            modifier = Modifier.fillMaxSize(),
+            onState = { status = it },
+            onFps = { fps = it },
+        )
+        // 输入：VNC 只发指针/键盘，不传画面（透明覆盖层）
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
                 VncView(ctx).apply {
+                    inputOnly = true
                     listener = object : VncView.Listener {
-                        override fun onState(state: String) {
-                            status = state
-                        }
-
+                        override fun onState(state: String) {}
                         override fun onError(message: String) {
                             status = message
-                        }
-
-                        override fun onFps(fpsValue: Int) {
-                            fps = fpsValue
                         }
                     }
                     touchpadMode = touchpad

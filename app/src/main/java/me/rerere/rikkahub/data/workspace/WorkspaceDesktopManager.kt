@@ -88,6 +88,7 @@ class WorkspaceDesktopManager internal constructor(
     companion object {
         const val SCRIPT_PATH = ".liquidhub/desktop.sh"
         const val NOVNC_URL = "http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale"
+        const val H264_URL = "http://127.0.0.1:8080/live.ts"
     }
 }
 
@@ -99,6 +100,7 @@ set -u
 DISP=":1"
 VNC_PORT=5900
 WEB_PORT=6080
+H264_PORT=8080
 RUNDIR=/tmp/.liquidhub-desktop
 NOVNC_DIR=""
 FORCE_INSTALL=0
@@ -171,7 +173,7 @@ install_pkgs() {
     apk add --no-cache --allow-untrusted ca-certificates xvfb x11vnc fluxbox xdotool bash coreutils || RC=1
     if [ "${'$'}TIER" != "mini" ]; then
       apk add --no-cache --allow-untrusted xterm imagemagick scrot dbus font-noto font-noto-cjk \
-        pulseaudio pulseaudio-utils || log "WARN: 部分可选组件安装失败（不影响桌面）"
+        pulseaudio pulseaudio-utils ffmpeg || log "WARN: 部分可选组件安装失败（不影响桌面）"
     fi
     if [ "${'$'}TIER" = "full" ]; then
       apk add --no-cache --allow-untrusted pcmanfm firefox 2>/dev/null || true
@@ -195,7 +197,7 @@ install_pkgs() {
     done
     if [ "${'$'}TIER" != "mini" ]; then
       apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true \
-        xterm imagemagick scrot dbus-x11 fonts-noto-cjk pulseaudio pulseaudio-utils \
+        xterm imagemagick scrot dbus-x11 fonts-noto-cjk pulseaudio pulseaudio-utils ffmpeg \
         || log "WARN: 部分可选组件安装失败（不影响桌面）"
     fi
     if [ "${'$'}TIER" = "full" ]; then
@@ -341,6 +343,7 @@ start() {
     tail -n 30 "${'$'}RUNDIR/x11vnc.log" 2>/dev/null
     return 3
   fi
+  start_stream
   start_audio
 }
 
@@ -451,6 +454,27 @@ ensure_universe() {
     [ -f "${'$'}f" ] || continue
     grep -q universe "${'$'}f" 2>/dev/null || sed -i 's/ main$/ main universe/' "${'$'}f" 2>/dev/null
   done
+}
+
+start_stream() {
+  command -v ffmpeg >/dev/null 2>&1 || { log "ffmpeg 未安装，跳过 H.264 串流"; return 0; }
+  RES=$(cat /workspace/.liquidhub/resolution 2>/dev/null)
+  [ -z "${'$'}RES" ] && RES=1280x720
+  pkill -f "x11grab" 2>/dev/null
+  sleep 1
+  ffmpeg -loglevel error -f x11grab -framerate 30 -video_size "${'$'}RES" -i "${'$'}DISP" \
+    -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -g 30 \
+    -b:v 4M -maxrate 4M -bufsize 8M \
+    -f mpegts -listen 1 "http://127.0.0.1:${'$'}H264_PORT/live.ts" \
+    >"${'$'}RUNDIR/ffmpeg.log" 2>&1 &
+  echo ${'$'}! > "${'$'}RUNDIR/ffmpeg.pid"
+  sleep 1
+  if kill -0 "${'$'}(cat "${'$'}RUNDIR/ffmpeg.pid")" 2>/dev/null; then
+    log "H.264 stream: http://127.0.0.1:${'$'}H264_PORT/live.ts"
+  else
+    log "WARN: ffmpeg 未启动，详见 ffmpeg.log"
+    tail -n 15 "${'$'}RUNDIR/ffmpeg.log" 2>/dev/null
+  fi
 }
 
 start_audio() {

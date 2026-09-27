@@ -191,6 +191,8 @@ dependencies {
     implementation(libs.androidx.profileinstaller)
     implementation(libs.termux.terminal.view)
     implementation(libs.guava.listenablefuture)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
 
     // Compose
     implementation(libs.androidx.activity.compose)
