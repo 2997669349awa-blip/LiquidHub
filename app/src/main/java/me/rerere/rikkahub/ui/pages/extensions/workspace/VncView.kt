@@ -201,10 +201,12 @@ class VncView @JvmOverloads constructor(
             output.writeShort(255); output.writeShort(255); output.writeShort(255)
             output.writeByte(16); output.writeByte(8); output.writeByte(0)
             output.writeByte(0); output.writeByte(0); output.writeByte(0)
-            // SetEncodings: Raw only
+            // SetEncodings: Hextile(5) > CopyRect(1) > Raw(0)
             output.writeByte(2)
             output.writeByte(0)
-            output.writeShort(1)
+            output.writeShort(3)
+            output.writeInt(5)
+            output.writeInt(1)
             output.writeInt(0)
             output.flush()
 
@@ -222,7 +224,6 @@ class VncView @JvmOverloads constructor(
                 invalidate()
             }
 
-            val row = ByteArray(w * 4)
             while (running) {
                 synchronized(writeLock) {
                     output.writeByte(3) // FramebufferUpdateRequest
@@ -241,22 +242,11 @@ class VncView @JvmOverloads constructor(
                             val rw = input.readUnsignedShort()
                             val rh = input.readUnsignedShort()
                             val enc = input.readInt()
-                            if (enc != 0) fail("不支持的 VNC 编码: $enc")
-                            var yy = 0
-                            while (yy < rh) {
-                                input.readFully(row, 0, rw * 4)
-                                val base = (y + yy) * w + x
-                                var i = 0
-                                var px = 0
-                                while (i < rw * 4) {
-                                    val b = row[i].toInt() and 0xFF
-                                    val g = row[i + 1].toInt() and 0xFF
-                                    val rr = row[i + 2].toInt() and 0xFF
-                                    colors[base + px] = (0xFF shl 24) or (rr shl 16) or (g shl 8) or b
-                                    i += 4
-                                    px++
-                                }
-                                yy++
+                            when (enc) {
+                                0 -> readRaw(input, colors, w, x, y, rw, rh)
+                                1 -> readCopyRect(input, colors, w, x, y, rw, rh)
+                                5 -> readHextile(input, colors, w, x, y, rw, rh)
+                                else -> fail("不支持的 VNC 编码: $enc")
                             }
                             // 只把变化的矩形写回 Bitmap，避免每次整屏 setPixels 造成卡顿
                             synchronized(bmp) {
@@ -280,7 +270,7 @@ class VncView @JvmOverloads constructor(
                     }
                     else -> fail("未知的 VNC 消息: $msg")
                 }
-                Thread.sleep(40)
+                Thread.sleep(16)
             }
         } catch (t: Throwable) {
             // 交给外层 connect() 的重试循环
@@ -289,6 +279,84 @@ class VncView @JvmOverloads constructor(
             runCatching { socket?.close() }
             socket = null
             out = null
+        }
+    }
+
+    private fun cpixel(input: DataInputStream): Int {
+        val b = input.readUnsignedByte()
+        val g = input.readUnsignedByte()
+        val r = input.readUnsignedByte()
+        return (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+    }
+
+    private fun readRaw(input: DataInputStream, colors: IntArray, stride: Int, x: Int, y: Int, rw: Int, rh: Int) {
+        for (yy in 0 until rh) {
+            val base = (y + yy) * stride + x
+            for (xx in 0 until rw) colors[base + xx] = cpixel(input)
+        }
+    }
+
+    private fun readCopyRect(input: DataInputStream, colors: IntArray, stride: Int, x: Int, y: Int, rw: Int, rh: Int) {
+        val sx = input.readUnsignedShort()
+        val sy = input.readUnsignedShort()
+        if (sx == x && sy == y) return
+        val tmp = IntArray(rw * rh)
+        for (yy in 0 until rh) {
+            System.arraycopy(colors, (sy + yy) * stride + sx, tmp, yy * rw, rw)
+        }
+        for (yy in 0 until rh) {
+            System.arraycopy(tmp, yy * rw, colors, (y + yy) * stride + x, rw)
+        }
+    }
+
+    private fun readHextile(input: DataInputStream, colors: IntArray, stride: Int, x: Int, y: Int, rw: Int, rh: Int) {
+        var bg = 0
+        var fg = 0
+        var ty = 0
+        while (ty < rh) {
+            val th = minOf(16, rh - ty)
+            var tx = 0
+            while (tx < rw) {
+                val tw = minOf(16, rw - tx)
+                val sub = input.readUnsignedByte()
+                if (sub and 1 != 0) {
+                    for (yy in 0 until th) {
+                        val base = (y + ty + yy) * stride + x + tx
+                        for (xx in 0 until tw) colors[base + xx] = cpixel(input)
+                    }
+                } else {
+                    if (sub and 2 != 0) bg = cpixel(input)
+                    if (sub and 4 != 0) fg = cpixel(input)
+                    for (yy in 0 until th) {
+                        val base = (y + ty + yy) * stride + x + tx
+                        for (xx in 0 until tw) colors[base + xx] = bg
+                    }
+                    if (sub and 8 != 0) {
+                        val n = input.readUnsignedByte()
+                        val colored = sub and 16 != 0
+                        for (i in 0 until n) {
+                            val color = if (colored) cpixel(input) else fg
+                            val xy = input.readUnsignedByte()
+                            val wh = input.readUnsignedByte()
+                            val sxx = xy shr 4
+                            val syy = xy and 0x0F
+                            val sw = (wh shr 4) + 1
+                            val sh = (wh and 0x0F) + 1
+                            for (yy in 0 until sh) {
+                                val ry = syy + yy
+                                if (ry >= th) break
+                                val base = (y + ty + ry) * stride + x + tx
+                                for (xx in 0 until sw) {
+                                    if (sxx + xx >= tw) break
+                                    colors[base + sxx + xx] = color
+                                }
+                            }
+                        }
+                    }
+                }
+                tx += 16
+            }
+            ty += 16
         }
     }
 
