@@ -33,6 +33,7 @@ class VncView @JvmOverloads constructor(
     interface Listener {
         fun onState(state: String)
         fun onError(message: String)
+        fun onFps(fps: Int) {}
     }
 
     var listener: Listener? = null
@@ -48,6 +49,9 @@ class VncView @JvmOverloads constructor(
     @Volatile private var frameHeight = 0
     @Volatile private var running = false
     @Volatile private var frame: IntArray? = null
+    private var copyScratch = IntArray(0)
+    private var framesThisSecond = 0
+    private var lastFpsAt = 0L
 
     /** true = 触摸板（相对移动 + 点击），false = 触屏（绝对坐标） */
     var touchpadMode: Boolean = false
@@ -194,12 +198,12 @@ class VncView @JvmOverloads constructor(
             val nameLen = input.readInt()
             if (nameLen > 0) input.skipBytes(nameLen)
 
-            // SetPixelFormat: 32bpp, depth24, little-endian, truecolor, shifts R16 G8 B0
+            // SetPixelFormat: 16bpp RGB565 小端（数据量是 32bpp 的一半，明显更快）
             output.writeByte(0)
             output.writeByte(0); output.writeByte(0); output.writeByte(0)
-            output.writeByte(32); output.writeByte(24); output.writeByte(0); output.writeByte(1)
-            output.writeShort(255); output.writeShort(255); output.writeShort(255)
-            output.writeByte(16); output.writeByte(8); output.writeByte(0)
+            output.writeByte(16); output.writeByte(16); output.writeByte(0); output.writeByte(1)
+            output.writeShort(31); output.writeShort(63); output.writeShort(31)
+            output.writeByte(11); output.writeByte(5); output.writeByte(0)
             output.writeByte(0); output.writeByte(0); output.writeByte(0)
             // SetEncodings: Hextile(5) > CopyRect(1) > Raw(0)
             output.writeByte(2)
@@ -256,6 +260,14 @@ class VncView @JvmOverloads constructor(
                         if (rects > 0) {
                             postInvalidateOnAnimation()
                         }
+                        framesThisSecond++
+                        val nowMs = System.currentTimeMillis()
+                        if (nowMs - lastFpsAt >= 1000) {
+                            lastFpsAt = nowMs
+                            val fps = framesThisSecond
+                            framesThisSecond = 0
+                            post { listener?.onFps(fps) }
+                        }
                     }
                     1 -> {
                         input.skipBytes(3)
@@ -283,11 +295,13 @@ class VncView @JvmOverloads constructor(
     }
 
     private fun cpixel(input: DataInputStream): Int {
-        // Raw/Hextile 的像素是 bytesPerPixel（32bpp -> 4 字节，小端 B,G,R,pad）
-        val b = input.readUnsignedByte()
-        val g = input.readUnsignedByte()
-        val r = input.readUnsignedByte()
-        input.readUnsignedByte()
+        // 16bpp RGB565 小端
+        val lo = input.readUnsignedByte()
+        val hi = input.readUnsignedByte()
+        val v = lo or (hi shl 8)
+        val r = ((v shr 11) and 0x1F) * 255 / 31
+        val g = ((v shr 5) and 0x3F) * 255 / 63
+        val b = (v and 0x1F) * 255 / 31
         return (0xFF shl 24) or (r shl 16) or (g shl 8) or b
     }
 
@@ -302,7 +316,9 @@ class VncView @JvmOverloads constructor(
         val sx = input.readUnsignedShort()
         val sy = input.readUnsignedShort()
         if (sx == x && sy == y) return
-        val tmp = IntArray(rw * rh)
+        // 复用缓冲，避免每帧分配导致 GC 卡顿
+        if (copyScratch.size < rw * rh) copyScratch = IntArray(rw * rh)
+        val tmp = copyScratch
         for (yy in 0 until rh) {
             System.arraycopy(colors, (sy + yy) * stride + sx, tmp, yy * rw, rw)
         }

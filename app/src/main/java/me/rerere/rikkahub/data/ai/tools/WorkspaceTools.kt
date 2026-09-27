@@ -46,6 +46,9 @@ val WorkspaceApprovalToolNames: List<String> = listOf(
     "desktop_key",
     "desktop_browser",
     "desktop_wait_user",
+    "desktop_move",
+    "desktop_scroll",
+    "desktop_drag",
 )
 
 fun resolveWorkspaceToolApproval(name: String, overrides: Map<String, Boolean>): Boolean =

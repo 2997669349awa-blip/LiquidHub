@@ -301,6 +301,8 @@ private fun FullScreenDesktop(audioEnabled: Boolean, onExit: () -> Unit) {
     var touchpad by remember { mutableStateOf(false) }
     var input by remember { mutableStateOf("") }
     var showInput by remember { mutableStateOf(false) }
+    var toolbarVisible by remember { mutableStateOf(true) }
+    var fps by remember { mutableStateOf(0) }
 
     val audioPlayer = remember { PulseAudioPlayer() }
     var audioState by remember { mutableStateOf("") }
@@ -340,6 +342,10 @@ private fun FullScreenDesktop(audioEnabled: Boolean, onExit: () -> Unit) {
                         override fun onError(message: String) {
                             status = message
                         }
+
+                        override fun onFps(fpsValue: Int) {
+                            fps = fpsValue
+                        }
                     }
                     touchpadMode = touchpad
                     connect()
@@ -353,7 +359,7 @@ private fun FullScreenDesktop(audioEnabled: Boolean, onExit: () -> Unit) {
         )
 
         Text(
-            text = if (audioState.isBlank()) status else "$status\n$audioState",
+            text = (if (audioState.isBlank()) status else "$status\n$audioState") + "\n${fps} FPS",
             color = Color.White,
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier
@@ -364,53 +370,70 @@ private fun FullScreenDesktop(audioEnabled: Boolean, onExit: () -> Unit) {
         )
 
         Column(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
-            if (showInput) {
+            if (toolbarVisible) {
+                if (showInput) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xE6000000))
+                            .padding(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        OutlinedTextField(
+                            value = input,
+                            onValueChange = { input = it },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            label = { Text("输入文字（回车发送）") },
+                        )
+                        Button(onClick = {
+                            vncRef?.sendText(input + "\n")
+                            input = ""
+                        }) { Text("发送") }
+                    }
+                }
+                FlowRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xCC000000))
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    IconButton(onClick = { vncRef?.leftClick() }) {
+                        Icon(HugeIcons.Cursor01, contentDescription = "左键", tint = Color.White)
+                    }
+                    IconButton(onClick = { vncRef?.rightClick() }) {
+                        Icon(HugeIcons.Cursor02, contentDescription = "右键", tint = Color.White)
+                    }
+                    TextButton(onClick = { touchpad = !touchpad }) {
+                        Text(if (touchpad) "触摸板" else "触屏", color = Color.White)
+                    }
+                    TextButton(onClick = { showInput = !showInput }) {
+                        Text("输入", color = Color.White)
+                    }
+                    TextButton(onClick = { vncRef?.sendText("\u000d") }) {
+                        Text("回车", color = Color.White)
+                    }
+                    TextButton(onClick = { toolbarVisible = false }) {
+                        Text("收起", color = Color.White)
+                    }
+                    TextButton(onClick = onExit) {
+                        Text("退出", color = Color.White)
+                    }
+                }
+            } else {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xE6000000))
-                        .padding(8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                        .background(Color(0x88000000))
+                        .padding(2.dp),
+                    horizontalArrangement = Arrangement.Center,
                 ) {
-                    OutlinedTextField(
-                        value = input,
-                        onValueChange = { input = it },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        label = { Text("输入文字（回车发送）") },
-                    )
-                    Button(onClick = {
-                        vncRef?.sendText(input + "\n")
-                        input = ""
-                    }) { Text("发送") }
-                }
-            }
-            FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xCC000000))
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                IconButton(onClick = { vncRef?.leftClick() }) {
-                    Icon(HugeIcons.Cursor01, contentDescription = "左键", tint = Color.White)
-                }
-                IconButton(onClick = { vncRef?.rightClick() }) {
-                    Icon(HugeIcons.Cursor02, contentDescription = "右键", tint = Color.White)
-                }
-                TextButton(onClick = { touchpad = !touchpad }) {
-                    Text(if (touchpad) "触摸板" else "触屏", color = Color.White)
-                }
-                TextButton(onClick = { showInput = !showInput }) {
-                    Text("输入", color = Color.White)
-                }
-                TextButton(onClick = { vncRef?.sendText("\u000d") }) {
-                    Text("回车", color = Color.White)
-                }
-                TextButton(onClick = onExit) {
-                    Text("退出", color = Color.White)
+                    TextButton(onClick = { toolbarVisible = true }) {
+                        Text("工具", color = Color.White)
+                    }
                 }
             }
         }

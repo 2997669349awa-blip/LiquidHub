@@ -550,6 +550,9 @@ private fun workspaceToolApprovalItems() = listOf(
     "desktop_key" to "桌面: 按键",
     "desktop_browser" to "桌面: 打开网页",
     "desktop_wait_user" to "桌面: 等待用户接管",
+    "desktop_move" to "桌面: 移动鼠标",
+    "desktop_scroll" to "桌面: 滚轮",
+    "desktop_drag" to "桌面: 拖拽",
 )
 
 @Composable

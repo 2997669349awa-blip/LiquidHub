@@ -34,6 +34,9 @@ val DesktopToolDefaultApprovals: Map<String, Boolean> = mapOf(
     "desktop_key" to true,
     "desktop_browser" to true,
     "desktop_wait_user" to false,
+    "desktop_move" to false,
+    "desktop_scroll" to true,
+    "desktop_drag" to true,
 )
 
 internal suspend fun createDesktopTools(
@@ -52,6 +55,9 @@ internal suspend fun createDesktopTools(
         createDesktopKeyTool(workspaceId, workspaceRepository, ::needsApproval),
         createDesktopBrowserTool(workspaceId, workspaceRepository, desktopManager, ::needsApproval),
         createDesktopWaitUserTool(::needsApproval),
+        createDesktopMoveTool(workspaceId, workspaceRepository, ::needsApproval),
+        createDesktopScrollTool(workspaceId, workspaceRepository, ::needsApproval),
+        createDesktopDragTool(workspaceId, workspaceRepository, ::needsApproval),
     )
 }
 
@@ -361,6 +367,99 @@ private fun createDesktopWaitUserTool(
                 }.toString()
             )
         )
+    },
+)
+
+private fun createDesktopMoveTool(
+    workspaceId: String,
+    workspaceRepository: WorkspaceRepository,
+    needsApproval: (String) -> Boolean,
+) = Tool(
+    name = "desktop_move",
+    description = "Move the mouse pointer to (x, y) on the remote desktop (no click). Coordinates match the 1280x720 screenshot.",
+    parameters = {
+        InputSchema.Obj(
+            properties = buildJsonObject {
+                put("x", buildJsonObject { put("type", "integer") })
+                put("y", buildJsonObject { put("type", "integer") })
+            },
+            required = listOf("x", "y"),
+        )
+    },
+    needsApproval = { needsApproval("desktop_move") },
+    execute = {
+        val x = it.jsonObject.intValue("x") ?: error("x is required")
+        val y = it.jsonObject.intValue("y") ?: error("y is required")
+        val result = workspaceRepository.executeCommand(
+            id = workspaceId,
+            command = "DISPLAY=:1 xdotool mousemove -- $x $y && echo MOVE_OK",
+            timeoutMillis = 30_000,
+        )
+        listOf(UIMessagePart.Text(commandResultJson(result)))
+    },
+)
+
+private fun createDesktopScrollTool(
+    workspaceId: String,
+    workspaceRepository: WorkspaceRepository,
+    needsApproval: (String) -> Boolean,
+) = Tool(
+    name = "desktop_scroll",
+    description = "Scroll the remote desktop. direction is up or down; amount is wheel clicks (default 5).",
+    parameters = {
+        InputSchema.Obj(
+            properties = buildJsonObject {
+                put("direction", buildJsonObject { put("type", "string"); put("description", "up or down") })
+                put("amount", buildJsonObject { put("type", "integer"); put("description", "wheel clicks, default 5") })
+            },
+            required = listOf("direction"),
+        )
+    },
+    needsApproval = { needsApproval("desktop_scroll") },
+    execute = {
+        val direction = it.jsonObject.stringValue("direction")?.lowercase() ?: "down"
+        val amount = (it.jsonObject.intValue("amount") ?: 5).coerceIn(1, 50)
+        val button = if (direction == "up") "4" else "5"
+        val result = workspaceRepository.executeCommand(
+            id = workspaceId,
+            command = "DISPLAY=:1 xdotool click --repeat $amount $button && echo SCROLL_OK",
+            timeoutMillis = 30_000,
+        )
+        listOf(UIMessagePart.Text(commandResultJson(result)))
+    },
+)
+
+private fun createDesktopDragTool(
+    workspaceId: String,
+    workspaceRepository: WorkspaceRepository,
+    needsApproval: (String) -> Boolean,
+) = Tool(
+    name = "desktop_drag",
+    description = "Drag on the remote desktop from (x1, y1) to (x2, y2) with the left button.",
+    parameters = {
+        InputSchema.Obj(
+            properties = buildJsonObject {
+                put("x1", buildJsonObject { put("type", "integer") })
+                put("y1", buildJsonObject { put("type", "integer") })
+                put("x2", buildJsonObject { put("type", "integer") })
+                put("y2", buildJsonObject { put("type", "integer") })
+            },
+            required = listOf("x1", "y1", "x2", "y2"),
+        )
+    },
+    needsApproval = { needsApproval("desktop_drag") },
+    execute = {
+        val p = it.jsonObject
+        val x1 = p.intValue("x1") ?: error("x1 is required")
+        val y1 = p.intValue("y1") ?: error("y1 is required")
+        val x2 = p.intValue("x2") ?: error("x2 is required")
+        val y2 = p.intValue("y2") ?: error("y2 is required")
+        val result = workspaceRepository.executeCommand(
+            id = workspaceId,
+            command = "DISPLAY=:1 xdotool mousemove -- $x1 $y1 mousedown 1 mousemove -- $x2 $y2 mouseup 1 && echo DRAG_OK",
+            timeoutMillis = 30_000,
+        )
+        listOf(UIMessagePart.Text(commandResultJson(result)))
     },
 )
 
