@@ -305,11 +305,6 @@ private fun FullScreenDesktop(audioEnabled: Boolean, onExit: () -> Unit) {
     var fps by remember { mutableStateOf(0) }
 
     val audioPlayer = remember { PulseAudioPlayer() }
-    var audioState by remember { mutableStateOf("") }
-    LaunchedEffect(audioEnabled) {
-        audioPlayer.listener = PulseAudioPlayer.Listener { audioState = it }
-        if (audioEnabled) audioPlayer.start() else audioPlayer.stop()
-    }
     DisposableEffect(Unit) {
         onDispose { audioPlayer.stop() }
     }
@@ -361,7 +356,7 @@ private fun FullScreenDesktop(audioEnabled: Boolean, onExit: () -> Unit) {
         )
 
         Text(
-            text = (if (audioState.isBlank()) status else "$status\n$audioState") + "\n${fps} FPS",
+            text = "$status\n${fps} FPS",
             color = Color.White,
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier

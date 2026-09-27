@@ -108,6 +108,10 @@ FORCE_INSTALL=0
 export DISPLAY="${'$'}DISP"
 export HOME="${'$'}{HOME:-/root}"
 export XDG_RUNTIME_DIR="${'$'}RUNDIR/xdg"
+# 声音：桌面应用把音频发到 Termux 侧的 PulseAudio（终端执行 likkahub sound 启动）
+if ! { [ -f /workspace/.liquidhub/audio ] && [ "${'$'}(cat /workspace/.liquidhub/audio 2>/dev/null)" = "0" ]; }; then
+  export PULSE_SERVER=tcp:127.0.0.1:4713
+fi
 mkdir -p "${'$'}RUNDIR" "${'$'}XDG_RUNTIME_DIR" 2>/dev/null
 chmod 700 "${'$'}XDG_RUNTIME_DIR" 2>/dev/null
 
@@ -344,7 +348,6 @@ start() {
     return 3
   fi
   start_stream
-  start_audio
 }
 
 browser() {

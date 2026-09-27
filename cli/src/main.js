@@ -22,6 +22,7 @@ import {
   stopServer
 } from './ollama.js'
 import { goCommand } from './chat.js'
+import { soundCommand } from './sound.js'
 
 const VERSION = '0.1.0'
 
@@ -45,6 +46,8 @@ export async function main(argv) {
       return providerCommand(rest)
     case 'log':
       return logCommand()
+    case 'sound':
+      return soundCommand(rest)
     case 'help':
     case '--help':
     case '-h':
