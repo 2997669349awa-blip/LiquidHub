@@ -253,11 +253,6 @@ setup_theme() {
   if command -v convert >/dev/null 2>&1; then
     convert -size 1280x720 gradient:'#0f172a'-'#1d4ed8' "${'$'}RUNDIR/wallpaper.png" 2>/dev/null
   fi
-  if [ -f "${'$'}RUNDIR/wallpaper.png" ] && command -v display >/dev/null 2>&1; then
-    display -window root "${'$'}RUNDIR/wallpaper.png" >/dev/null 2>&1 &
-  elif command -v xsetroot >/dev/null 2>&1; then
-    xsetroot -solid "#0f172a" 2>/dev/null
-  fi
   # Fluxbox 配置：显示底部工具栏（工作区 + 时钟），作为美化基础
   cat > "${'$'}HOME/.fluxbox/init" <<'FBEOF'
 session.screen0.toolbar.visible: true
@@ -315,6 +310,7 @@ start() {
   if command -v xterm >/dev/null 2>&1; then
     xterm >"${'$'}RUNDIR/xterm.log" 2>&1 &
   fi
+  set_background
 
   log "starting x11vnc on ${'$'}VNC_PORT"
   x11vnc -display "${'$'}DISP" -forever -shared -localhost -rfbport "${'$'}VNC_PORT" \
@@ -406,6 +402,19 @@ logs() {
   if [ -f "${'$'}RUNDIR/last.log" ]; then
     echo "==== last.log (最近一次 启动/停止 输出) ===="
     tail -n 50 "${'$'}RUNDIR/last.log"
+  fi
+}
+
+set_background() {
+  # fluxbox 的 bsetroot 最可靠：直接给根窗口设渐变背景，避免被刷成全黑
+  if command -v bsetroot >/dev/null 2>&1; then
+    bsetroot -gradient northsouth "#1e3a8a" "#0f172a" 2>/dev/null && return 0
+  fi
+  if [ -f "${'$'}RUNDIR/wallpaper.png" ] && command -v fbsetbg >/dev/null 2>&1; then
+    fbsetbg -f "${'$'}RUNDIR/wallpaper.png" 2>/dev/null && return 0
+  fi
+  if command -v xsetroot >/dev/null 2>&1; then
+    xsetroot -solid "#0f172a" 2>/dev/null
   fi
 }
 
