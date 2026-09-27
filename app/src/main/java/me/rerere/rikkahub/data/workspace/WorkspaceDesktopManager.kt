@@ -256,7 +256,7 @@ start() {
   # -ac 关闭访问控制，避免 rootfs 里没有 xauth/Xauthority 导致 x11vnc 连不上 X
   RES=$(cat /workspace/.liquidhub/resolution 2>/dev/null)
   [ -z "${'$'}RES" ] && RES=1280x720
-  Xvfb "${'$'}DISP" -screen 0 "${'$'}RESx24" -nolisten tcp -ac >"${'$'}RUNDIR/xvfb.log" 2>&1 &
+  Xvfb "${'$'}DISP" -screen 0 "${'$'}{RES}x24" -nolisten tcp -ac >"${'$'}RUNDIR/xvfb.log" 2>&1 &
   echo ${'$'}! > "${'$'}RUNDIR/xvfb.pid"
   i=0
   while [ ! -e /tmp/.X11-unix/X1 ] && [ ${'$'}i -lt 20 ]; do sleep 0.5 2>/dev/null || sleep 1; i=${'$'}((i+1)); done

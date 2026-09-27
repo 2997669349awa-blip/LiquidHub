@@ -41,14 +41,20 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import me.rerere.ai.provider.Model
+import me.rerere.ai.provider.ProviderSetting
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Delete01
 import me.rerere.hugeicons.stroke.Download04
+import me.rerere.rikkahub.data.datastore.LOCAL_AI_PROVIDER_ID
+import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.theme.CustomColors
+import org.koin.compose.koinInject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlin.uuid.Uuid
 
 private const val HF_MIRROR = "https://hf-mirror.com"
 private const val MODELS_DIR = "localmodels"
@@ -102,6 +108,7 @@ private val LOCAL_MODEL_CATALOG = listOf(
 fun LocalModelsPage() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val settingsStore: SettingsStore = koinInject()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     val dir = remember { File(context.filesDir, MODELS_DIR).apply { mkdirs() } }
@@ -180,6 +187,35 @@ fun LocalModelsPage() {
         runCatching { File(dir, fileName).delete() }
         downloaded.remove(fileName)
         refresh()
+    }
+
+    /** 把已下载的 gguf 名字注册进「本地AI」提供商，这样在模型选择里就能看到它。 */
+    fun addToProvider(fileName: String) {
+        val name = fileName.removeSuffix(".gguf")
+        scope.launch {
+            settingsStore.update { current ->
+                val updated = current.providers.map { provider ->
+                    if (provider.id == LOCAL_AI_PROVIDER_ID && provider is ProviderSetting.OpenAI) {
+                        val existing = provider.models.map { it.modelId }.toSet()
+                        if (name in existing) {
+                            provider.copy(enabled = true)
+                        } else {
+                            provider.copy(
+                                enabled = true,
+                                models = provider.models + Model(
+                                    modelId = name,
+                                    displayName = name,
+                                    id = Uuid.random(),
+                                ),
+                            )
+                        }
+                    } else {
+                        provider
+                    }
+                }
+                current.copy(providers = updated)
+            }
+        }
     }
 
     Scaffold(
@@ -277,6 +313,9 @@ fun LocalModelsPage() {
                             ) {
                                 if (isDownloaded) {
                                     Text("已下载", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
+                                    Button(onClick = { addToProvider(model.fileName) }) {
+                                        Text("添加到本地AI")
+                                    }
                                     OutlinedButton(onClick = { delete(model.fileName) }) {
                                         Icon(HugeIcons.Delete01, contentDescription = null)
                                         Text("删除")

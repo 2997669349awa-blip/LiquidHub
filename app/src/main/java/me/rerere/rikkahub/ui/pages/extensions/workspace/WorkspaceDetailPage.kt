@@ -541,6 +541,7 @@ private fun workspaceToolApprovalItems() = listOf(
     "workspace_write_file" to stringResource(R.string.workspace_detail_tool_write_file),
     "workspace_edit_file" to stringResource(R.string.workspace_detail_tool_edit_file),
     "workspace_shell" to stringResource(R.string.workspace_detail_tool_shell),
+    "workspace_network" to "工作区: 访问外网",
     "desktop_start" to "桌面: 启动",
     "desktop_stop" to "桌面: 停止",
     "desktop_screenshot" to "桌面: 截图",

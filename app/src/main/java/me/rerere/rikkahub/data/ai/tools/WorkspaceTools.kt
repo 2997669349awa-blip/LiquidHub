@@ -28,6 +28,7 @@ val WorkspaceToolDefaultApprovals: Map<String, Boolean> = mapOf(
     "workspace_write_file" to false,
     "workspace_edit_file" to false,
     "workspace_shell" to true,
+    "workspace_network" to true,
 )
 
 /** 工作区 + 桌面里所有可设置「是否需要批准」的工具名。 */
@@ -36,6 +37,7 @@ val WorkspaceApprovalToolNames: List<String> = listOf(
     "workspace_write_file",
     "workspace_edit_file",
     "workspace_shell",
+    "workspace_network",
     "desktop_start",
     "desktop_stop",
     "desktop_screenshot",
@@ -65,8 +67,58 @@ suspend fun createWorkspaceTools(
         createWriteFileTool(workspaceId, ::needsApproval, workspaceRepository),
         createEditFileTool(workspaceId, ::needsApproval, workspaceRepository),
         createShellTool(workspaceId, ::needsApproval, workspaceRepository, shellCwd),
+        createNetworkTool(workspaceId, ::needsApproval, workspaceRepository),
     )
 }
+
+private fun createNetworkTool(
+    workspaceId: String,
+    needsApproval: (String) -> Boolean,
+    workspaceRepository: WorkspaceRepository,
+) = Tool(
+    name = "workspace_network",
+    description = "Let the workspace sandbox access the internet. With no url it just checks " +
+        "connectivity; with a url it fetches that http(s) URL and returns the text (truncated).",
+    parameters = {
+        InputSchema.Obj(
+            properties = buildJsonObject {
+                put(
+                    "url",
+                    buildJsonObject {
+                        put("type", "string")
+                        put("description", "Optional http(s) URL to fetch from inside the sandbox")
+                    }
+                )
+            },
+        )
+    },
+    needsApproval = { needsApproval("workspace_network") },
+    execute = {
+        val url = it.jsonObject["url"]?.let { v ->
+            runCatching { v.jsonPrimitive.contentOrNull }.getOrNull()
+        }
+        val command = if (url.isNullOrBlank()) {
+            "curl -sSL --max-time 15 -o /dev/null -w 'HTTP %{http_code}\\n' " +
+                "https://mirrors.tuna.tsinghua.edu.cn/ 2>&1 || echo 'network failed'"
+        } else {
+            "curl -sSL --max-time 30 '" + url.replace("'", "'\\''") + "' 2>&1 | head -c 20000"
+        }
+        val result = workspaceRepository.executeCommand(
+            id = workspaceId,
+            command = command,
+            timeoutMillis = 60_000,
+        )
+        listOf(
+            UIMessagePart.Text(
+                buildJsonObject {
+                    put("exitCode", result.exitCode)
+                    put("stdout", result.stdout)
+                    put("stderr", result.stderr)
+                }.toString()
+            )
+        )
+    },
+)
 
 private val IMAGE_EXTENSIONS = setOf(
     "png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "heic", "heif", "avif", "ico",
