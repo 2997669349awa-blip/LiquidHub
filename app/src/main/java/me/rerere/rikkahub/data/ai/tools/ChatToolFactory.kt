@@ -61,6 +61,7 @@ class ChatToolFactory(
         if (shouldUseExternalWebSearch(assistant, model)) {
             addAll(createSearchTools(settings))
         }
+        addAll(createMusicTools())
         addAll(localTools.getTools(assistant.localTools))
         if (assistant.enableRecentChatsReference) {
             addAll(createConversationTools(conversationRepository, assistant.id))
