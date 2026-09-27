@@ -39,6 +39,7 @@ data class WorkspaceDesktopState(
     val browser: String = "auto",
     val audioEnabled: Boolean = true,
     val resolution: String = "1280x720",
+    val tier: String = "normal",
 )
 
 class WorkspaceDesktopVM(
@@ -99,6 +100,11 @@ class WorkspaceDesktopVM(
                 ?.trim()
                 .orEmpty()
                 .ifBlank { "1280x720" }
+            val tier = lines.firstOrNull { it.startsWith("TIER=") }
+                ?.removePrefix("TIER=")
+                ?.trim()
+                .orEmpty()
+                .ifBlank { "normal" }
             _state.update {
                 it.copy(
                     shellReady = true,
@@ -107,6 +113,7 @@ class WorkspaceDesktopVM(
                     browser = browser,
                     audioEnabled = audio,
                     resolution = resolution,
+                    tier = tier,
                 )
             }
         }
@@ -154,6 +161,20 @@ class WorkspaceDesktopVM(
                 )
             }
             _state.update { it.copy(resolution = res) }
+        }
+    }
+
+    /** tier: mini / normal / full */
+    fun setTier(tier: String) {
+        viewModelScope.launch {
+            runCatching {
+                repository.executeCommand(
+                    id = id,
+                    command = "mkdir -p /workspace/.liquidhub && printf '%s' '$tier' > /workspace/.liquidhub/tier",
+                    timeoutMillis = 15_000,
+                )
+            }
+            _state.update { it.copy(tier = tier) }
         }
     }
 
@@ -357,7 +378,8 @@ class WorkspaceDesktopVM(
                 "command -v Xvfb >/dev/null 2>&1 && echo XVFB_YES || echo XVFB_NO; " +
                 "echo BROWSER=$(cat /workspace/.liquidhub/browser 2>/dev/null); " +
                 "echo AUDIO=$(cat /workspace/.liquidhub/audio 2>/dev/null); " +
-                "echo RESOLUTION=$(cat /workspace/.liquidhub/resolution 2>/dev/null)"
+                "echo RESOLUTION=$(cat /workspace/.liquidhub/resolution 2>/dev/null); " +
+                "echo TIER=$(cat /workspace/.liquidhub/tier 2>/dev/null)"
         val APT_NEED = Regex("Need to get ([\\d.,]+)\\s*([kKmMgG]?B)", RegexOption.IGNORE_CASE)
         val APT_GET = Regex("Get:(\\d+)\\s+\\S+.*?\\[([\\d.,]+)\\s*([kKmMgG]?B)\\]", RegexOption.IGNORE_CASE)
         val COUNT = Regex("\\((\\d+)\\s*/\\s*(\\d+)\\)")

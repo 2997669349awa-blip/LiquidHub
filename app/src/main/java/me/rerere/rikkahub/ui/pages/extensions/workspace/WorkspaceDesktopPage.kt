@@ -222,6 +222,20 @@ fun WorkspaceDesktopPage(id: String) {
                             )
                         }
                     }
+                    Text("系统版本（重装后生效）", style = MaterialTheme.typography.titleSmall)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            "mini" to "精简 <100MB",
+                            "normal" to "普通 <1GB",
+                            "full" to "完整 <10GB",
+                        ).forEach { (tier, label) ->
+                            FilterChip(
+                                selected = state.tier == tier,
+                                onClick = { vm.setTier(tier) },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("播放桌面声音", style = MaterialTheme.typography.bodyLarge)
                         Spacer(Modifier.width(6.dp))

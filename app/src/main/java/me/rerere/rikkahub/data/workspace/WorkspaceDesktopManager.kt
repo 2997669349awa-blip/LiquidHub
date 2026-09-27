@@ -118,55 +118,85 @@ find_novnc() {
   return 1
 }
 
+read_tier() {
+  T=$(cat /workspace/.liquidhub/tier 2>/dev/null)
+  [ -z "${'$'}T" ] && T=normal
+  echo "${'$'}T"
+}
+
 install_browser() {
-  log "installing browser (firefox preferred)"
+  TIER=$(read_tier)
+  if [ "${'$'}TIER" = "mini" ]; then log "tier=mini：跳过浏览器"; return 0; fi
+  log "installing browser (tier ${'$'}TIER)"
   if command -v apk >/dev/null 2>&1; then
-    apk add --no-cache --allow-untrusted firefox 2>/dev/null \
-      || apk add --no-cache --allow-untrusted chromium 2>/dev/null || true
+    [ "${'$'}TIER" = "full" ] && { apk add --no-cache --allow-untrusted firefox 2>/dev/null || true; }
+    apk add --no-cache --allow-untrusted chromium 2>/dev/null || true
   elif command -v apt-get >/dev/null 2>&1; then
-    apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true firefox-esr 2>/dev/null \
-      || apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true firefox 2>/dev/null \
-      || apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true chromium 2>/dev/null \
+    if [ "${'$'}TIER" = "full" ]; then
+      apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true firefox-esr 2>/dev/null \
+        || apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true firefox 2>/dev/null || true
+    fi
+    apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true chromium 2>/dev/null \
       || apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true chromium-browser 2>/dev/null \
       || apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true epiphany-browser 2>/dev/null \
       || apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true falkon 2>/dev/null \
-      || log "WARN: 没有可用的浏览器（可稍后手动安装）"
+      || log "WARN: 没有可用的浏览器"
   elif command -v pacman >/dev/null 2>&1; then
-    pacman -Sy --noconfirm --needed firefox 2>/dev/null \
-      || pacman -Sy --noconfirm --needed chromium 2>/dev/null || true
+    [ "${'$'}TIER" = "full" ] && { pacman -Sy --noconfirm --needed firefox 2>/dev/null || true; }
+    pacman -Sy --noconfirm --needed chromium 2>/dev/null || true
   fi
 }
 
 install_pkgs() {
+  TIER=$(read_tier)
+  log "system tier: ${'$'}TIER"
+  export TIER
   if [ "${'$'}{FORCE_INSTALL:-0}" != "1" ] \
      && command -v Xvfb >/dev/null 2>&1 && command -v x11vnc >/dev/null 2>&1 \
      && command -v fluxbox >/dev/null 2>&1 \
-     && command -v xdotool >/dev/null 2>&1 \
-     && { command -v scrot >/dev/null 2>&1 || command -v import >/dev/null 2>&1; }; then
+     && command -v xdotool >/dev/null 2>&1; then
     log "desktop already installed, skipping"
     return 0
   fi
   RC=0
   if command -v apk >/dev/null 2>&1; then
-    log "Alpine: installing desktop packages"
-    apk add --no-cache --allow-untrusted ca-certificates xvfb x11vnc fluxbox xdotool imagemagick scrot dbus \
-      pulseaudio pulseaudio-utils font-noto font-noto-cjk bash coreutils || RC=1
+    log "Alpine(apk): installing desktop packages"
+    apk add --no-cache --allow-untrusted ca-certificates xvfb x11vnc fluxbox xdotool bash coreutils || RC=1
+    if [ "${'$'}TIER" != "mini" ]; then
+      apk add --no-cache --allow-untrusted xterm imagemagick scrot dbus font-noto font-noto-cjk \
+        pulseaudio pulseaudio-utils || log "WARN: 部分可选组件安装失败（不影响桌面）"
+    fi
+    if [ "${'$'}TIER" = "full" ]; then
+      apk add --no-cache --allow-untrusted pcmanfm firefox 2>/dev/null || true
+    fi
   elif command -v apt-get >/dev/null 2>&1; then
-    log "Debian/Ubuntu: installing desktop packages"
+    log "Debian/Ubuntu(apt): installing desktop packages"
     export DEBIAN_FRONTEND=noninteractive
     getent hosts mirrors.tuna.tsinghua.edu.cn >/dev/null 2>&1 || log "WARN: 无法解析镜像域名，DNS 可能有问题"
     apt-get update -y -o Acquire::Retries=5 -o Acquire::ForceIPv4=true || RC=1
     apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true \
-      ca-certificates xvfb x11vnc fluxbox xdotool imagemagick scrot dbus-x11 fonts-noto-cjk \
-      pulseaudio pulseaudio-utils || RC=1
+      ca-certificates xvfb x11vnc fluxbox xdotool || RC=1
+    if [ "${'$'}TIER" != "mini" ]; then
+      apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true \
+        xterm imagemagick scrot dbus-x11 fonts-noto-cjk pulseaudio pulseaudio-utils \
+        || log "WARN: 部分可选组件安装失败（不影响桌面）"
+    fi
+    if [ "${'$'}TIER" = "full" ]; then
+      apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true pcmanfm 2>/dev/null || true
+    fi
   elif command -v pacman >/dev/null 2>&1; then
-    log "Arch: installing desktop packages"
-    # Arch 的包用 GPG 签名，老 rootfs 的 keyring 过期会报 key expired / unknown trust
+    log "Arch(pacman): installing desktop packages"
     pacman-key --init >/dev/null 2>&1 || true
     pacman-key --populate archlinuxarm >/dev/null 2>&1 || pacman-key --populate archlinux >/dev/null 2>&1 || true
     pacman -Sy --noconfirm --needed archlinux-keyring >/dev/null 2>&1 || true
-    pacman -Sy --noconfirm --needed ca-certificates xorg-server-xvfb x11vnc fluxbox xdotool \
-      imagemagick scrot dbus noto-fonts pulseaudio || RC=1
+    pacman -Sy --noconfirm --needed ca-certificates xorg-server-xvfb x11vnc fluxbox xdotool || RC=1
+    if [ "${'$'}TIER" != "mini" ]; then
+      pacman -Sy --noconfirm --needed xterm imagemagick scrot dbus noto-fonts pulseaudio \
+        || log "WARN: 部分可选组件安装失败（不影响桌面）"
+    fi
+    if [ "${'$'}TIER" = "full" ]; then
+      pacman -Sy --noconfirm --needed pcmanfm firefox 2>/dev/null || true
+    fi
   else
     log "ERROR: unsupported package manager"
     return 1
@@ -240,6 +270,17 @@ session.screen0.strftimeFormat: %H:%M
 session.screen0.workspaces: 1
 session.screen0.focusModel: ClickToFocus
 FBEOF
+  # 桌面右键菜单（让桌面不是“空气”）
+  cat > "${'$'}HOME/.fluxbox/menu" <<'FBMENU'
+[begin] (LiquidHub)
+  [exec] (终端 Terminal) { xterm }
+  [exec] (文件 Files) { pcmanfm }
+  [exec] (浏览器 Browser) { firefox }
+  [separator]
+  [restart] (重新加载)
+  [exit] (退出)
+[end]
+FBMENU
 }
 
 start() {
@@ -270,6 +311,10 @@ start() {
   log "starting fluxbox"
   fluxbox >"${'$'}RUNDIR/fluxbox.log" 2>&1 &
   echo ${'$'}! > "${'$'}RUNDIR/fluxbox.pid"
+  # 自动开一个终端，桌面不至于空无一物
+  if command -v xterm >/dev/null 2>&1; then
+    xterm >"${'$'}RUNDIR/xterm.log" 2>&1 &
+  fi
 
   log "starting x11vnc on ${'$'}VNC_PORT"
   x11vnc -display "${'$'}DISP" -forever -shared -localhost -rfbport "${'$'}VNC_PORT" \
