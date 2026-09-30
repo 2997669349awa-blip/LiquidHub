@@ -1,11 +1,11 @@
 {
-  "version": "0.2.3Data",
-  "publishedAt": "2026-09-30T11:18:00Z",
-  "changelog": "LiquidHub V0.2.3Data\n\n- 远程桌面：VNC 改为走 Unix socket（TigerVNC Xvnc，同 tiny_container），更低延迟；缺失时自动回退 Xvfb+x11vnc\n- 远程桌面：日志改到工作区文件，持久保留、不再消失，启动过程中即可实时查看\n- 音乐：music_play 支持直接传关键词（+歌手）一步搜索并播放，减少多余步骤与 token",
+  "version": "0.2.4Data",
+  "publishedAt": "2026-09-30T12:08:00Z",
+  "changelog": "LiquidHub V0.2.4Data\n\n- 远程桌面：修复 TigerVNC(Xvnc) 的安装（安装/启动时都会确保装上），真正走 Unix socket VNC；装不上则回退 Xvfb+x11vnc\n- 远程桌面：关闭 MIT-SHM，消除 ffmpeg x11grab 反复报 “Could not get shared memory buffer”\n- 上一版：日志持久保留且在启动过程中可实时查看；音乐一步搜索播放",
   "downloads": [
     {
-      "name": "liquidhub-release-0930-1118.apk",
-      "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-0930-1118.apk",
+      "name": "liquidhub-release-0930-1208.apk",
+      "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-0930-1208.apk",
       "size": "约 49 MB"
     }
   ]
