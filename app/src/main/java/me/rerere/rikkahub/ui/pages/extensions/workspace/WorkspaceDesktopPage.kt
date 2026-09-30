@@ -4,11 +4,6 @@
 
 package me.rerere.rikkahub.ui.pages.extensions.workspace
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
-import android.content.pm.ActivityInfo
-import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,7 +27,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -40,7 +34,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,22 +41,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
 import me.rerere.hugeicons.HugeIcons
-import me.rerere.hugeicons.stroke.ArrowLeft01
-import me.rerere.hugeicons.stroke.Cursor01
-import me.rerere.hugeicons.stroke.Cursor02
 import me.rerere.hugeicons.stroke.Refresh01
 import me.rerere.rikkahub.BuildConfig
-import me.rerere.rikkahub.data.workspace.WorkspaceDesktopManager
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.theme.CustomColors
 import org.koin.androidx.compose.koinViewModel
@@ -83,17 +71,19 @@ private fun stageLabel(stage: DesktopStage): String = when (stage) {
 fun WorkspaceDesktopPage(id: String) {
     val vm: WorkspaceDesktopVM = koinViewModel(parameters = { parametersOf(id) })
     val state by vm.state.collectAsStateWithLifecycle()
-    var entered by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     var showFullLog by remember { mutableStateOf(false) }
 
-    // 进入桌面：全屏显示
-    if (entered && state.running) {
-        FullScreenDesktop(
-            audioEnabled = state.audioEnabled,
-            vncSocketPath = state.vncSocketPath,
-            onExit = { entered = false },
-        )
-        return
+    // 打开页面先读一次持久日志；桌面运行中或全屏看日志时持续刷新，
+    // 保证「启动完成之后」日志仍在、并能实时观看。
+    LaunchedEffect(Unit) { vm.loadLogs() }
+    LaunchedEffect(state.running, state.busy, showFullLog) {
+        if ((state.running && !state.busy) || showFullLog) {
+            while (true) {
+                vm.loadLogs()
+                delay(1500)
+            }
+        }
     }
 
     Scaffold(
@@ -146,7 +136,7 @@ fun WorkspaceDesktopPage(id: String) {
                 }
                 Button(
                     enabled = !state.busy && state.running,
-                    onClick = { entered = true },
+                    onClick = { AvncLauncher.launch(context, state.vncSocketPath) },
                 ) {
                     Text("进入桌面")
                 }
@@ -157,7 +147,7 @@ fun WorkspaceDesktopPage(id: String) {
             Text(
                 text = when {
                     state.busy -> "状态：${state.progressText ?: stageLabel(state.stage)}"
-                    state.running -> "状态：桌面已启动（可进入）"
+                    state.running -> "状态：桌面已启动（点「进入桌面」用 AVNC 打开，支持鼠标/键盘/手势）"
                     else -> "状态：已停止"
                 },
                 style = MaterialTheme.typography.labelMedium,
@@ -181,90 +171,89 @@ fun WorkspaceDesktopPage(id: String) {
                 )
             }
 
-            if (!state.running) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text("使用步骤", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        text = "1) 安装环境 → 2) 启动（会常驻保活）→ 3) 进入桌面（全屏，可直接触控）。\n" +
-                            "桌面里底部工具栏可以按下左键/右键、切换「触屏/触摸板」、发送文字。装坏了点「重装」。",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = "构建版本：${BuildConfig.BUILD_STAMP}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text("浏览器（AI 打开网页时使用）", style = MaterialTheme.typography.titleSmall)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(
-                            "auto" to "自动",
-                            "firefox" to "火狐",
-                            "chromium" to "Chrome",
-                            "falkon" to "Falkon",
-                        ).forEach { (bin, label) ->
-                            FilterChip(
-                                selected = state.browser == bin,
-                                onClick = { vm.setBrowser(if (bin == "auto") "" else bin) },
-                                label = { Text(label) },
-                            )
-                        }
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("使用步骤", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    text = "1) 安装环境 → 2) 启动（会常驻保活）→ 3) 点「进入桌面」。\n" +
+                        "桌面由 AVNC 全屏显示，直接用触摸当鼠标、用键盘输入；返回键即退出桌面。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "构建版本：${BuildConfig.BUILD_STAMP}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text("浏览器（AI 打开网页时使用）", style = MaterialTheme.typography.titleSmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        "auto" to "自动",
+                        "firefox" to "火狐",
+                        "chromium" to "Chrome",
+                        "falkon" to "Falkon",
+                    ).forEach { (bin, label) ->
+                        FilterChip(
+                            selected = state.browser == bin,
+                            onClick = { vm.setBrowser(if (bin == "auto") "" else bin) },
+                            label = { Text(label) },
+                        )
                     }
-                    Text("分辨率（越高越清晰、也越吃性能）", style = MaterialTheme.typography.titleSmall)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(
-                            "1280x720" to "720p 流畅",
-                            "1600x900" to "900p",
-                            "1920x1080" to "1080p 清晰",
-                        ).forEach { (res, label) ->
-                            FilterChip(
-                                selected = state.resolution == res,
-                                onClick = { vm.setResolution(res) },
-                                label = { Text(label) },
-                            )
-                        }
-                    }
-                    Text("系统版本（重装后生效）", style = MaterialTheme.typography.titleSmall)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(
-                            "mini" to "精简 <100MB",
-                            "normal" to "普通 <1GB",
-                            "full" to "完整 <10GB",
-                        ).forEach { (tier, label) ->
-                            FilterChip(
-                                selected = state.tier == tier,
-                                onClick = { vm.setTier(tier) },
-                                label = { Text(label) },
-                            )
-                        }
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("播放桌面声音", style = MaterialTheme.typography.bodyLarge)
-                        Spacer(Modifier.width(6.dp))
-                        Surface(
-                            color = MaterialTheme.colorScheme.tertiaryContainer,
-                            shape = RoundedCornerShape(4.dp),
-                        ) {
-                            Text(
-                                "实验性",
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            )
-                        }
-                        Spacer(Modifier.weight(1f))
-                        Switch(checked = state.audioEnabled, onCheckedChange = { vm.setAudio(it) })
-                    }
-                    InstallLog(
-                        state = state,
-                        onLoadLogs = { vm.loadLogs() },
-                        onFullscreen = { showFullLog = true },
-                    )
                 }
+                Text("分辨率（越高越清晰、也越吃性能）", style = MaterialTheme.typography.titleSmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        "1280x720" to "720p 流畅",
+                        "1600x900" to "900p",
+                        "1920x1080" to "1080p 清晰",
+                    ).forEach { (res, label) ->
+                        FilterChip(
+                            selected = state.resolution == res,
+                            onClick = { vm.setResolution(res) },
+                            label = { Text(label) },
+                        )
+                    }
+                }
+                Text("系统版本（重装后生效）", style = MaterialTheme.typography.titleSmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        "mini" to "精简 <100MB",
+                        "normal" to "普通 <1GB",
+                        "full" to "完整 <10GB",
+                    ).forEach { (tier, label) ->
+                        FilterChip(
+                            selected = state.tier == tier,
+                            onClick = { vm.setTier(tier) },
+                            label = { Text(label) },
+                        )
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("播放桌面声音", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(Modifier.width(6.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        shape = RoundedCornerShape(4.dp),
+                    ) {
+                        Text(
+                            "实验性",
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Switch(checked = state.audioEnabled, onCheckedChange = { vm.setAudio(it) })
+                }
+                InstallLog(
+                    state = state,
+                    onLoadLogs = { vm.loadLogs() },
+                    onFullscreen = { showFullLog = true },
+                )
             }
         }
     }
@@ -277,8 +266,9 @@ fun WorkspaceDesktopPage(id: String) {
             Surface(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("安装日志", style = MaterialTheme.typography.titleMedium)
+                        Text("桌面日志", style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.weight(1f))
+                        TextButton(onClick = { vm.loadLogs() }) { Text("刷新") }
                         TextButton(onClick = { showFullLog = false }) { Text("关闭") }
                     }
                     Text(
@@ -296,159 +286,13 @@ fun WorkspaceDesktopPage(id: String) {
     }
 }
 
-/** 全屏桌面：VNC 画面 + 底部操作栏。 */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun FullScreenDesktop(audioEnabled: Boolean, vncSocketPath: String?, onExit: () -> Unit) {
-    var vncRef by remember { mutableStateOf<VncView?>(null) }
-    var status by remember { mutableStateOf("正在连接桌面…") }
-    var touchpad by remember { mutableStateOf(false) }
-    var input by remember { mutableStateOf("") }
-    var showInput by remember { mutableStateOf(false) }
-    var toolbarVisible by remember { mutableStateOf(true) }
-    var fps by remember { mutableStateOf(0) }
-
-    val audioPlayer = remember { PulseAudioPlayer() }
-    DisposableEffect(Unit) {
-        onDispose { audioPlayer.stop() }
-    }
-
-    // 进入桌面时横屏，退出恢复
-    val context = LocalContext.current
-    DisposableEffect(Unit) {
-        val activity = context.findActivity()
-        val previous = activity?.requestedOrientation
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        onDispose {
-            activity?.requestedOrientation = previous ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black),
-    ) {
-        // 画面：ExoPlayer 硬解 H.264（目标 30+ FPS）
-        DesktopH264View(
-            url = WorkspaceDesktopManager.H264_URL,
-            modifier = Modifier.fillMaxSize(),
-            onState = { status = it },
-            onFps = { fps = it },
-        )
-        // 输入：VNC 只发指针/键盘，不传画面（透明覆盖层）
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
-                VncView(ctx).apply {
-                    inputOnly = true
-                    unixSocketPath = vncSocketPath
-                    listener = object : VncView.Listener {
-                        override fun onState(state: String) {}
-                        override fun onError(message: String) {
-                            status = message
-                        }
-                    }
-                    touchpadMode = touchpad
-                    connect()
-                }.also { vncRef = it }
-            },
-            update = { it.touchpadMode = touchpad },
-            onRelease = {
-                it.disconnect()
-                if (vncRef === it) vncRef = null
-            },
-        )
-
-        Text(
-            text = "$status\n${fps} FPS",
-            color = Color.White,
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(8.dp)
-                .background(Color(0x99000000), RoundedCornerShape(4.dp))
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-        )
-
-        Column(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
-            if (toolbarVisible) {
-                if (showInput) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color(0xE6000000))
-                            .padding(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        OutlinedTextField(
-                            value = input,
-                            onValueChange = { input = it },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            label = { Text("输入文字（回车发送）") },
-                        )
-                        Button(onClick = {
-                            vncRef?.sendText(input + "\n")
-                            input = ""
-                        }) { Text("发送") }
-                    }
-                }
-                FlowRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xCC000000))
-                        .padding(horizontal = 6.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    IconButton(onClick = { vncRef?.leftClick() }) {
-                        Icon(HugeIcons.Cursor01, contentDescription = "左键", tint = Color.White)
-                    }
-                    IconButton(onClick = { vncRef?.rightClick() }) {
-                        Icon(HugeIcons.Cursor02, contentDescription = "右键", tint = Color.White)
-                    }
-                    TextButton(onClick = { touchpad = !touchpad }) {
-                        Text(if (touchpad) "触摸板" else "触屏", color = Color.White)
-                    }
-                    TextButton(onClick = { showInput = !showInput }) {
-                        Text("输入", color = Color.White)
-                    }
-                    TextButton(onClick = { vncRef?.sendText("\u000d") }) {
-                        Text("回车", color = Color.White)
-                    }
-                    TextButton(onClick = { toolbarVisible = false }) {
-                        Text("收起", color = Color.White)
-                    }
-                    TextButton(onClick = onExit) {
-                        Text("退出", color = Color.White)
-                    }
-                }
-            } else {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0x88000000))
-                        .padding(2.dp),
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    TextButton(onClick = { toolbarVisible = true }) {
-                        Text("工具", color = Color.White)
-                    }
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun InstallLog(state: WorkspaceDesktopState, onLoadLogs: () -> Unit, onFullscreen: () -> Unit) {
     val scroll = rememberScrollState()
     LaunchedEffect(state.log) {
         scroll.scrollTo(scroll.maxValue)
     }
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -458,21 +302,21 @@ private fun InstallLog(state: WorkspaceDesktopState, onLoadLogs: () -> Unit, onF
                 style = MaterialTheme.typography.labelLarge,
             )
             Spacer(Modifier.weight(1f))
+            TextButton(onClick = onLoadLogs) { Text("刷新") }
             TextButton(onClick = onFullscreen) { Text("全屏") }
-            TextButton(onClick = onLoadLogs) { Text("查看服务日志") }
         }
         Spacer(Modifier.height(4.dp))
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(220.dp),
+                .height(240.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
             shape = MaterialTheme.shapes.small,
         ) {
             Box(modifier = Modifier.fillMaxSize().padding(8.dp)) {
                 if (state.log.isBlank()) {
                     Text(
-                        text = "还没有日志。点「安装环境」后会实时显示每一步。",
+                        text = "还没有日志。点「安装环境」后会实时显示每一步；启动/重装过程中的输出也会持续显示在这里。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -490,13 +334,4 @@ private fun InstallLog(state: WorkspaceDesktopState, onLoadLogs: () -> Unit, onF
             }
         }
     }
-}
-
-private fun Context.findActivity(): Activity? {
-    var ctx: Context = this
-    while (ctx is ContextWrapper) {
-        if (ctx is Activity) return ctx
-        ctx = ctx.baseContext
-    }
-    return null
 }

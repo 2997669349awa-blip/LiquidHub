@@ -110,6 +110,11 @@ class WorkspaceDesktopVM(
                 ?.trim()
                 .orEmpty()
                 .ifBlank { "normal" }
+            val vncMode = lines.firstOrNull { it.startsWith("MODE=") }
+                ?.removePrefix("MODE=")
+                ?.trim()
+                .orEmpty()
+                .ifBlank { "unknown" }
             _state.update {
                 it.copy(
                     shellReady = true,
@@ -119,7 +124,8 @@ class WorkspaceDesktopVM(
                     audioEnabled = audio,
                     resolution = resolution,
                     tier = tier,
-                    vncSocketPath = sockPath,
+                    // 只有 Unix socket 模式才把 socket 路径交给 AVNC，否则回退 TCP
+                    vncSocketPath = if (vncMode == "unix") sockPath else null,
                 )
             }
         }

@@ -87,8 +87,6 @@ class WorkspaceDesktopManager internal constructor(
 
     companion object {
         const val SCRIPT_PATH = ".liquidhub/desktop.sh"
-        const val NOVNC_URL = "http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale"
-        const val H264_URL = "http://127.0.0.1:8080/live.ts"
 
         /** 日志目录（相对工作区 /workspace），宿主机可直接读取 */
         const val LOG_DIR = ".liquidhub/logs"
@@ -106,7 +104,6 @@ set -u
 DISP=":1"
 VNC_PORT=5900
 WEB_PORT=6080
-H264_PORT=8080
 # 日志与运行时文件放在 /workspace（宿主机 = App 的 files/ 目录）下：
 # 1) 持久保留，不会随 proot 退出或下一次 start 被清空；
 # 2) App 可直接读取文件，启动过程中也能实时刷新，无需再起一个 proot。
@@ -465,7 +462,6 @@ start() {
     xterm >>"${'$'}RUNDIR/xterm.log" 2>&1 &
   fi
   set_background
-  start_stream
   log "STARTED: VNC ready (mode=${'$'}(cat /workspace/.liquidhub/vnc_mode 2>/dev/null || echo unknown))"
 }
 
@@ -583,32 +579,6 @@ ensure_universe() {
     [ -f "${'$'}f" ] || continue
     grep -q universe "${'$'}f" 2>/dev/null || sed -i 's/ main$/ main universe/' "${'$'}f" 2>/dev/null
   done
-}
-
-start_stream() {
-  command -v ffmpeg >/dev/null 2>&1 || { log "ffmpeg 未安装，跳过 H.264 串流"; return 0; }
-  RES=$(cat /workspace/.liquidhub/resolution 2>/dev/null)
-  [ -z "${'$'}RES" ] && RES=1280x720
-  FPS=$(cat /workspace/.liquidhub/fps 2>/dev/null)
-  [ -z "${'$'}FPS" ] && FPS=60
-  pkill -f "x11grab" 2>/dev/null
-  sleep 1
-  # -listen 1 只接受一个客户端；用循环在客户端断开后自动重听，保证再次进入也能连上
-  # ultrafast + zerolatency + sliced-threads 降低编码延迟，尽量冲高帧率
-  (
-    while true; do
-      ffmpeg -loglevel error -f x11grab -draw_mouse 1 -framerate "${'$'}FPS" -video_size "${'$'}RES" -i "${'$'}DISP" \
-        -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p \
-        -g "${'$'}FPS" -keyint_min "${'$'}FPS" -sc_threshold 0 \
-        -x264-params "sliced-threads=1:sync-lookahead=0:rc-lookahead=0:bframes=0:ref=1:me=dia:subme=0:trellis=0:weightp=0:8x8dct=0:cabac=0" \
-        -b:v 4M -maxrate 4M -bufsize 8M -threads 4 \
-        -fflags nobuffer -f mpegts -listen 1 "http://127.0.0.1:${'$'}H264_PORT/live.ts" || true
-      sleep 1
-    done
-  ) >"${'$'}RUNDIR/ffmpeg.log" 2>&1 &
-  echo ${'$'}! > "${'$'}RUNDIR/ffmpeg.pid"
-  sleep 1
-  log "H.264 stream ${'$'}RES@${'$'}FPS (auto-restart on disconnect): http://127.0.0.1:${'$'}H264_PORT/live.ts"
 }
 
 start_audio() {

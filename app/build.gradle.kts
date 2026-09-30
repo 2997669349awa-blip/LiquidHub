@@ -87,6 +87,9 @@ android {
             signingConfig = signingConfigs.getByName("release")
             optimization {
                 enable = true
+                keepRules {
+                    files.add(file("proguard-rules.pro"))
+                }
             }
             buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}\"")
             buildConfigField("String", "VERSION_CODE", "\"${android.defaultConfig.versionCode}\"")
@@ -124,6 +127,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        dataBinding = true
     }
     sourceSets {
         getByName("androidTest").assets.srcDirs("$projectDir/schemas")
@@ -194,6 +198,9 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.session)
     implementation(libs.androidx.media3.ui)
+
+    // AVNC（tiny_container 的 VNC 库化 fork）：工作区桌面复用其 VNC 输出/输入处理
+    implementation("com.github.tiny-computer:avnc:030e6c032e")
 
     // Compose
     implementation(libs.androidx.activity.compose)
