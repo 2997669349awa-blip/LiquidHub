@@ -178,6 +178,30 @@ class WorkspaceRepository(
         manager.readText(workspace.root, path)
     }
 
+    /**
+     * 读取工作区 /workspace 下的文本文件；不存在或读取失败时返回 null。
+     * 用于日志这类可能尚未生成的文件，直接在宿主机读取，无需再起一个 proot。
+     */
+    suspend fun readTextOrNull(id: String, path: String): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val workspace = dao.getById(id) ?: return@runCatching null
+            val file = java.io.File(manager.filesDir(workspace.root), path)
+            if (file.isFile) file.readText() else null
+        }.getOrNull()
+    }
+
+    /**
+     * 工作区 /workspace 在宿主机上的绝对目录（等于 App 的 files/ 目录）。
+     * 用于直接读取日志、连接容器内在 /workspace 下创建的 Unix socket 等。
+     */
+    suspend fun workspaceHostDir(id: String): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val workspace = dao.getById(id) ?: return@runCatching null
+            manager.ensureWorkspace(workspace.root)
+            manager.filesDir(workspace.root).absolutePath
+        }.getOrNull()
+    }
+
     suspend fun writeText(
         id: String,
         path: String,

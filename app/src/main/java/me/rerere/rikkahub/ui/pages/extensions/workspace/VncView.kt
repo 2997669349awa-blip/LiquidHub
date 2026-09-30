@@ -11,11 +11,14 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
+import android.net.LocalSocket
+import android.net.LocalSocketAddress
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
+import java.io.Closeable
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.net.InetSocketAddress
@@ -66,9 +69,16 @@ class VncView @JvmOverloads constructor(
     private var moved = false
 
     private var worker: Thread? = null
-    private var socket: Socket? = null
+    private var conn: Closeable? = null
     private var out: DataOutputStream? = null
     private val writeLock = Any()
+
+    /**
+     * 非空时通过 Unix domain socket 连接（tiny_container 使用的方式，绕过 TCP 网络栈），
+     * 路径是宿主机上可见的 socket 文件（容器内 /workspace/.vnc 的宿主机映射）。
+     * 为空时回退到 TCP host:port。
+     */
+    @Volatile var unixSocketPath: String? = null
 
     fun connect(host: String = "127.0.0.1", port: Int = 5900) {
         disconnect()
@@ -95,8 +105,8 @@ class VncView @JvmOverloads constructor(
 
     fun disconnect() {
         running = false
-        runCatching { socket?.close() }
-        socket = null
+        runCatching { conn?.close() }
+        conn = null
         worker?.interrupt()
         worker = null
         out = null
@@ -162,12 +172,32 @@ class VncView @JvmOverloads constructor(
 
     private fun runSession(host: String, port: Int) {
         try {
-            val s = Socket()
-            s.tcpNoDelay = true
-            s.connect(InetSocketAddress(host, port), 5000)
-            socket = s
-            val input = DataInputStream(BufferedInputStream(s.getInputStream()))
-            val output = DataOutputStream(BufferedOutputStream(s.getOutputStream()))
+            val path = unixSocketPath
+            var inS: java.io.InputStream? = null
+            var outS: java.io.OutputStream? = null
+            if (!path.isNullOrBlank()) {
+                try {
+                    val ls = LocalSocket()
+                    ls.connect(LocalSocketAddress(path, LocalSocketAddress.Namespace.FILESYSTEM))
+                    conn = ls
+                    inS = ls.inputStream
+                    outS = ls.outputStream
+                } catch (t: Throwable) {
+                    runCatching { conn?.close() }
+                    conn = null
+                    post { listener?.onError("Unix socket 连接失败，回退 TCP：${t.message ?: t::class.java.simpleName}") }
+                }
+            }
+            if (inS == null || outS == null) {
+                val s = Socket()
+                s.tcpNoDelay = true
+                s.connect(InetSocketAddress(host, port), 5000)
+                conn = s
+                inS = s.getInputStream()
+                outS = s.getOutputStream()
+            }
+            val input = DataInputStream(BufferedInputStream(inS!!))
+            val output = DataOutputStream(BufferedOutputStream(outS!!))
             out = output
 
             val version = ByteArray(12)
@@ -298,8 +328,8 @@ class VncView @JvmOverloads constructor(
             // 交给外层 connect() 的重试循环
             if (running) throw t
         } finally {
-            runCatching { socket?.close() }
-            socket = null
+            runCatching { conn?.close() }
+            conn = null
             out = null
         }
     }

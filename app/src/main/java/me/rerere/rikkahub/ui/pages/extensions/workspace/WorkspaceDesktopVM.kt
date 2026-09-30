@@ -40,6 +40,8 @@ data class WorkspaceDesktopState(
     val audioEnabled: Boolean = true,
     val resolution: String = "1280x720",
     val tier: String = "normal",
+    /** 宿主机上 VNC Unix socket 的绝对路径（tiny_container 风格），为空则回退 TCP */
+    val vncSocketPath: String? = null,
 )
 
 class WorkspaceDesktopVM(
@@ -69,11 +71,14 @@ class WorkspaceDesktopVM(
 
     fun refresh() {
         viewModelScope.launch {
+            val hostDir = repository.workspaceHostDir(id)
+            val sockPath = hostDir
+                ?.let { java.io.File(it, WorkspaceDesktopManager.VNC_SOCKET_NAME).absolutePath }
             val workspace = runCatching { repository.getById(id) }.getOrNull()
             val ready = workspace?.shellStatus == WorkspaceShellStatus.READY.name
             if (!ready) {
                 _state.update {
-                    it.copy(shellReady = false, running = false, installed = false)
+                    it.copy(shellReady = false, running = false, installed = false, vncSocketPath = sockPath)
                 }
                 return@launch
             }
@@ -114,6 +119,7 @@ class WorkspaceDesktopVM(
                     audioEnabled = audio,
                     resolution = resolution,
                     tier = tier,
+                    vncSocketPath = sockPath,
                 )
             }
         }
@@ -178,20 +184,56 @@ class WorkspaceDesktopVM(
         }
     }
 
-    /** 拉取桌面各服务（Xvfb/x11vnc/websockify/browser）的日志，方便排查网页打不开。 */
+    /**
+     * 读取工作区里的持久日志文件（宿主机直接读，无需再起 proot）。
+     * 日志写在 /workspace/.liquidhub/logs/ 下，因此启动过程中也能实时看到输出、且重启后仍在。
+     */
     fun loadLogs() {
         viewModelScope.launch {
-            val result = runCatching {
-                repository.executeCommand(
-                    id = id,
-                    command = "sh /workspace/${WorkspaceDesktopManager.SCRIPT_PATH} logs",
-                    timeoutMillis = 15_000,
-                )
-            }.getOrNull() ?: return@launch
-            val text = (result.stdout + "\n" + result.stderr).trim()
-            if (text.isNotBlank()) {
-                _state.update { it.copy(log = text.takeLast(MAX_LOG_CHARS)) }
+            val hostDir = repository.workspaceHostDir(id) ?: return@launch
+            val logDir = java.io.File(hostDir, WorkspaceDesktopManager.LOG_DIR)
+            val files = listOf(
+                "desktop.log" to 400,
+                "last.log" to 200,
+                "xvnc.log" to 60,
+                "xvfb.log" to 60,
+                "x11vnc.log" to 40,
+                "wm.log" to 40,
+                "ffmpeg.log" to 30,
+                "browser.log" to 30,
+            )
+            val report = buildString {
+                for ((name, tail) in files) {
+                    val f = java.io.File(logDir, name)
+                    if (!f.isFile) continue
+                    append("==== ").append(name).append(" (末尾 ").append(tail).append(" 行) ====\n")
+                    append(tailFile(f, tail)).append("\n\n")
+                }
+            }.trim()
+            if (report.isNotBlank()) {
+                _state.update { it.copy(log = report.takeLast(MAX_LOG_CHARS)) }
             }
+        }
+    }
+
+    /** 读取文件末尾 [lines] 行；超过 256KB 时只读最后 256KB，避免大日志拖慢。 */
+    private fun tailFile(file: java.io.File, lines: Int): String {
+        return try {
+            val maxBytes = 262_144L
+            val text: String = if (file.length() <= maxBytes) {
+                file.readText()
+            } else {
+                java.io.RandomAccessFile(file, "r").use { raf ->
+                    raf.seek(file.length() - maxBytes)
+                    val buf = ByteArray(maxBytes.toInt())
+                    raf.readFully(buf)
+                    String(buf, Charsets.UTF_8)
+                }
+            }
+            val all = text.split("\n")
+            if (all.size <= lines) text else all.subList(all.size - lines, all.size).joinToString("\n")
+        } catch (t: Throwable) {
+            ""
         }
     }
 
@@ -203,10 +245,12 @@ class WorkspaceDesktopVM(
             try {
                 desktopManager.ensureScript(id)
                 if (action == "start" || action == "stop") {
+                    // 动作下发到常驻终端会话；真正的启动是异步的，轮询持久日志文件，边跑边看
                     desktopManager.runAction(id, action)
-                    delay(2_500)
-                    // start 的输出走长驻终端会话，拿不到；改拉取服务日志（含 5900 端口/进程状态）
-                    if (action == "start") loadLogs()
+                    for (i in 0 until 18) {
+                        delay(700)
+                        loadLogs()
+                    }
                 } else {
                     appendLog("[${if (action == "reinstall") "重装" else "安装"}环境] 开始，下面是实时输出\n")
                     pushLog()

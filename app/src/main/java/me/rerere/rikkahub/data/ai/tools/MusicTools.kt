@@ -90,52 +90,95 @@ fun createMusicTools(): List<Tool> = listOf(
     ),
     Tool(
         name = "music_play",
-        description = "Play a NetEase Cloud Music song by its id (from music_search) on the device. " +
+        description = "Play a song on NetEase Cloud Music (网易云音乐) on the device. " +
+            "TWO ways to use it: " +
+            "(1) ONE-SHOT (preferred, saves steps): pass `keyword` — and `artist` if you know it — " +
+            "and the best-matching song plays immediately; no separate music_search call needed. " +
+            "(2) pass an `id` returned by music_search. " +
+            "Use the one-shot form whenever you already know the title (and artist). " +
             "Playback appears in the notification bar with media controls.",
         parameters = {
             InputSchema.Obj(
                 properties = buildJsonObject {
+                    put("keyword", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Song title (+ extra keywords). Use this to play directly without searching first.")
+                    })
+                    put("artist", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Optional artist name; include it whenever known for a better match.")
+                    })
                     put("id", buildJsonObject {
                         put("type", "string")
-                        put("description", "Song id returned by music_search")
+                        put("description", "Song id returned by music_search (alternative to keyword)")
                     })
                     put("name", buildJsonObject {
                         put("type", "string")
                         put("description", "Optional song title for display")
-                    })
-                    put("artist", buildJsonObject {
-                        put("type", "string")
-                        put("description", "Optional artist for display")
                     })
                     put("cover", buildJsonObject {
                         put("type", "string")
                         put("description", "Optional album cover URL for display")
                     })
                 },
-                required = listOf("id")
+                required = emptyList()
             )
         },
         execute = {
-            val id = it.jsonObject["id"]?.jsonPrimitive?.contentOrNull ?: error("id is required")
-            val name = it.jsonObject["name"]?.jsonPrimitive?.contentOrNull.orEmpty().ifBlank { "Song" }
-            val artist = it.jsonObject["artist"]?.jsonPrimitive?.contentOrNull.orEmpty()
-            val cover = it.jsonObject["cover"]?.jsonPrimitive?.contentOrNull.orEmpty()
-            val song = MusicSong(id = id, name = name, artist = artist, album = "", cover = cover)
-            val controller = runCatching {
-                MusicControllerHolder.playQueue(MusicToolKoin.context, listOf(song), 0)
-            }.getOrNull()
-            listOf(
-                UIMessagePart.Text(
-                    buildJsonObject {
-                        put("ok", controller != null)
-                        if (controller == null) {
-                            put("error", "Could not connect to the music player session")
-                        } else {
-                            put("playing", "$name - $artist".trim().trimStart('-').trim())
-                        }
-                    }.toString()
+            val keyword = it.jsonObject["keyword"]?.jsonPrimitive?.contentOrNull.orEmpty().trim()
+            val artistArg = it.jsonObject["artist"]?.jsonPrimitive?.contentOrNull.orEmpty().trim()
+            var id = it.jsonObject["id"]?.jsonPrimitive?.contentOrNull.orEmpty().trim()
+            var name = it.jsonObject["name"]?.jsonPrimitive?.contentOrNull.orEmpty().trim()
+            var artist = artistArg
+            var cover = it.jsonObject["cover"]?.jsonPrimitive?.contentOrNull.orEmpty().trim()
+            val query = listOf(keyword, artistArg).filter { it.isNotBlank() }.joinToString(" ")
+
+            // 只给了关键词：先搜一次，取最匹配的那首直接播放（一步到位）
+            val autoTop = if (id.isBlank() && keyword.isNotBlank()) {
+                withContext(Dispatchers.IO) {
+                    runCatching { NeteaseApi.search(query) }.getOrDefault(emptyList())
+                }.firstOrNull()
+            } else {
+                null
+            }
+            val song: MusicSong? = if (id.isBlank() && autoTop == null) {
+                null
+            } else {
+                if (id.isBlank()) {
+                    val top = autoTop!!
+                    id = top.id
+                    if (name.isBlank()) name = top.name
+                    if (artist.isBlank()) artist = top.artist
+                    if (cover.isBlank()) cover = top.cover
+                }
+                MusicSong(
+                    id = id,
+                    name = name.ifBlank { "Song" },
+                    artist = artist,
+                    album = "",
+                    cover = cover,
                 )
-            )
+            }
+            val payload = if (song == null) {
+                buildJsonObject {
+                    put("ok", false)
+                    put("error", "找不到匹配的歌曲，请换个关键词重试")
+                    if (query.isNotBlank()) put("query", query)
+                }
+            } else {
+                val controller = runCatching {
+                    MusicControllerHolder.playQueue(MusicToolKoin.context, listOf(song), 0)
+                }.getOrNull()
+                buildJsonObject {
+                    put("ok", controller != null)
+                    if (controller == null) {
+                        put("error", "Could not connect to the music player session")
+                    } else {
+                        put("playing", "${song.name} - ${song.artist}".trim().trimStart('-').trim())
+                    }
+                }
+            }
+            listOf(UIMessagePart.Text(payload.toString()))
         }
     ),
 )

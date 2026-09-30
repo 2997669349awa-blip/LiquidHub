@@ -48,9 +48,9 @@ class WorkspaceDesktopManager internal constructor(
         val session = withContext(sessionDispatcher) {
             sessionFor(workspace.root, workspace.shellCompatibilityMode)
         }
-        val cmd = "mkdir -p /tmp/.liquidhub-desktop; " +
-            "sh /workspace/$SCRIPT_PATH $action > /tmp/.liquidhub-desktop/last.log 2>&1; " +
-            "cat /tmp/.liquidhub-desktop/last.log\n"
+        val cmd = "mkdir -p /workspace/.liquidhub/logs; " +
+            "sh /workspace/$SCRIPT_PATH $action > /workspace/.liquidhub/logs/last.log 2>&1; " +
+            "cat /workspace/.liquidhub/logs/last.log\n"
         val bytes = cmd.toByteArray(Charsets.UTF_8)
         session.write(bytes, 0, bytes.size)
     }
@@ -89,6 +89,12 @@ class WorkspaceDesktopManager internal constructor(
         const val SCRIPT_PATH = ".liquidhub/desktop.sh"
         const val NOVNC_URL = "http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale"
         const val H264_URL = "http://127.0.0.1:8080/live.ts"
+
+        /** 日志目录（相对工作区 /workspace），宿主机可直接读取 */
+        const val LOG_DIR = ".liquidhub/logs"
+
+        /** VNC Unix socket 名（相对工作区 /workspace）：容器内 /workspace/.vnc，宿主机 <files>/.vnc */
+        const val VNC_SOCKET_NAME = ".vnc"
     }
 }
 
@@ -101,7 +107,12 @@ DISP=":1"
 VNC_PORT=5900
 WEB_PORT=6080
 H264_PORT=8080
-RUNDIR=/tmp/.liquidhub-desktop
+# 日志与运行时文件放在 /workspace（宿主机 = App 的 files/ 目录）下：
+# 1) 持久保留，不会随 proot 退出或下一次 start 被清空；
+# 2) App 可直接读取文件，启动过程中也能实时刷新，无需再起一个 proot。
+LOGDIR=/workspace/.liquidhub/logs
+RUNDIR="${'$'}LOGDIR"
+VNC_SOCK=/workspace/.vnc
 NOVNC_DIR=""
 FORCE_INSTALL=0
 
@@ -115,7 +126,22 @@ fi
 mkdir -p "${'$'}RUNDIR" "${'$'}XDG_RUNTIME_DIR" 2>/dev/null
 chmod 700 "${'$'}XDG_RUNTIME_DIR" 2>/dev/null
 
-log() { echo "[desktop] ${'$'}*"; }
+# 同时写终端与持久日志；带时间戳
+log() {
+  TS=${'$'}(date '+%H:%M:%S' 2>/dev/null || true)
+  LINE="[desktop ${'$'}TS] ${'$'}*"
+  echo "${'$'}LINE"
+  echo "${'$'}LINE" >> "${'$'}LOGDIR/desktop.log" 2>/dev/null
+}
+
+# 单个服务日志过大时轮转一次，避免长期运行把工作区撑爆
+rotate_log() {
+  F="${'$'}1"
+  [ -f "${'$'}F" ] || return 0
+  SZ=${'$'}(wc -c < "${'$'}F" 2>/dev/null || echo 0)
+  [ "${'$'}SZ" -gt 1048576 ] 2>/dev/null && mv -f "${'$'}F" "${'$'}F.1" 2>/dev/null
+  return 0
+}
 
 find_novnc() {
   for d in /usr/share/novnc /usr/share/webapps/novnc /usr/local/share/novnc; do
@@ -224,6 +250,18 @@ install_pkgs() {
     log "ERROR: unsupported package manager"
     return 1
   fi
+  # TigerVNC(Xvnc)：最好有它——VNC 可监听 Unix socket（同 tiny_container，App 用 LocalSocket 连接）；
+  # 缺失时 start 会自动回退到 Xvfb + x11vnc(TCP)。单独 best-effort 安装，避免整体安装失败。
+  if command -v Xvnc >/dev/null 2>&1; then
+    log "Xvnc already installed"
+  elif command -v apk >/dev/null 2>&1; then
+    apk add --no-cache --allow-untrusted tigervnc 2>/dev/null || log "WARN: tigervnc 安装失败（将用 Xvfb+x11vnc 回退）"
+  elif command -v apt-get >/dev/null 2>&1; then
+    apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true tigervnc-standalone-server \
+      2>/dev/null || log "WARN: tigervnc 安装失败（将用 Xvfb+x11vnc 回退）"
+  elif command -v pacman >/dev/null 2>&1; then
+    pacman -Sy --noconfirm --needed tigervnc 2>/dev/null || log "WARN: tigervnc 安装失败（将用 Xvfb+x11vnc 回退）"
+  fi
   # 浏览器单独装：失败也不影响桌面核心
   install_browser
   if command -v apt-get >/dev/null 2>&1; then
@@ -240,7 +278,7 @@ install_pkgs() {
   fi
   # 安装后自检：直接看到底装没装上、用的是哪个镜像源
   log "verify:"
-  for b in Xvfb x11vnc fluxbox xdotool; do
+  for b in Xvfb x11vnc fluxbox xdotool Xvnc; do
     command -v "${'$'}b" >/dev/null 2>&1 && echo "[desktop]   OK   ${'$'}b" || echo "[desktop]   MISS ${'$'}b"
   done
   if command -v scrot >/dev/null 2>&1 || command -v import >/dev/null 2>&1; then
@@ -264,10 +302,10 @@ pid_alive() {
   [ -f "${'$'}1" ] && kill -0 "${'$'}(cat "${'$'}1")" 2>/dev/null
 }
 
-is_x_running() { pid_alive "${'$'}RUNDIR/xvfb.pid"; }
-is_vnc_running() { pid_alive "${'$'}RUNDIR/x11vnc.pid"; }
+is_x_running() { pid_alive "${'$'}RUNDIR/xvnc.pid" || pid_alive "${'$'}RUNDIR/xvfb.pid"; }
+is_vnc_running() { pid_alive "${'$'}RUNDIR/xvnc.pid" || pid_alive "${'$'}RUNDIR/x11vnc.pid"; }
 
-# App 内置的 VNC 客户端需要 x11vnc，所以「运行中」以 x11vnc 为准
+# 运行与否以 VNC 服务（Xvnc 或 x11vnc）为准
 is_running() { is_vnc_running; }
 
 setup_theme() {
@@ -317,80 +355,93 @@ FBKEYS
 
 start() {
   if is_running; then log "already running"; return 0; fi
-  if ! command -v Xvfb >/dev/null 2>&1; then
-    log "ERROR: desktop environment not installed, run install first"
-    return 2
-  fi
-  pkill -f "Xvfb ${'$'}DISP" 2>/dev/null
-  pkill -f "x11vnc" 2>/dev/null
-  rm -f /tmp/.X11-unix/X1 2>/dev/null
-
-  log "starting Xvfb"
-  # -ac 关闭访问控制，避免 rootfs 里没有 xauth/Xauthority 导致 x11vnc 连不上 X
   RES=$(cat /workspace/.liquidhub/resolution 2>/dev/null)
   [ -z "${'$'}RES" ] && RES=1280x720
-  Xvfb "${'$'}DISP" -screen 0 "${'$'}{RES}x24" -nolisten tcp -ac +extension XTEST +extension RANDR >"${'$'}RUNDIR/xvfb.log" 2>&1 &
-  echo ${'$'}! > "${'$'}RUNDIR/xvfb.pid"
-  i=0
-  while [ ! -e /tmp/.X11-unix/X1 ] && [ ${'$'}i -lt 20 ]; do sleep 0.5 2>/dev/null || sleep 1; i=${'$'}((i+1)); done
-  if ! is_x_running; then
-    log "ERROR: Xvfb 启动失败，日志："
-    tail -n 20 "${'$'}RUNDIR/xvfb.log" 2>/dev/null
-    return 2
+  pkill -f "Xvnc ${'$'}DISP" 2>/dev/null
+  pkill -f "Xvfb ${'$'}DISP" 2>/dev/null
+  pkill -f "x11vnc" 2>/dev/null
+  rm -f "${'$'}RUNDIR/xvnc.pid" "${'$'}RUNDIR/xvfb.pid" "${'$'}RUNDIR/x11vnc.pid" /tmp/.X11-unix/X1 "${'$'}VNC_SOCK" 2>/dev/null
+
+  # 优先 TigerVNC 的 Xvnc：X 服务器 + VNC 服务器一体，VNC 监听 Unix socket（同 tiny_container，
+  # 绕过 TCP 网络栈，App 侧用 LocalSocket 连接）。缺失或启动失败时回退 Xvfb + x11vnc(TCP)。
+  USE_XVNC=0
+  if command -v Xvnc >/dev/null 2>&1; then
+    log "starting Xvnc (TigerVNC) ${'$'}DISP, unix socket ${'$'}VNC_SOCK"
+    rotate_log "${'$'}RUNDIR/xvnc.log"
+    echo "===== $(date '+%F %T' 2>/dev/null) start Xvnc ${'$'}RES =====" >> "${'$'}RUNDIR/xvnc.log" 2>/dev/null
+    Xvnc "${'$'}DISP" -geometry "${'$'}RES" -depth 24 \
+      -rfbunixpath "${'$'}VNC_SOCK" -rfbunixmode 700 -rfbport 0 \
+      -SecurityTypes None -AlwaysShared -desktop LiquidHub \
+      >>"${'$'}RUNDIR/xvnc.log" 2>&1 &
+    echo ${'$'}! > "${'$'}RUNDIR/xvnc.pid"
+    i=0
+    while [ ! -e "${'$'}VNC_SOCK" ] && [ ${'$'}i -lt 30 ]; do sleep 0.5 2>/dev/null || sleep 1; i=${'$'}((i+1)); done
+    if is_vnc_running; then
+      USE_XVNC=1
+      echo unix > /workspace/.liquidhub/vnc_mode
+    else
+      log "WARN: Xvnc 启动失败，回退 Xvfb+x11vnc。Xvnc 日志："
+      tail -n 30 "${'$'}RUNDIR/xvnc.log" 2>/dev/null
+      kill "${'$'}(cat "${'$'}RUNDIR/xvnc.pid" 2>/dev/null)" 2>/dev/null
+      rm -f "${'$'}RUNDIR/xvnc.pid" "${'$'}VNC_SOCK" 2>/dev/null
+    fi
   fi
 
-  setup_theme
-  # 优先 openbox：它的鼠标事件处理稳定，不像 fluxbox 会因 keys 配置吞掉点击
-  if command -v openbox >/dev/null 2>&1; then
-    log "starting openbox"
-    openbox >"${'$'}RUNDIR/fluxbox.log" 2>&1 &
-    echo ${'$'}! > "${'$'}RUNDIR/fluxbox.pid"
-  else
-    log "starting fluxbox"
-    fluxbox >"${'$'}RUNDIR/fluxbox.log" 2>&1 &
-    echo ${'$'}! > "${'$'}RUNDIR/fluxbox.pid"
-  fi
-  sleep 1
-  # 自动开一个终端，桌面不至于空无一物
-  if command -v xterm >/dev/null 2>&1; then
-    xterm >"${'$'}RUNDIR/xterm.log" 2>&1 &
-  fi
-  set_background
-
-  log "starting x11vnc on ${'$'}VNC_PORT"
-  # 绝不带 -viewonly；-noshm 兼容未启用 MIT-SHM 的 Xvfb。参数保持最小、已知可用。
-  : > "${'$'}RUNDIR/x11vnc.log"
-  start_x11vnc() {
+  if [ "${'$'}USE_XVNC" -ne 1 ]; then
+    if ! command -v Xvfb >/dev/null 2>&1; then
+      log "ERROR: desktop environment not installed, run install first"
+      return 2
+    fi
+    log "starting Xvfb + x11vnc (TCP fallback)"
+    rotate_log "${'$'}RUNDIR/xvfb.log"
+    echo "===== $(date '+%F %T' 2>/dev/null) start Xvfb ${'$'}RES =====" >> "${'$'}RUNDIR/xvfb.log" 2>/dev/null
+    Xvfb "${'$'}DISP" -screen 0 "${'$'}{RES}x24" -nolisten tcp -ac +extension XTEST +extension RANDR >>"${'$'}RUNDIR/xvfb.log" 2>&1 &
+    echo ${'$'}! > "${'$'}RUNDIR/xvfb.pid"
+    i=0
+    while [ ! -e /tmp/.X11-unix/X1 ] && [ ${'$'}i -lt 20 ]; do sleep 0.5 2>/dev/null || sleep 1; i=${'$'}((i+1)); done
+    if ! is_x_running; then
+      log "ERROR: Xvfb 启动失败，日志："
+      tail -n 20 "${'$'}RUNDIR/xvfb.log" 2>/dev/null
+      return 2
+    fi
+    echo tcp > /workspace/.liquidhub/vnc_mode
+    log "starting x11vnc on ${'$'}VNC_PORT"
+    rotate_log "${'$'}RUNDIR/x11vnc.log"
     x11vnc -display "${'$'}DISP" -forever -shared -localhost -rfbport "${'$'}VNC_PORT" \
       -nopw -noshm -quiet >>"${'$'}RUNDIR/x11vnc.log" 2>&1 &
     echo ${'$'}! > "${'$'}RUNDIR/x11vnc.pid"
-  }
-  start_x11vnc
-  i=0
-  while [ ${'$'}i -lt 20 ]; do
-    is_vnc_running && break
-    sleep 0.5 2>/dev/null || sleep 1
-    i=${'$'}((i+1))
-  done
-  if ! is_vnc_running; then
-    log "x11vnc 首次未就绪，重试…"
-    sleep 1
-    start_x11vnc
     i=0
     while [ ${'$'}i -lt 20 ]; do
       is_vnc_running && break
       sleep 0.5 2>/dev/null || sleep 1
       i=${'$'}((i+1))
     done
+    if ! is_vnc_running; then
+      log "ERROR: x11vnc 启动失败，日志："
+      tail -n 30 "${'$'}RUNDIR/x11vnc.log" 2>/dev/null
+      return 3
+    fi
   fi
-  if is_vnc_running; then
-    log "STARTED: VNC on 127.0.0.1:${'$'}VNC_PORT"
+
+  setup_theme
+  # 优先 openbox：它的鼠标事件处理稳定，不像 fluxbox 会因 keys 配置吞掉点击
+  if command -v openbox >/dev/null 2>&1; then
+    log "starting openbox"
+    openbox >>"${'$'}RUNDIR/wm.log" 2>&1 &
+    echo ${'$'}! > "${'$'}RUNDIR/wm.pid"
   else
-    log "ERROR: x11vnc 启动失败，完整日志："
-    cat "${'$'}RUNDIR/x11vnc.log" 2>/dev/null
-    return 3
+    log "starting fluxbox"
+    fluxbox >>"${'$'}RUNDIR/wm.log" 2>&1 &
+    echo ${'$'}! > "${'$'}RUNDIR/wm.pid"
   fi
+  sleep 1
+  # 自动开一个终端，桌面不至于空无一物
+  if command -v xterm >/dev/null 2>&1; then
+    xterm >>"${'$'}RUNDIR/xterm.log" 2>&1 &
+  fi
+  set_background
   start_stream
+  log "STARTED: VNC ready (mode=${'$'}(cat /workspace/.liquidhub/vnc_mode 2>/dev/null || echo unknown))"
 }
 
 browser() {
@@ -422,30 +473,36 @@ browser() {
 }
 
 stop() {
-  for p in websockify x11vnc fluxbox chromium xvfb; do
+  for p in websockify xvnc x11vnc xvfb wm fluxbox openbox xterm chromium ffmpeg; do
     if [ -f "${'$'}RUNDIR/${'$'}p.pid" ]; then
       kill "${'$'}(cat "${'$'}RUNDIR/${'$'}p.pid")" 2>/dev/null
       rm -f "${'$'}RUNDIR/${'$'}p.pid"
     fi
   done
   pkill -f websockify 2>/dev/null
+  pkill -f "Xvnc ${'$'}DISP" 2>/dev/null
+  pkill -f "Xvfb ${'$'}DISP" 2>/dev/null
   pkill -f x11vnc 2>/dev/null
   pkill -f fluxbox 2>/dev/null
   pkill -f openbox 2>/dev/null
-  pkill -f Xvfb 2>/dev/null
+  pkill -f x11grab 2>/dev/null
+  rm -f "${'$'}VNC_SOCK" /tmp/.X11-unix/X1 2>/dev/null
   log "STOPPED"
 }
 
 status() {
   if is_x_running; then echo "X_RUNNING"; else echo "X_STOPPED"; fi
   if is_vnc_running; then echo "VNC_RUNNING"; else echo "VNC_STOPPED"; fi
+  echo "MODE=$(cat /workspace/.liquidhub/vnc_mode 2>/dev/null || echo unknown)"
 }
 
 logs() {
   echo "== VNC 状态 =="
-  if is_vnc_running; then echo "x11vnc: RUNNING"; else echo "x11vnc: STOPPED"; fi
-  if is_x_running; then echo "Xvfb: RUNNING"; else echo "Xvfb: STOPPED"; fi
-  echo "== 端口 5900 =="
+  if is_vnc_running; then echo "VNC server: RUNNING"; else echo "VNC server: STOPPED"; fi
+  if is_x_running; then echo "X server: RUNNING"; else echo "X server: STOPPED"; fi
+  echo "mode: $(cat /workspace/.liquidhub/vnc_mode 2>/dev/null || echo unknown)"
+  if [ -e "${'$'}VNC_SOCK" ]; then echo "unix socket: ${'$'}VNC_SOCK (present)"; fi
+  echo "== 端口 5900 (TCP 回退模式才会监听) =="
   if [ -r /proc/net/tcp ] && grep -qi ":170C" /proc/net/tcp 2>/dev/null; then
     echo "5900 LISTENING"
   else
@@ -456,18 +513,18 @@ logs() {
   for d in /proc/[0-9]*; do
     c=$(cat "${'$'}d/comm" 2>/dev/null)
     case "${'$'}c" in
-      Xvfb|x11vnc|fluxbox) echo "${'$'}c pid ${'$'}{d#/proc/}"; found=1 ;;
+      Xvnc|Xvfb|x11vnc|fluxbox|openbox) echo "${'$'}c pid ${'$'}{d#/proc/}"; found=1 ;;
     esac
   done
-  [ "${'$'}found" -eq 0 ] && echo "(无 Xvfb/x11vnc/fluxbox 进程)"
-  for f in xvfb fluxbox x11vnc browser; do
+  [ "${'$'}found" -eq 0 ] && echo "(无 Xvnc/Xvfb/x11vnc/WM 进程)"
+  for f in desktop xvnc xvfb x11vnc wm ffmpeg browser; do
     if [ -f "${'$'}RUNDIR/${'$'}f.log" ]; then
-      echo "==== ${'$'}f.log ===="
-      tail -n 40 "${'$'}RUNDIR/${'$'}f.log"
+      echo "==== ${'$'}f.log (末尾 30 行) ===="
+      tail -n 30 "${'$'}RUNDIR/${'$'}f.log"
     fi
   done
   if [ -f "${'$'}RUNDIR/last.log" ]; then
-    echo "==== last.log (最近一次 启动/停止 输出) ===="
+    echo "==== last.log (最近一次动作输出) ===="
     tail -n 50 "${'$'}RUNDIR/last.log"
   fi
 }
@@ -548,6 +605,10 @@ start_audio() {
     tail -n 15 "${'$'}RUNDIR/pulse.log" 2>/dev/null
   fi
 }
+
+TS=${'$'}(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || true)
+echo "" >> "${'$'}LOGDIR/desktop.log" 2>/dev/null
+echo "========== ${'$'}TS · action=${'$'}{1:-status} ==========" >> "${'$'}LOGDIR/desktop.log" 2>/dev/null
 
 case "${'$'}{1:-status}" in
   install) install_pkgs ;;

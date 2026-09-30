@@ -88,7 +88,11 @@ fun WorkspaceDesktopPage(id: String) {
 
     // 进入桌面：全屏显示
     if (entered && state.running) {
-        FullScreenDesktop(audioEnabled = state.audioEnabled, onExit = { entered = false })
+        FullScreenDesktop(
+            audioEnabled = state.audioEnabled,
+            vncSocketPath = state.vncSocketPath,
+            onExit = { entered = false },
+        )
         return
     }
 
@@ -153,7 +157,7 @@ fun WorkspaceDesktopPage(id: String) {
             Text(
                 text = when {
                     state.busy -> "状态：${state.progressText ?: stageLabel(state.stage)}"
-                    state.running -> "状态：桌面已启动（x11vnc 运行中，可进入）"
+                    state.running -> "状态：桌面已启动（可进入）"
                     else -> "状态：已停止"
                 },
                 style = MaterialTheme.typography.labelMedium,
@@ -295,7 +299,7 @@ fun WorkspaceDesktopPage(id: String) {
 /** 全屏桌面：VNC 画面 + 底部操作栏。 */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FullScreenDesktop(audioEnabled: Boolean, onExit: () -> Unit) {
+private fun FullScreenDesktop(audioEnabled: Boolean, vncSocketPath: String?, onExit: () -> Unit) {
     var vncRef by remember { mutableStateOf<VncView?>(null) }
     var status by remember { mutableStateOf("正在连接桌面…") }
     var touchpad by remember { mutableStateOf(false) }
@@ -338,6 +342,7 @@ private fun FullScreenDesktop(audioEnabled: Boolean, onExit: () -> Unit) {
             factory = { ctx ->
                 VncView(ctx).apply {
                     inputOnly = true
+                    unixSocketPath = vncSocketPath
                     listener = object : VncView.Listener {
                         override fun onState(state: String) {}
                         override fun onError(message: String) {
