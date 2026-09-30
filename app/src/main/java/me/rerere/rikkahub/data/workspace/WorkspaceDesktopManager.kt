@@ -277,7 +277,8 @@ setup_theme() {
     convert -size 1280x720 gradient:'#0f172a'-'#1d4ed8' "${'$'}RUNDIR/wallpaper.png" 2>/dev/null
   fi
   # Fluxbox 配置：显示底部工具栏（工作区 + 时钟），作为美化基础
-  cat > "${'$'}HOME/.fluxbox/init" <<'FBEOF'
+  {
+    cat <<'FBEOF'
 session.screen0.toolbar.visible: true
 session.screen0.toolbar.autoHide: false
 session.screen0.toolbar.placement: BottomCenter
@@ -288,6 +289,10 @@ session.screen0.strftimeFormat: %H:%M
 session.screen0.workspaces: 1
 session.screen0.focusModel: ClickToFocus
 FBEOF
+    # 显式指向我们自己的 keys/menu，避免 fluxbox 去读系统默认（会刷 Invalid key/modifier）
+    echo "session.keyFile: ${'$'}HOME/.fluxbox/keys"
+    echo "session.menuFile: ${'$'}HOME/.fluxbox/menu"
+  } > "${'$'}HOME/.fluxbox/init"
   # 桌面右键菜单（让桌面不是“空气”）
   cat > "${'$'}HOME/.fluxbox/menu" <<'FBMENU'
 [begin] (LiquidHub)
@@ -324,7 +329,7 @@ start() {
   # -ac 关闭访问控制，避免 rootfs 里没有 xauth/Xauthority 导致 x11vnc 连不上 X
   RES=$(cat /workspace/.liquidhub/resolution 2>/dev/null)
   [ -z "${'$'}RES" ] && RES=1280x720
-  Xvfb "${'$'}DISP" -screen 0 "${'$'}{RES}x24" -nolisten tcp -ac -extension MIT-SHM +extension XTEST +extension RANDR >"${'$'}RUNDIR/xvfb.log" 2>&1 &
+  Xvfb "${'$'}DISP" -screen 0 "${'$'}{RES}x24" -nolisten tcp -ac +extension XTEST +extension RANDR >"${'$'}RUNDIR/xvfb.log" 2>&1 &
   echo ${'$'}! > "${'$'}RUNDIR/xvfb.pid"
   i=0
   while [ ! -e /tmp/.X11-unix/X1 ] && [ ${'$'}i -lt 20 ]; do sleep 0.5 2>/dev/null || sleep 1; i=${'$'}((i+1)); done
@@ -353,24 +358,36 @@ start() {
   set_background
 
   log "starting x11vnc on ${'$'}VNC_PORT"
-  # -xkb 正确加载键盘布局；-noxdamage 避免 XDAMAGE 影响输入；绝不用 -viewonly
-  x11vnc -display "${'$'}DISP" -forever -shared -localhost -rfbport "${'$'}VNC_PORT" \
-    -nopw -quiet -xkb -noxdamage >"${'$'}RUNDIR/x11vnc.log" 2>&1 &
-  echo ${'$'}! > "${'$'}RUNDIR/x11vnc.pid"
-  sleep 1
-  if ! is_vnc_running; then
-    log "x11vnc 首次未就绪，等待 X 后重试…"
-    sleep 2
+  # 绝不带 -viewonly；-noshm 兼容未启用 MIT-SHM 的 Xvfb。参数保持最小、已知可用。
+  : > "${'$'}RUNDIR/x11vnc.log"
+  start_x11vnc() {
     x11vnc -display "${'$'}DISP" -forever -shared -localhost -rfbport "${'$'}VNC_PORT" \
-      -nopw -quiet -xkb -noxdamage >"${'$'}RUNDIR/x11vnc.log" 2>&1 &
+      -nopw -noshm -quiet >>"${'$'}RUNDIR/x11vnc.log" 2>&1 &
     echo ${'$'}! > "${'$'}RUNDIR/x11vnc.pid"
+  }
+  start_x11vnc
+  i=0
+  while [ ${'$'}i -lt 20 ]; do
+    is_vnc_running && break
+    sleep 0.5 2>/dev/null || sleep 1
+    i=${'$'}((i+1))
+  done
+  if ! is_vnc_running; then
+    log "x11vnc 首次未就绪，重试…"
     sleep 1
+    start_x11vnc
+    i=0
+    while [ ${'$'}i -lt 20 ]; do
+      is_vnc_running && break
+      sleep 0.5 2>/dev/null || sleep 1
+      i=${'$'}((i+1))
+    done
   fi
   if is_vnc_running; then
     log "STARTED: VNC on 127.0.0.1:${'$'}VNC_PORT"
   else
-    log "ERROR: x11vnc 启动失败，桌面无法连接。x11vnc 日志："
-    tail -n 30 "${'$'}RUNDIR/x11vnc.log" 2>/dev/null
+    log "ERROR: x11vnc 启动失败，完整日志："
+    cat "${'$'}RUNDIR/x11vnc.log" 2>/dev/null
     return 3
   fi
   start_stream

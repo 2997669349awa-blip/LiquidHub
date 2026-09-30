@@ -31,14 +31,23 @@ fun createMusicTools(): List<Tool> = listOf(
         name = "music_search",
         description = "Search songs on NetEase Cloud Music (网易云音乐). " +
             "Use this whenever the user wants to find, listen to, or talk about music. " +
-            "Return matching songs with id, name, artist and album. " +
-            "Prefer this over browsing the web. To play a result, call music_play with its id.",
+            "IMPORTANT: always search with rich keywords, never a bare title. " +
+            "Put the song title in `keyword` and, when you know it, the artist name in `artist` " +
+            "(e.g. keyword=\"晴天\", artist=\"周杰伦\"; or keyword=\"人类的山寨品 原版\"). " +
+            "If the user only gave a title, still add any distinctive word you know (artist, version, album). " +
+            "Results are ranked by relevance to the keywords; the best match is first. " +
+            "If the expected song is missing or the results look unrelated, retry with different/more keywords. " +
+            "Returns matching songs with id, name, artist and album. To play a result, call music_play with its id.",
         parameters = {
             InputSchema.Obj(
                 properties = buildJsonObject {
                     put("keyword", buildJsonObject {
                         put("type", "string")
-                        put("description", "Song title, artist, or keywords to search for")
+                        put("description", "Song title plus any extra keywords (version, album, etc.)")
+                    })
+                    put("artist", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Optional artist name to narrow the search. Include it whenever known.")
                     })
                 },
                 required = listOf("keyword")
@@ -47,8 +56,10 @@ fun createMusicTools(): List<Tool> = listOf(
         execute = {
             val keyword = it.jsonObject["keyword"]?.jsonPrimitive?.contentOrNull
                 ?: error("keyword is required")
+            val artist = it.jsonObject["artist"]?.jsonPrimitive?.contentOrNull.orEmpty().trim()
+            val query = listOf(keyword.trim(), artist).filter { it.isNotBlank() }.joinToString(" ")
             val songs = withContext(Dispatchers.IO) {
-                runCatching { NeteaseApi.search(keyword) }.getOrDefault(emptyList())
+                runCatching { NeteaseApi.search(query) }.getOrDefault(emptyList())
             }
             val arr = buildJsonArray {
                 songs.forEach { s ->
@@ -63,11 +74,14 @@ fun createMusicTools(): List<Tool> = listOf(
             listOf(
                 UIMessagePart.Text(
                     buildJsonObject {
+                        put("query", query)
                         put("count", songs.size)
                         put("songs", arr)
                         put(
                             "note",
-                            "Call music_play with a song id to start playback on the device."
+                            "Results are ranked by relevance. Pick the song whose title and artist match the request; " +
+                                "if none match, call music_search again with different keywords. " +
+                                "Then call music_play with the chosen id."
                         )
                     }.toString()
                 )

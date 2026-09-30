@@ -138,7 +138,43 @@ object NeteaseApi {
             },
         ) ?: return emptyList()
         val songs = res.jsonObject["result"]?.jsonObject?.get("songs")?.jsonArray ?: return emptyList()
-        return songs.mapNotNull { parseSong(it.jsonObject) }
+        // 网易的模糊搜索会把大量无关歌曲混进来，这里按与关键词的相关度重排，
+        // 让歌名精确/包含匹配的结果浮到最前面；若存在强匹配则过滤掉完全不相关的噪声。
+        val scored = songs.mapNotNull { parseSong(it.jsonObject) }
+            .map { it to relevance(keyword, it) }
+        val hasStrong = scored.any { it.second >= STRONG_MATCH }
+        val kept = if (hasStrong) scored.filter { it.second > 0 } else scored
+        return kept.sortedWith(compareByDescending<Pair<MusicSong, Int>> { it.second })
+            .map { it.first }
+    }
+
+    private const val STRONG_MATCH = 400
+
+    private fun normalize(s: String): String =
+        s.lowercase().replace(Regex("[\\s\\p{Punct}（）()【】《》「」『』·、,，。!！?？~～\\-—…]"), "")
+
+    /** 计算歌曲与搜索关键词的相关度，用于把最匹配的结果排到最前。 */
+    private fun relevance(query: String, song: MusicSong): Int {
+        val q = normalize(query)
+        if (q.isEmpty()) return 0
+        val name = normalize(song.name)
+        val artist = normalize(song.artist)
+        var score = 0
+        when {
+            name == q -> score += 1000
+            name.startsWith(q) -> score += 800
+            name.contains(q) -> score += 600
+            q.contains(name) && name.isNotEmpty() -> score += 400
+        }
+        // 关键词里带了歌手名
+        if (artist.isNotEmpty() && q.contains(artist)) score += 150
+        // 多关键词逐个命中（歌名 / 歌手 / 专辑）
+        val tokens = query.lowercase().split(Regex("[\\s,，、/]+")).filter { it.isNotBlank() }
+        if (tokens.size > 1) {
+            val hay = (song.name + " " + song.artist + " " + song.album).lowercase()
+            score += tokens.count { hay.contains(it) } * 40
+        }
+        return score
     }
 
     private fun parseSong(o: JsonObject): MusicSong? {
