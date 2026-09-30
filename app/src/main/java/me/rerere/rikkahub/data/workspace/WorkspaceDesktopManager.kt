@@ -143,6 +143,31 @@ rotate_log() {
   return 0
 }
 
+# 确保 TigerVNC 的 Xvnc 可用（VNC 走 Unix socket 需要它）。best-effort，失败返回非 0。
+# 失败后写标记，避免每次 start 都反复 apt/apk；重装时清除标记。
+ensure_xvnc() {
+  command -v Xvnc >/dev/null 2>&1 && return 0
+  if [ -f /workspace/.liquidhub/xvnc_unavailable ]; then
+    return 1
+  fi
+  log "TigerVNC 未安装，尝试安装（用于 Unix socket VNC）"
+  if command -v apk >/dev/null 2>&1; then
+    apk add --no-cache --allow-untrusted tigervnc 2>/dev/null || true
+  elif command -v apt-get >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -y -o Acquire::Retries=3 -o Acquire::ForceIPv4=true >/dev/null 2>&1 || true
+    apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true tigervnc-standalone-server 2>/dev/null || true
+  elif command -v pacman >/dev/null 2>&1; then
+    pacman -Sy --noconfirm --needed tigervnc 2>/dev/null || true
+  fi
+  if command -v Xvnc >/dev/null 2>&1; then
+    rm -f /workspace/.liquidhub/xvnc_unavailable
+    return 0
+  fi
+  touch /workspace/.liquidhub/xvnc_unavailable 2>/dev/null
+  return 1
+}
+
 find_novnc() {
   for d in /usr/share/novnc /usr/share/webapps/novnc /usr/local/share/novnc; do
     if [ -d "${'$'}d" ]; then NOVNC_DIR="${'$'}d"; return 0; fi
@@ -193,11 +218,13 @@ install_pkgs() {
   if [ "${'$'}{FORCE_INSTALL:-0}" != "1" ] \
      && command -v Xvfb >/dev/null 2>&1 && command -v x11vnc >/dev/null 2>&1 \
      && command -v fluxbox >/dev/null 2>&1 \
-     && command -v xdotool >/dev/null 2>&1; then
+     && command -v xdotool >/dev/null 2>&1 \
+     && command -v Xvnc >/dev/null 2>&1; then
     log "desktop already installed, skipping"
     return 0
   fi
   RC=0
+  rm -f /workspace/.liquidhub/xvnc_unavailable 2>/dev/null
   if command -v apk >/dev/null 2>&1; then
     log "Alpine(apk): installing desktop packages"
     apk add --no-cache --allow-untrusted ca-certificates xvfb x11vnc fluxbox openbox xdotool bash coreutils || RC=1
@@ -250,17 +277,12 @@ install_pkgs() {
     log "ERROR: unsupported package manager"
     return 1
   fi
-  # TigerVNC(Xvnc)：最好有它——VNC 可监听 Unix socket（同 tiny_container，App 用 LocalSocket 连接）；
-  # 缺失时 start 会自动回退到 Xvfb + x11vnc(TCP)。单独 best-effort 安装，避免整体安装失败。
-  if command -v Xvnc >/dev/null 2>&1; then
-    log "Xvnc already installed"
-  elif command -v apk >/dev/null 2>&1; then
-    apk add --no-cache --allow-untrusted tigervnc 2>/dev/null || log "WARN: tigervnc 安装失败（将用 Xvfb+x11vnc 回退）"
-  elif command -v apt-get >/dev/null 2>&1; then
-    apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true tigervnc-standalone-server \
-      2>/dev/null || log "WARN: tigervnc 安装失败（将用 Xvfb+x11vnc 回退）"
-  elif command -v pacman >/dev/null 2>&1; then
-    pacman -Sy --noconfirm --needed tigervnc 2>/dev/null || log "WARN: tigervnc 安装失败（将用 Xvfb+x11vnc 回退）"
+  # TigerVNC(Xvnc)：VNC 走 Unix socket 需要它（同 tiny_container，App 用 LocalSocket 连接）；
+  # 缺失时 start 会自动回退到 Xvfb + x11vnc(TCP)。best-effort，避免整体安装失败。
+  if ensure_xvnc; then
+    log "Xvnc ready"
+  else
+    log "WARN: Xvnc 不可用，桌面将回退 Xvfb+x11vnc(TCP)"
   fi
   # 浏览器单独装：失败也不影响桌面核心
   install_browser
@@ -365,11 +387,14 @@ start() {
   # 优先 TigerVNC 的 Xvnc：X 服务器 + VNC 服务器一体，VNC 监听 Unix socket（同 tiny_container，
   # 绕过 TCP 网络栈，App 侧用 LocalSocket 连接）。缺失或启动失败时回退 Xvfb + x11vnc(TCP)。
   USE_XVNC=0
+  ensure_xvnc >/dev/null 2>&1 || true
   if command -v Xvnc >/dev/null 2>&1; then
     log "starting Xvnc (TigerVNC) ${'$'}DISP, unix socket ${'$'}VNC_SOCK"
     rotate_log "${'$'}RUNDIR/xvnc.log"
     echo "===== $(date '+%F %T' 2>/dev/null) start Xvnc ${'$'}RES =====" >> "${'$'}RUNDIR/xvnc.log" 2>/dev/null
-    Xvnc "${'$'}DISP" -geometry "${'$'}RES" -depth 24 \
+    # -extension MIT-SHM：安卓下 SysV 共享内存不可用，关掉可避免 x11grab 反复报
+    # "Could not get shared memory buffer"（ffmpeg 会走普通抓屏路径）
+    Xvnc "${'$'}DISP" -geometry "${'$'}RES" -depth 24 -extension MIT-SHM \
       -rfbunixpath "${'$'}VNC_SOCK" -rfbunixmode 700 -rfbport 0 \
       -SecurityTypes None -AlwaysShared -desktop LiquidHub \
       >>"${'$'}RUNDIR/xvnc.log" 2>&1 &
@@ -395,7 +420,7 @@ start() {
     log "starting Xvfb + x11vnc (TCP fallback)"
     rotate_log "${'$'}RUNDIR/xvfb.log"
     echo "===== $(date '+%F %T' 2>/dev/null) start Xvfb ${'$'}RES =====" >> "${'$'}RUNDIR/xvfb.log" 2>/dev/null
-    Xvfb "${'$'}DISP" -screen 0 "${'$'}{RES}x24" -nolisten tcp -ac +extension XTEST +extension RANDR >>"${'$'}RUNDIR/xvfb.log" 2>&1 &
+    Xvfb "${'$'}DISP" -screen 0 "${'$'}{RES}x24" -nolisten tcp -ac -extension MIT-SHM +extension XTEST +extension RANDR >>"${'$'}RUNDIR/xvfb.log" 2>&1 &
     echo ${'$'}! > "${'$'}RUNDIR/xvfb.pid"
     i=0
     while [ ! -e /tmp/.X11-unix/X1 ] && [ ${'$'}i -lt 20 ]; do sleep 0.5 2>/dev/null || sleep 1; i=${'$'}((i+1)); done
