@@ -1,12 +1,12 @@
 {
-  "version": "0.1.0",
-  "publishedAt": "2026-09-25T00:00:00Z",
-  "changelog": "LiquidHub V0.1.0Data\n\n- 液态玻璃主题默认开启\n- 二创 X 角标图标\n- 包名 teto.rikkahub.X\n- 更新检查指向本项目",
+  "version": "0.2.2Data",
+  "publishedAt": "2026-09-30T10:16:00Z",
+  "changelog": "LiquidHub V0.2.2Data\n\n- 音乐搜索：结果按与关键词的相关度排序，并过滤掉完全不相关的歌曲\n- music_search 工具：要求带上歌手/版本等关键词，搜不到会自动换关键词重试\n- 远程桌面：恢复 x11vnc 启动、启用 XTEST 扩展，修复鼠标无法移动的问题",
   "downloads": [
     {
-      "name": "liquidhub-release-0927-1458.apk",
-      "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-0927-1458.apk",
-      "size": "约 48 MB"
+      "name": "liquidhub-release-0930-1016.apk",
+      "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-0930-1016.apk",
+      "size": "约 49 MB"
     }
   ]
 }
