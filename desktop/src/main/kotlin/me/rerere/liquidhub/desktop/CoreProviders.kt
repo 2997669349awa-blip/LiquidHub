@@ -33,6 +33,7 @@ class CoreProviders(cacheDir: File) {
         setting: ProviderSetting,
         history: List<ChatMessage>,
         model: Model,
+        temperature: Float? = null,
         onText: suspend (String) -> Unit,
         onReasoning: suspend (String) -> Unit,
     ) {
@@ -43,7 +44,7 @@ class CoreProviders(cacheDir: File) {
                 else -> UIMessage.system(m.content.orEmpty())
             }
         }
-        val params = TextGenerationParams(model = model)
+        val params = TextGenerationParams(model = model, temperature = temperature)
         val flow = when (setting) {
             is ProviderSetting.OpenAI -> manager.getProviderByType(setting).streamText(setting, messages, params)
             is ProviderSetting.Google -> manager.getProviderByType(setting).streamText(setting, messages, params)

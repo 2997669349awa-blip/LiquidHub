@@ -16,7 +16,19 @@ data class ChatMessage(
 data class Conversation(
     val id: String,
     val title: String = "新对话",
+    val assistantId: Uuid? = null,
     val messages: List<ChatMessage> = emptyList(),
+)
+
+/** 助手：系统提示词 + 可选的模型绑定（对照 RikkaHub 的 Assistant）。 */
+@Serializable
+data class Assistant(
+    val id: Uuid = Uuid.random(),
+    val name: String = "默认助手",
+    val systemPrompt: String = "",
+    val providerId: Uuid? = null,
+    val modelId: Uuid? = null,
+    val temperature: Float? = null,
 )
 
 @Serializable
@@ -35,8 +47,10 @@ data class AppSettings(
 data class PersistedState(
     val settings: AppSettings = AppSettings(),
     val providers: List<ProviderSetting> = emptyList(),
+    val assistants: List<Assistant> = emptyList(),
     val selectedProviderId: Uuid? = null,
     val selectedModelId: Uuid? = null,
+    val selectedAssistantId: Uuid? = null,
     val conversations: List<Conversation> = emptyList(),
     val currentId: String? = null,
 )
@@ -59,4 +73,9 @@ val DEFAULT_DESKTOP_PROVIDERS: List<ProviderSetting> = listOf(
             Model(modelId = "gpt-4o", displayName = "gpt-4o"),
         ),
     ),
+)
+
+val DEFAULT_DESKTOP_ASSISTANT = Assistant(
+    name = "默认助手",
+    systemPrompt = "你是一个乐于助人的中文 AI 助手。",
 )
