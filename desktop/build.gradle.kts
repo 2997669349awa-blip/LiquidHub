@@ -30,9 +30,15 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
             packageName = "LiquidHub"
-            packageVersion = "1.0.0"
+            packageVersion = "1.1.0"
             description = "LiquidHub Desktop"
             vendor = "LiquidHub"
+            windows {
+                iconFile.set(project.file("icons/app.ico"))
+            }
+            linux {
+                iconFile.set(project.file("icons/app.png"))
+            }
         }
     }
 }

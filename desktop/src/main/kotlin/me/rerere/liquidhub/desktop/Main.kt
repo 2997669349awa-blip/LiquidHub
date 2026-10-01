@@ -1,5 +1,6 @@
 package me.rerere.liquidhub.desktop
 
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -9,7 +10,8 @@ fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
         title = "LiquidHub",
-        state = rememberWindowState(width = 1100.dp, height = 720.dp),
+        icon = painterResource("app.png"),
+        state = rememberWindowState(width = 1120.dp, height = 760.dp),
     ) {
         App()
     }

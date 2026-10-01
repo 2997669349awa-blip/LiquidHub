@@ -17,6 +17,7 @@ data class Conversation(
     val id: String,
     val title: String = "新对话",
     val assistantId: Uuid? = null,
+    val createdAt: Long = System.currentTimeMillis(),
     val messages: List<ChatMessage> = emptyList(),
 )
 
