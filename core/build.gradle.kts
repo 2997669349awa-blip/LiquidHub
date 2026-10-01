@@ -9,6 +9,10 @@ plugins {
 
 kotlin {
     jvmToolchain(17)
+    compilerOptions {
+        optIn.add("kotlin.uuid.ExperimentalUuidApi")
+        optIn.add("kotlin.time.ExperimentalTime")
+    }
     androidLibrary {
         namespace = "me.rerere.core"
         compileSdk = 37
@@ -20,7 +24,12 @@ kotlin {
         val commonMain by getting
         // Android 与 JVM 共享、但使用了 java.* 的代码放这里
         val jvmCommonMain by creating { dependsOn(commonMain) }
-        val androidMain by getting { dependsOn(jvmCommonMain) }
+        val androidMain by getting {
+            dependsOn(jvmCommonMain)
+            dependencies {
+                implementation(libs.androidx.core.ktx)
+            }
+        }
         val jvmMain by getting { dependsOn(jvmCommonMain) }
 
         jvmCommonMain.dependencies {
@@ -30,6 +39,7 @@ kotlin {
             api(libs.kotlinx.serialization.json)
             api(libs.kotlinx.coroutines.core)
             api(libs.kotlinx.datetime)
+            implementation(libs.commons.text)
         }
     }
 }

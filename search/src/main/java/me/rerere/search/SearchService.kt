@@ -1,6 +1,6 @@
 package me.rerere.search
 
-import android.content.Context
+import java.io.File
 import androidx.compose.runtime.Composable
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.SerialName
@@ -78,9 +78,9 @@ interface SearchService<T : SearchServiceOptions> {
         @Volatile
         internal var keyRoulette: KeyRoulette = KeyRoulette.default()
 
-        fun init(client: OkHttpClient, context: Context? = null) {
+        fun init(client: OkHttpClient, cacheDir: File? = null) {
             httpClient = client
-            keyRoulette = if (context != null) KeyRoulette.lru(context) else KeyRoulette.default()
+            keyRoulette = if (cacheDir != null) KeyRoulette.lru(cacheDir) else KeyRoulette.default()
         }
 
         internal val json by lazy {

@@ -185,7 +185,7 @@ val dataSourceModule = module {
                 level = HttpLoggingInterceptor.Level.HEADERS
             })
             .build()
-        client.also { SearchService.init(it, get()) }
+        client.also { SearchService.init(it, get<android.content.Context>().cacheDir) }
     }
 
     single {
@@ -193,7 +193,7 @@ val dataSourceModule = module {
     }
 
     single {
-        ProviderManager(client = get(), context = get())
+        ProviderManager(client = get(), cacheDir = get<android.content.Context>().cacheDir)
     }
 
     single { BackupManager(context = get(), database = get(), settingsStore = get(), json = get()) }

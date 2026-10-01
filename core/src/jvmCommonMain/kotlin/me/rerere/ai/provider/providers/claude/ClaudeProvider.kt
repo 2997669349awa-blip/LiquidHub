@@ -1,7 +1,7 @@
 package me.rerere.ai.provider.providers.claude
 
-import android.content.Context
-import android.util.Log
+import java.io.File
+import me.rerere.ai.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
@@ -241,8 +241,8 @@ private fun TokenUsage?.sum(other: TokenUsage?): TokenUsage? {
     )
 }
 
-class ClaudeProvider(private val client: OkHttpClient, context: Context? = null) : Provider<ProviderSetting.Claude> {
-    private val keyRoulette = if (context != null) KeyRoulette.lru(context) else KeyRoulette.default()
+class ClaudeProvider(private val client: OkHttpClient, cacheDir: File? = null) : Provider<ProviderSetting.Claude> {
+    private val keyRoulette = if (cacheDir != null) KeyRoulette.lru(cacheDir) else KeyRoulette.default()
 
     override suspend fun listModels(providerSetting: ProviderSetting.Claude): List<Model> =
         withContext(Dispatchers.IO) {

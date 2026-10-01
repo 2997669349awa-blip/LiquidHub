@@ -1,7 +1,7 @@
 package me.rerere.ai.provider.providers.google
 
-import android.content.Context
-import android.util.Log
+import java.io.File
+import me.rerere.ai.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
@@ -81,8 +81,8 @@ import kotlin.uuid.Uuid
 
 private const val TAG = "GoogleProvider"
 
-class GoogleProvider(private val client: OkHttpClient, context: Context? = null) : Provider<ProviderSetting.Google> {
-    private val keyRoulette = if (context != null) KeyRoulette.lru(context) else KeyRoulette.default()
+class GoogleProvider(private val client: OkHttpClient, cacheDir: File? = null) : Provider<ProviderSetting.Google> {
+    private val keyRoulette = if (cacheDir != null) KeyRoulette.lru(cacheDir) else KeyRoulette.default()
     private val serviceAccountTokenProvider by lazy {
         ServiceAccountTokenProvider(client)
     }

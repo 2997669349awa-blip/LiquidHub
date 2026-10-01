@@ -1,6 +1,5 @@
 package me.rerere.ai.provider
 
-import androidx.compose.runtime.Composable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -31,8 +30,6 @@ sealed class ProviderSetting {
     abstract val balanceOption: BalanceOption
 
     abstract val builtIn: Boolean
-    abstract val description: @Composable() () -> Unit
-    abstract val shortDescription: @Composable() () -> Unit
 
     abstract fun addModel(model: Model): ProviderSetting
     abstract fun editModel(model: Model): ProviderSetting
@@ -45,8 +42,6 @@ sealed class ProviderSetting {
         models: List<Model> = this.models,
         balanceOption: BalanceOption = this.balanceOption,
         builtIn: Boolean = this.builtIn,
-        description: @Composable (() -> Unit) = this.description,
-        shortDescription: @Composable (() -> Unit) = this.shortDescription,
     ): ProviderSetting
 
     @Serializable
@@ -58,8 +53,6 @@ sealed class ProviderSetting {
         override var models: List<Model> = emptyList(),
         override val balanceOption: BalanceOption = BalanceOption(),
         @Transient override val builtIn: Boolean = false,
-        @Transient override val description: @Composable (() -> Unit) = {},
-        @Transient override val shortDescription: @Composable (() -> Unit) = {},
         var apiKey: String = "",
         var baseUrl: String = "https://api.openai.com/v1",
         var chatCompletionsPath: String = "/chat/completions",
@@ -67,27 +60,19 @@ sealed class ProviderSetting {
         var includeHistoryReasoning: Boolean = true,
         var responsesPath: String = "/responses",
     ) : ProviderSetting() {
-        override fun addModel(model: Model): ProviderSetting {
-            return copy(models = models + model)
-        }
+        override fun addModel(model: Model): ProviderSetting = copy(models = models + model)
 
-        override fun editModel(model: Model): ProviderSetting {
-            return copy(models = models.map { if (it.id == model.id) model.copy() else it })
-        }
+        override fun editModel(model: Model): ProviderSetting =
+            copy(models = models.map { if (it.id == model.id) model.copy() else it })
 
-        override fun delModel(model: Model): ProviderSetting {
-            return copy(models = models.filter { it.id != model.id })
-        }
+        override fun delModel(model: Model): ProviderSetting =
+            copy(models = models.filter { it.id != model.id })
 
-        override fun moveMove(
-            from: Int,
-            to: Int
-        ): ProviderSetting {
-            return copy(models = models.toMutableList().apply {
+        override fun moveMove(from: Int, to: Int): ProviderSetting =
+            copy(models = models.toMutableList().apply {
                 val model = removeAt(from)
                 add(to, model)
             })
-        }
 
         override fun copyProvider(
             id: Uuid,
@@ -96,20 +81,14 @@ sealed class ProviderSetting {
             models: List<Model>,
             balanceOption: BalanceOption,
             builtIn: Boolean,
-            description: @Composable (() -> Unit),
-            shortDescription: @Composable (() -> Unit),
-        ): ProviderSetting {
-            return this.copy(
-                id = id,
-                enabled = enabled,
-                name = name,
-                models = models,
-                builtIn = builtIn,
-                description = description,
-                balanceOption = balanceOption,
-                shortDescription = shortDescription
-            )
-        }
+        ): ProviderSetting = copy(
+            id = id,
+            enabled = enabled,
+            name = name,
+            models = models,
+            builtIn = builtIn,
+            balanceOption = balanceOption,
+        )
     }
 
     @Serializable
@@ -121,8 +100,6 @@ sealed class ProviderSetting {
         override var models: List<Model> = emptyList(),
         override val balanceOption: BalanceOption = BalanceOption(),
         @Transient override val builtIn: Boolean = false,
-        @Transient override val description: @Composable (() -> Unit) = {},
-        @Transient override val shortDescription: @Composable (() -> Unit) = {},
         var apiKey: String = "",
         var baseUrl: String = "https://generativelanguage.googleapis.com/v1beta",
         var vertexAI: Boolean = false,
@@ -132,27 +109,19 @@ sealed class ProviderSetting {
         var location: String = "us-central1", // only for vertex AI service account
         var projectId: String = "", // only for vertex AI service account
     ) : ProviderSetting() {
-        override fun addModel(model: Model): ProviderSetting {
-            return copy(models = models + model)
-        }
+        override fun addModel(model: Model): ProviderSetting = copy(models = models + model)
 
-        override fun editModel(model: Model): ProviderSetting {
-            return copy(models = models.map { if (it.id == model.id) model.copy() else it })
-        }
+        override fun editModel(model: Model): ProviderSetting =
+            copy(models = models.map { if (it.id == model.id) model.copy() else it })
 
-        override fun delModel(model: Model): ProviderSetting {
-            return copy(models = models.filter { it.id != model.id })
-        }
+        override fun delModel(model: Model): ProviderSetting =
+            copy(models = models.filter { it.id != model.id })
 
-        override fun moveMove(
-            from: Int,
-            to: Int
-        ): ProviderSetting {
-            return copy(models = models.toMutableList().apply {
+        override fun moveMove(from: Int, to: Int): ProviderSetting =
+            copy(models = models.toMutableList().apply {
                 val model = removeAt(from)
                 add(to, model)
             })
-        }
 
         override fun copyProvider(
             id: Uuid,
@@ -161,20 +130,14 @@ sealed class ProviderSetting {
             models: List<Model>,
             balanceOption: BalanceOption,
             builtIn: Boolean,
-            description: @Composable (() -> Unit),
-            shortDescription: @Composable (() -> Unit),
-        ): ProviderSetting {
-            return this.copy(
-                id = id,
-                enabled = enabled,
-                name = name,
-                models = models,
-                builtIn = builtIn,
-                description = description,
-                shortDescription = shortDescription,
-                balanceOption = balanceOption
-            )
-        }
+        ): ProviderSetting = copy(
+            id = id,
+            enabled = enabled,
+            name = name,
+            models = models,
+            builtIn = builtIn,
+            balanceOption = balanceOption,
+        )
     }
 
     @Serializable
@@ -186,34 +149,24 @@ sealed class ProviderSetting {
         override var models: List<Model> = emptyList(),
         override val balanceOption: BalanceOption = BalanceOption(),
         @Transient override val builtIn: Boolean = false,
-        @Transient override val description: @Composable (() -> Unit) = {},
-        @Transient override val shortDescription: @Composable (() -> Unit) = {},
         var apiKey: String = "",
         var baseUrl: String = "https://api.anthropic.com/v1",
         var promptCaching: Boolean = false,
         var promptCacheTtl: ClaudePromptCacheTtl = ClaudePromptCacheTtl.FIVE_MINUTES,
     ) : ProviderSetting() {
-        override fun addModel(model: Model): ProviderSetting {
-            return copy(models = models + model)
-        }
+        override fun addModel(model: Model): ProviderSetting = copy(models = models + model)
 
-        override fun editModel(model: Model): ProviderSetting {
-            return copy(models = models.map { if (it.id == model.id) model.copy() else it })
-        }
+        override fun editModel(model: Model): ProviderSetting =
+            copy(models = models.map { if (it.id == model.id) model.copy() else it })
 
-        override fun delModel(model: Model): ProviderSetting {
-            return copy(models = models.filter { it.id != model.id })
-        }
+        override fun delModel(model: Model): ProviderSetting =
+            copy(models = models.filter { it.id != model.id })
 
-        override fun moveMove(
-            from: Int,
-            to: Int
-        ): ProviderSetting {
-            return copy(models = models.toMutableList().apply {
+        override fun moveMove(from: Int, to: Int): ProviderSetting =
+            copy(models = models.toMutableList().apply {
                 val model = removeAt(from)
                 add(to, model)
             })
-        }
 
         override fun copyProvider(
             id: Uuid,
@@ -222,20 +175,14 @@ sealed class ProviderSetting {
             models: List<Model>,
             balanceOption: BalanceOption,
             builtIn: Boolean,
-            description: @Composable (() -> Unit),
-            shortDescription: @Composable (() -> Unit),
-        ): ProviderSetting {
-            return this.copy(
-                id = id,
-                enabled = enabled,
-                name = name,
-                models = models,
-                balanceOption = balanceOption,
-                builtIn = builtIn,
-                description = description,
-                shortDescription = shortDescription,
-            )
-        }
+        ): ProviderSetting = copy(
+            id = id,
+            enabled = enabled,
+            name = name,
+            models = models,
+            balanceOption = balanceOption,
+            builtIn = builtIn,
+        )
     }
 
     companion object {

@@ -2,6 +2,8 @@ package me.rerere.rikkahub.ui.pages.setting
 
 import android.net.Uri
 import me.rerere.hugeicons.HugeIcons
+import me.rerere.rikkahub.ui.pages.setting.components.providerDescription
+import me.rerere.rikkahub.ui.pages.setting.components.providerShortDescription
 import me.rerere.hugeicons.stroke.Camera01
 import me.rerere.hugeicons.stroke.DragDropHorizontal
 import me.rerere.hugeicons.stroke.Image02
@@ -315,7 +317,7 @@ private fun RecommendProviderItem(
                 )
                 ProvideTextStyle(MaterialTheme.typography.labelSmall) {
                     CompositionLocalProvider(LocalContentColor provides LocalContentColor.current.copy(alpha = 0.7f)) {
-                        provider.description()
+                        providerDescription(provider)
                     }
                 }
             }
@@ -623,7 +625,7 @@ private fun ProviderItem(
                 )
                 ProvideTextStyle(MaterialTheme.typography.labelSmall) {
                     CompositionLocalProvider(LocalContentColor provides LocalContentColor.current.copy(alpha = 0.7f)) {
-                        provider.shortDescription()
+                        providerShortDescription(provider)
                     }
                 }
                 FlowRow(

@@ -1,23 +1,23 @@
 package me.rerere.ai.provider
 
-import android.content.Context
 import me.rerere.ai.provider.providers.claude.ClaudeProvider
 import me.rerere.ai.provider.providers.google.GoogleProvider
 import me.rerere.ai.provider.providers.openai.OpenAIProvider
 import okhttp3.OkHttpClient
+import java.io.File
 
 /**
  * Provider管理器，负责注册和获取Provider实例
  */
-class ProviderManager(client: OkHttpClient, context: Context) {
+class ProviderManager(client: OkHttpClient, cacheDir: File? = null) {
     // 存储已注册的Provider实例
     private val providers = mutableMapOf<String, Provider<*>>()
 
     init {
         // 注册默认Provider
-        registerProvider("openai", OpenAIProvider(client, context))
-        registerProvider("google", GoogleProvider(client, context))
-        registerProvider("claude", ClaudeProvider(client, context))
+        registerProvider("openai", OpenAIProvider(client, cacheDir))
+        registerProvider("google", GoogleProvider(client, cacheDir))
+        registerProvider("claude", ClaudeProvider(client, cacheDir))
     }
 
     /**

@@ -11,19 +11,7 @@ import me.rerere.ai.ui.UIMessagePart
 import java.io.ByteArrayOutputStream
 import java.io.File
 
-private val supportedTypes = setOf(
-    "image/jpeg",
-    "image/png",
-    "image/gif",
-    "image/webp",
-)
-
-data class EncodedImage(
-    val base64: String,
-    val mimeType: String
-)
-
-internal enum class ExifTransformType {
+enum class ExifTransformType {
     NONE,
     FLIP_HORIZONTAL,
     ROTATE_180,
@@ -34,7 +22,7 @@ internal enum class ExifTransformType {
     ROTATE_270,
 }
 
-internal fun mapExifOrientationToTransform(orientation: Int): ExifTransformType = when (orientation) {
+fun mapExifOrientationToTransform(orientation: Int): ExifTransformType = when (orientation) {
     ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> ExifTransformType.FLIP_HORIZONTAL
     ExifInterface.ORIENTATION_ROTATE_180 -> ExifTransformType.ROTATE_180
     ExifInterface.ORIENTATION_FLIP_VERTICAL -> ExifTransformType.FLIP_VERTICAL
@@ -49,7 +37,7 @@ internal fun mapExifOrientationToTransform(orientation: Int): ExifTransformType 
     else -> ExifTransformType.NONE
 }
 
-fun UIMessagePart.Image.encodeBase64(withPrefix: Boolean = true): Result<EncodedImage> = runCatching {
+actual fun UIMessagePart.Image.encodeBase64(withPrefix: Boolean): Result<EncodedImage> = runCatching {
     when {
         this.url.startsWith("file://") -> {
             val filePath =
@@ -72,15 +60,17 @@ fun UIMessagePart.Image.encodeBase64(withPrefix: Boolean = true): Result<Encoded
             val mimeType = url.substringAfter("data:").substringBefore(";")
             EncodedImage(base64 = url, mimeType = mimeType)
         }
+
         this.url.startsWith("http") -> {
             // HTTP URL 无法确定 mime type，默认使用 image/png
             EncodedImage(base64 = url, mimeType = "image/png")
         }
+
         else -> throw IllegalArgumentException("Unsupported URL format: $url")
     }
 }
 
-fun UIMessagePart.Video.encodeBase64(withPrefix: Boolean = true): Result<String> = runCatching {
+actual fun UIMessagePart.Video.encodeBase64(withPrefix: Boolean): Result<String> = runCatching {
     when {
         this.url.startsWith("file://") -> {
             val filePath =
@@ -97,7 +87,7 @@ fun UIMessagePart.Video.encodeBase64(withPrefix: Boolean = true): Result<String>
     }
 }
 
-fun UIMessagePart.Audio.encodeBase64(withPrefix: Boolean = true): Result<String> = runCatching {
+actual fun UIMessagePart.Audio.encodeBase64(withPrefix: Boolean): Result<String> = runCatching {
     when {
         this.url.startsWith("file://") -> {
             val filePath =
@@ -205,7 +195,7 @@ private fun File.encodeToBase64Streaming(): String {
     return byteArrayOutputStream.toString(Charsets.ISO_8859_1.name())
 }
 
-internal fun calculateImageInSampleSize(
+fun calculateImageInSampleSize(
     width: Int,
     height: Int,
     maxDimension: Int,
