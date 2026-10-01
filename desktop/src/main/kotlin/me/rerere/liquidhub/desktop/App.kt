@@ -29,8 +29,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
@@ -50,6 +50,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private val LiquidColors = darkColorScheme(
     primary = Color(0xFF8AB4FF),
@@ -62,13 +64,7 @@ private val LiquidColors = darkColorScheme(
     error = Color(0xFFFFB4AB),
 )
 
-private val MODEL_PRESETS = listOf(
-    "gpt-4o-mini",
-    "gpt-4o",
-    "deepseek-chat",
-    "qwen-plus",
-    "glm-4-flash",
-)
+private val MODEL_PRESETS = listOf("gpt-4o-mini", "gpt-4o", "deepseek-chat", "qwen-plus", "glm-4-flash")
 
 @Composable
 fun LiquidHubTheme(content: @Composable () -> Unit) {
@@ -154,7 +150,7 @@ private fun ChatArea(state: AppState, scope: CoroutineScope, modifier: Modifier)
         GlassPanel(Modifier.weight(1f).fillMaxWidth()) {
             val messages = conversation?.messages.orEmpty()
             val listState = rememberLazyListState()
-            LaunchedEffect(messages.size) {
+            LaunchedEffect(messages.size, messages.lastOrNull()?.content?.length) {
                 if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
             }
             LazyColumn(
@@ -163,11 +159,9 @@ private fun ChatArea(state: AppState, scope: CoroutineScope, modifier: Modifier)
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(messages) { m -> MessageBubble(m) }
-                if (state.sending) {
-                    item {
-                        Text("正在生成…", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-                    }
-                }
+            }
+            state.toolNotice?.let {
+                Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             }
             state.error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
@@ -180,7 +174,7 @@ private fun ChatArea(state: AppState, scope: CoroutineScope, modifier: Modifier)
                 value = input,
                 onValueChange = { input = it },
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("输入消息，点「发送」") },
+                placeholder = { Text(if (state.sending) "正在生成…" else "输入消息，点「发送」") },
                 maxLines = 4,
             )
             Spacer(Modifier.width(8.dp))
@@ -216,26 +210,61 @@ private fun ModelPicker(state: AppState) {
 
 @Composable
 private fun MessageBubble(m: ChatMessage) {
-    val isUser = m.role == "user"
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
-    ) {
-        Surface(
-            color = if (isUser) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-            } else {
-                Color(0x22FFFFFF)
-            },
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.widthIn(max = 560.dp),
+    when (m.role) {
+        "user" -> Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
         ) {
-            Text(
-                text = m.content,
-                modifier = Modifier.padding(10.dp),
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            Surface(
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.widthIn(max = 620.dp),
+            ) {
+                Text(
+                    text = m.content.orEmpty(),
+                    modifier = Modifier.padding(10.dp),
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+
+        "assistant" -> {
+            val content = m.content
+            if (!content.isNullOrBlank()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start,
+                ) {
+                    Surface(
+                        color = Color(0x22FFFFFF),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.widthIn(max = 720.dp),
+                    ) {
+                        MarkdownText(content, Modifier.padding(10.dp))
+                    }
+                }
+            }
+        }
+
+        "tool" -> Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Start,
+        ) {
+            Surface(color = Color(0x14FFFFFF), shape = RoundedCornerShape(10.dp)) {
+                Column(Modifier.padding(8.dp)) {
+                    Text(
+                        text = "工具 · ${m.name ?: ""}",
+                        fontSize = 11.sp,
+                        color = Color(0xFF8AB4FF),
+                    )
+                    Text(
+                        text = m.content.orEmpty().take(600),
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }
@@ -263,6 +292,18 @@ private fun Sidebar(
     onOpenSettings: () -> Unit,
     onNewChat: () -> Unit,
 ) {
+    var tab by remember { mutableStateOf(0) }
+    val workspaceTree = remember { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(tab, state.settings.workspaceDir) {
+        workspaceTree.value = if (tab == 1 && state.settings.workspaceDir.isNotBlank()) {
+            withContext(Dispatchers.IO) {
+                runCatching { Workspace(state.settings.workspaceDir, false).tree() }.getOrDefault(emptyList())
+            }
+        } else {
+            emptyList()
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxHeight()
@@ -270,23 +311,40 @@ private fun Sidebar(
             .background(Color(0x33FFFFFF))
             .padding(12.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("历史对话", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            TextButton(onClick = onNewChat) { Text("新建") }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            FilterChip(selected = tab == 0, onClick = { tab = 0 }, label = { Text("对话") })
+            FilterChip(selected = tab == 1, onClick = { tab = 1 }, label = { Text("工作区") })
+            Spacer(Modifier.weight(1f))
+            if (tab == 0) TextButton(onClick = onNewChat) { Text("新建") }
         }
         Spacer(Modifier.height(8.dp))
-        LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            items(state.conversations, key = { it.id }) { c ->
-                val selected = c.id == state.currentId
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (selected) Color(0x33FFFFFF) else Color(0x14FFFFFF))
-                        .clickable { onSelect(c.id) }
-                        .padding(10.dp),
-                ) {
-                    Text(c.title, maxLines = 1)
+        if (tab == 0) {
+            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                items(state.conversations, key = { it.id }) { c ->
+                    val selected = c.id == state.currentId
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (selected) Color(0x33FFFFFF) else Color(0x14FFFFFF))
+                            .clickable { onSelect(c.id) }
+                            .padding(10.dp),
+                    ) {
+                        Text(c.title, maxLines = 1)
+                    }
+                }
+            }
+        } else {
+            val dir = state.settings.workspaceDir
+            if (dir.isBlank()) {
+                Text("未设置工作区目录。到「设置」里填写一个本地文件夹路径。", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Text(dir, fontSize = 11.sp, color = Color(0xFF8AB4FF), maxLines = 2)
+                Spacer(Modifier.height(6.dp))
+                LazyColumn(Modifier.weight(1f)) {
+                    items(workspaceTree.value) { line ->
+                        Text(line, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 11.sp, maxLines = 1)
+                    }
                 }
             }
         }
@@ -302,7 +360,12 @@ private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
     var baseUrl by remember { mutableStateOf(state.settings.baseUrl) }
     var apiKey by remember { mutableStateOf(state.settings.apiKey) }
     var model by remember { mutableStateOf(state.settings.model) }
+    var searchProvider by remember { mutableStateOf(state.settings.searchProvider) }
+    var searchApiKey by remember { mutableStateOf(state.settings.searchApiKey) }
+    var workspaceDir by remember { mutableStateOf(state.settings.workspaceDir) }
+    var allowCommands by remember { mutableStateOf(state.settings.allowCommands) }
     val scroll = rememberScrollState()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -314,38 +377,71 @@ private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
             Text("设置", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
             TextButton(onClick = onBack) { Text("返回") }
         }
+
         GlassPanel(Modifier.fillMaxWidth()) {
             Text("模型服务（OpenAI 兼容）", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = baseUrl,
-                onValueChange = { baseUrl = it },
-                label = { Text("Base URL") },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            OutlinedTextField(baseUrl, { baseUrl = it }, label = { Text("Base URL") }, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(apiKey, { apiKey = it }, label = { Text("API Key") }, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(model, { model = it }, label = { Text("默认模型") }, modifier = Modifier.fillMaxWidth())
+        }
+
+        GlassPanel(Modifier.fillMaxWidth()) {
+            Text("联网搜索", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("tavily" to "Tavily", "exa" to "Exa").forEach { (id, label) ->
+                    FilterChip(
+                        selected = searchProvider == id,
+                        onClick = { searchProvider = id },
+                        label = { Text(label) },
+                    )
+                }
+            }
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
-                value = apiKey,
-                onValueChange = { apiKey = it },
-                label = { Text("API Key") },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = model,
-                onValueChange = { model = it },
-                label = { Text("默认模型") },
+                searchApiKey,
+                { searchApiKey = it },
+                label = { Text("搜索 API Key") },
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+
+        GlassPanel(Modifier.fillMaxWidth()) {
+            Text("本地工作区", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                workspaceDir,
+                { workspaceDir = it },
+                label = { Text("工作区根目录（绝对路径）") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("允许 AI 执行 shell 命令", modifier = Modifier.weight(1f))
+                Switch(checked = allowCommands, onCheckedChange = { allowCommands = it })
+            }
+        }
+
         Button(onClick = {
             state.updateSettings(
-                state.settings.copy(baseUrl = baseUrl, apiKey = apiKey, model = model)
+                state.settings.copy(
+                    baseUrl = baseUrl,
+                    apiKey = apiKey,
+                    model = model,
+                    searchProvider = searchProvider,
+                    searchApiKey = searchApiKey,
+                    workspaceDir = workspaceDir,
+                    allowCommands = allowCommands,
+                )
             )
             onBack()
         }) { Text("保存") }
+
         Text(
-            "Windows 版开发中：本地模型、云同步、远程连接等会在后续版本加入。",
+            "Windows 版开发中：本地模型、云同步等会在后续版本加入。",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 12.sp,
         )

@@ -3,9 +3,22 @@ package me.rerere.liquidhub.desktop
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class ToolCallFunction(val name: String, val arguments: String = "{}")
+
+@Serializable
+data class ToolCall(
+    val id: String,
+    val type: String = "function",
+    val function: ToolCallFunction,
+)
+
+@Serializable
 data class ChatMessage(
     val role: String,
-    val content: String,
+    val content: String? = null,
+    val toolCalls: List<ToolCall>? = null,
+    val toolCallId: String? = null,
+    val name: String? = null,
 )
 
 @Serializable
@@ -21,6 +34,13 @@ data class AppSettings(
     val apiKey: String = "",
     val model: String = "gpt-4o-mini",
     val webSearch: Boolean = false,
+    /** tavily | exa */
+    val searchProvider: String = "tavily",
+    val searchApiKey: String = "",
+    /** 本地工作区根目录；为空表示未启用工作区 */
+    val workspaceDir: String = "",
+    /** 允许 AI 在工作区执行 shell 命令（默认关闭，风险更高） */
+    val allowCommands: Boolean = false,
 )
 
 @Serializable
