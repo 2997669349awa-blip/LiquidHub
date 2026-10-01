@@ -1,11 +1,11 @@
 {
-  "version": "0.2.5Data",
-  "publishedAt": "2026-09-30T18:45:00Z",
-  "changelog": "LiquidHub V0.2.5Data\n\n- 远程桌面：改用 AVNC 查看器（与 tiny_container 同款方案），支持鼠标/键盘/手势，画面与输入更跟手\n- 远程桌面：移除不稳定的 H.264 自研串流\n- 远程桌面：日志在启动完成后仍然保留，并可全屏实时查看",
+  "version": "0.2.6Data",
+  "publishedAt": "2026-10-01T00:04:00Z",
+  "changelog": "LiquidHub V0.2.6Data\n\n- 远程桌面改为内嵌、仅 AI 可用：去掉用户操作页，AI 首次调用会自动安装并启动桌面\n- 保留远程桌面全套 AI 工具（截图、点击、输入、按键、浏览网页等）",
   "downloads": [
     {
-      "name": "liquidhub-release-0930-1845.apk",
-      "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-0930-1845.apk",
+      "name": "liquidhub-release-1001-0004.apk",
+      "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1001-0004.apk",
       "size": "约 54 MB"
     }
   ]
