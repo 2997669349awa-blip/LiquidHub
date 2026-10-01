@@ -38,28 +38,9 @@ class AcceptLanguageBuilder private constructor(
         }
 
         /**
-         * 从 Android 系统环境创建。
-         * @param context 建议传入应用或当前上下文，以获取用户“应用内语言”/系统语言首选列表
-         */
-        fun fromAndroid(context: android.content.Context, options: Options = Options()): AcceptLanguageBuilder {
-            val locales = systemLocalesAndroid(context)
-            return AcceptLanguageBuilder(locales, options)
-        }
-
-        /** 使用调用方自定义的 Locale 列表（按优先顺序）创建。*/
+         * 使用调用方自定义的 Locale 列表（按优先顺序）创建。*/
         fun withLocales(locales: List<Locale>, options: Options = Options()): AcceptLanguageBuilder {
             return AcceptLanguageBuilder(locales, options)
-        }
-
-        // Android 的系统 Locale 列表获取
-        private fun systemLocalesAndroid(context: android.content.Context): List<Locale> {
-            val cfg = context.resources.configuration
-            return if (android.os.Build.VERSION.SDK_INT >= 24) {
-                val list = cfg.locales
-                (0 until list.size()).map { idx -> list[idx] }
-            } else {
-                listOf(cfg.locale)
-            }
         }
     }
 

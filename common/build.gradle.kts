@@ -15,6 +15,8 @@ android {
 }
 
 dependencies {
+    api(project(":core"))
+
     // okhttp
     api(libs.okhttp)
     api(libs.okhttp.sse)
