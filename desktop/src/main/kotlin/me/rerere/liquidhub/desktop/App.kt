@@ -3,6 +3,7 @@ package me.rerere.liquidhub.desktop
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,12 +47,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import me.rerere.ai.provider.ProviderSetting
 
 private val LiquidColors = darkColorScheme(
     primary = Color(0xFF8AB4FF),
@@ -63,8 +66,6 @@ private val LiquidColors = darkColorScheme(
     onSurfaceVariant = Color(0xFFB9C2D0),
     error = Color(0xFFFFB4AB),
 )
-
-private val MODEL_PRESETS = listOf("gpt-4o-mini", "gpt-4o", "deepseek-chat", "qwen-plus", "glm-4-flash")
 
 @Composable
 fun LiquidHubTheme(content: @Composable () -> Unit) {
@@ -99,7 +100,7 @@ fun App() {
                 .background(Brush.linearGradient(listOf(Color(0xFF0F172A), Color(0xFF1D4ED8)))),
         ) {
             if (showSettings) {
-                SettingsScreen(state, onBack = { showSettings = false })
+                SettingsScreen(state, scope, onBack = { showSettings = false })
             } else {
                 Row(Modifier.fillMaxSize()) {
                     ChatArea(state, scope, Modifier.weight(1f).fillMaxHeight())
@@ -160,9 +161,6 @@ private fun ChatArea(state: AppState, scope: CoroutineScope, modifier: Modifier)
             ) {
                 items(messages) { m -> MessageBubble(m) }
             }
-            state.toolNotice?.let {
-                Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-            }
             state.error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
             }
@@ -192,17 +190,31 @@ private fun ChatArea(state: AppState, scope: CoroutineScope, modifier: Modifier)
 @Composable
 private fun ModelPicker(state: AppState) {
     var open by remember { mutableStateOf(false) }
+    val provider = state.selectedProvider
+    val model = state.selectedModel
     Box {
-        OutlinedButton(onClick = { open = true }) { Text(state.settings.model) }
+        OutlinedButton(onClick = { open = true }) {
+            Text("${provider?.name ?: "未选择服务"} / ${model?.displayName?.ifBlank { model.modelId } ?: "无模型"}")
+        }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            MODEL_PRESETS.forEach { m ->
+            state.providers.forEach { p ->
                 DropdownMenuItem(
-                    text = { Text(m) },
+                    text = { Text("服务：${p.name}", fontWeight = FontWeight.Bold) },
                     onClick = {
-                        state.updateSettings(state.settings.copy(model = m))
+                        state.selectProvider(p.id)
                         open = false
                     },
                 )
+                p.models.forEach { m ->
+                    DropdownMenuItem(
+                        text = { Text("    ${m.displayName.ifBlank { m.modelId }}") },
+                        onClick = {
+                            state.selectProvider(p.id)
+                            state.selectModel(m.id)
+                            open = false
+                        },
+                    )
+                }
             }
         }
     }
@@ -229,40 +241,26 @@ private fun MessageBubble(m: ChatMessage) {
             }
         }
 
-        "assistant" -> {
-            val content = m.content
-            if (!content.isNullOrBlank()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start,
-                ) {
-                    Surface(
-                        color = Color(0x22FFFFFF),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.widthIn(max = 720.dp),
-                    ) {
-                        MarkdownText(content, Modifier.padding(10.dp))
-                    }
-                }
-            }
-        }
-
-        "tool" -> Row(
+        "assistant" -> Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Start,
         ) {
-            Surface(color = Color(0x14FFFFFF), shape = RoundedCornerShape(10.dp)) {
-                Column(Modifier.padding(8.dp)) {
-                    Text(
-                        text = "工具 · ${m.name ?: ""}",
-                        fontSize = 11.sp,
-                        color = Color(0xFF8AB4FF),
-                    )
-                    Text(
-                        text = m.content.orEmpty().take(600),
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            Surface(
+                color = Color(0x22FFFFFF),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.widthIn(max = 760.dp),
+            ) {
+                Column(Modifier.padding(10.dp)) {
+                    m.reasoning?.takeIf { it.isNotBlank() }?.let { reasoning ->
+                        Text(
+                            text = reasoning,
+                            fontSize = 11.sp,
+                            color = Color(0xFF9DB4D0),
+                            fontFamily = FontFamily.Monospace,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                    }
+                    MarkdownText(m.content.orEmpty())
                 }
             }
         }
@@ -337,13 +335,17 @@ private fun Sidebar(
         } else {
             val dir = state.settings.workspaceDir
             if (dir.isBlank()) {
-                Text("未设置工作区目录。到「设置」里填写一个本地文件夹路径。", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "未设置工作区目录。到「设置」里填写一个本地文件夹路径。",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             } else {
                 Text(dir, fontSize = 11.sp, color = Color(0xFF8AB4FF), maxLines = 2)
                 Spacer(Modifier.height(6.dp))
                 LazyColumn(Modifier.weight(1f)) {
                     items(workspaceTree.value) { line ->
-                        Text(line, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 11.sp, maxLines = 1)
+                        Text(line, fontFamily = FontFamily.Monospace, fontSize = 11.sp, maxLines = 1)
                     }
                 }
             }
@@ -356,16 +358,8 @@ private fun Sidebar(
 }
 
 @Composable
-private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
-    var baseUrl by remember { mutableStateOf(state.settings.baseUrl) }
-    var apiKey by remember { mutableStateOf(state.settings.apiKey) }
-    var model by remember { mutableStateOf(state.settings.model) }
-    var searchProvider by remember { mutableStateOf(state.settings.searchProvider) }
-    var searchApiKey by remember { mutableStateOf(state.settings.searchApiKey) }
-    var workspaceDir by remember { mutableStateOf(state.settings.workspaceDir) }
-    var allowCommands by remember { mutableStateOf(state.settings.allowCommands) }
+private fun SettingsScreen(state: AppState, scope: CoroutineScope, onBack: () -> Unit) {
     val scroll = rememberScrollState()
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -378,72 +372,127 @@ private fun SettingsScreen(state: AppState, onBack: () -> Unit) {
             TextButton(onClick = onBack) { Text("返回") }
         }
 
-        GlassPanel(Modifier.fillMaxWidth()) {
-            Text("模型服务（OpenAI 兼容）", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(baseUrl, { baseUrl = it }, label = { Text("Base URL") }, modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(apiKey, { apiKey = it }, label = { Text("API Key") }, modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(model, { model = it }, label = { Text("默认模型") }, modifier = Modifier.fillMaxWidth())
-        }
+        ProviderSection(state, scope)
 
         GlassPanel(Modifier.fillMaxWidth()) {
             Text("联网搜索", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
+            var provider by remember { mutableStateOf(state.settings.searchProvider) }
+            var key by remember { mutableStateOf(state.settings.searchApiKey) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("tavily" to "Tavily", "exa" to "Exa").forEach { (id, label) ->
-                    FilterChip(
-                        selected = searchProvider == id,
-                        onClick = { searchProvider = id },
-                        label = { Text(label) },
-                    )
+                    FilterChip(selected = provider == id, onClick = { provider = id }, label = { Text(label) })
                 }
             }
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                searchApiKey,
-                { searchApiKey = it },
-                label = { Text("搜索 API Key") },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            OutlinedTextField(key, { key = it }, label = { Text("搜索 API Key") }, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(8.dp))
+            Button(onClick = {
+                state.updateSettings(state.settings.copy(searchProvider = provider, searchApiKey = key))
+            }) { Text("保存搜索设置") }
         }
 
         GlassPanel(Modifier.fillMaxWidth()) {
             Text("本地工作区", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                workspaceDir,
-                { workspaceDir = it },
-                label = { Text("工作区根目录（绝对路径）") },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            var dir by remember { mutableStateOf(state.settings.workspaceDir) }
+            var allow by remember { mutableStateOf(state.settings.allowCommands) }
+            OutlinedTextField(dir, { dir = it }, label = { Text("工作区根目录（绝对路径）") }, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("允许 AI 执行 shell 命令", modifier = Modifier.weight(1f))
-                Switch(checked = allowCommands, onCheckedChange = { allowCommands = it })
+                Switch(checked = allow, onCheckedChange = { allow = it })
+            }
+            Spacer(Modifier.height(8.dp))
+            Button(onClick = {
+                state.updateSettings(state.settings.copy(workspaceDir = dir, allowCommands = allow))
+            }) { Text("保存工作区设置") }
+        }
+    }
+}
+
+@Composable
+private fun ProviderSection(state: AppState, scope: CoroutineScope) {
+    val provider = state.selectedProvider
+    GlassPanel(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("模型服务", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            TextButton(onClick = {
+                state.addProvider(
+                    ProviderSetting.OpenAI(
+                        name = "新服务",
+                        baseUrl = "https://api.openai.com/v1",
+                    )
+                )
+            }) { Text("＋ 添加服务") }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            state.providers.forEach { p ->
+                FilterChip(
+                    selected = p.id == state.selectedProviderId,
+                    onClick = { state.selectProvider(p.id) },
+                    label = { Text(p.name) },
+                )
             }
         }
-
-        Button(onClick = {
-            state.updateSettings(
-                state.settings.copy(
-                    baseUrl = baseUrl,
-                    apiKey = apiKey,
-                    model = model,
-                    searchProvider = searchProvider,
-                    searchApiKey = searchApiKey,
-                    workspaceDir = workspaceDir,
-                    allowCommands = allowCommands,
-                )
+        if (provider == null) {
+            Text("还没有服务，点右上角「添加服务」。", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            return@GlassPanel
+        }
+        Spacer(Modifier.height(8.dp))
+        var name by remember(provider.id) { mutableStateOf(provider.name) }
+        var baseUrl by remember(provider.id) {
+            mutableStateOf(
+                when (provider) {
+                    is ProviderSetting.OpenAI -> provider.baseUrl
+                    is ProviderSetting.Google -> provider.baseUrl
+                    is ProviderSetting.Claude -> provider.baseUrl
+                }
             )
-            onBack()
-        }) { Text("保存") }
-
-        Text(
-            "Windows 版开发中：本地模型、云同步等会在后续版本加入。",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 12.sp,
-        )
+        }
+        var apiKey by remember(provider.id) {
+            mutableStateOf(
+                when (provider) {
+                    is ProviderSetting.OpenAI -> provider.apiKey
+                    is ProviderSetting.Google -> provider.apiKey
+                    is ProviderSetting.Claude -> provider.apiKey
+                }
+            )
+        }
+        OutlinedTextField(name, { name = it }, label = { Text("名称") }, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(baseUrl, { baseUrl = it }, label = { Text("Base URL") }, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(apiKey, { apiKey = it }, label = { Text("API Key") }, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = {
+                val updated = when (provider) {
+                    is ProviderSetting.OpenAI -> provider.copy(name = name, baseUrl = baseUrl, apiKey = apiKey)
+                    is ProviderSetting.Google -> provider.copy(name = name, baseUrl = baseUrl, apiKey = apiKey)
+                    is ProviderSetting.Claude -> provider.copy(name = name, baseUrl = baseUrl, apiKey = apiKey)
+                }
+                state.updateProvider(updated)
+            }) { Text("保存") }
+            OutlinedButton(onClick = { state.fetchModels(scope, provider) }) { Text("拉取模型") }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text("模型（${provider.models.size}）", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            provider.models.forEach { m ->
+                FilterChip(
+                    selected = m.id == state.selectedModelId,
+                    onClick = { state.selectModel(m.id) },
+                    label = { Text(m.displayName.ifBlank { m.modelId }) },
+                )
+            }
+        }
     }
 }

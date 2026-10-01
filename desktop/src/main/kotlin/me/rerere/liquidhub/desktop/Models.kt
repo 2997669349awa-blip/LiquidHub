@@ -1,24 +1,15 @@
 package me.rerere.liquidhub.desktop
 
 import kotlinx.serialization.Serializable
-
-@Serializable
-data class ToolCallFunction(val name: String, val arguments: String = "{}")
-
-@Serializable
-data class ToolCall(
-    val id: String,
-    val type: String = "function",
-    val function: ToolCallFunction,
-)
+import me.rerere.ai.provider.Model
+import me.rerere.ai.provider.ProviderSetting
+import kotlin.uuid.Uuid
 
 @Serializable
 data class ChatMessage(
     val role: String,
     val content: String? = null,
-    val toolCalls: List<ToolCall>? = null,
-    val toolCallId: String? = null,
-    val name: String? = null,
+    val reasoning: String? = null,
 )
 
 @Serializable
@@ -30,9 +21,6 @@ data class Conversation(
 
 @Serializable
 data class AppSettings(
-    val baseUrl: String = "https://api.openai.com/v1",
-    val apiKey: String = "",
-    val model: String = "gpt-4o-mini",
     val webSearch: Boolean = false,
     /** tavily | exa */
     val searchProvider: String = "tavily",
@@ -46,6 +34,29 @@ data class AppSettings(
 @Serializable
 data class PersistedState(
     val settings: AppSettings = AppSettings(),
+    val providers: List<ProviderSetting> = emptyList(),
+    val selectedProviderId: Uuid? = null,
+    val selectedModelId: Uuid? = null,
     val conversations: List<Conversation> = emptyList(),
     val currentId: String? = null,
+)
+
+/** 首次运行时的预置 Provider（都走 OpenAI 兼容接口，用户填 Key 即用）。 */
+val DEFAULT_DESKTOP_PROVIDERS: List<ProviderSetting> = listOf(
+    ProviderSetting.OpenAI(
+        name = "DeepSeek",
+        baseUrl = "https://api.deepseek.com/v1",
+        models = listOf(
+            Model(modelId = "deepseek-chat", displayName = "deepseek-chat"),
+            Model(modelId = "deepseek-reasoner", displayName = "deepseek-reasoner"),
+        ),
+    ),
+    ProviderSetting.OpenAI(
+        name = "OpenAI",
+        baseUrl = "https://api.openai.com/v1",
+        models = listOf(
+            Model(modelId = "gpt-4o-mini", displayName = "gpt-4o-mini"),
+            Model(modelId = "gpt-4o", displayName = "gpt-4o"),
+        ),
+    ),
 )

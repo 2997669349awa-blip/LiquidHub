@@ -1,42 +1,6 @@
 package me.rerere.liquidhub.desktop
 
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.add
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
-import kotlinx.serialization.json.putJsonObject
 import java.io.File
-
-data class ToolSpec(val name: String, val description: String, val parameters: JsonObject) {
-    fun toJson(): JsonObject = buildJsonObject {
-        put("type", "function")
-        putJsonObject("function") {
-            put("name", name)
-            put("description", description)
-            put("parameters", parameters)
-        }
-    }
-}
-
-private fun objSchema(properties: Map<String, String>, required: List<String>): JsonObject =
-    buildJsonObject {
-        put("type", "object")
-        putJsonObject("properties") {
-            properties.forEach { (k, desc) ->
-                putJsonObject(k) {
-                    put("type", "string")
-                    put("description", desc)
-                }
-            }
-        }
-        putJsonArray("required") { required.forEach { add(JsonPrimitive(it)) } }
-    }
 
 /** 本地工作区：限定在一个根目录内的文件读写，可选执行命令。 */
 class Workspace(private val rootPath: String, private val allowCommands: Boolean) {
@@ -83,11 +47,7 @@ class Workspace(private val rootPath: String, private val allowCommands: Boolean
     fun runCommand(command: String): String {
         if (!allowCommands) return "命令执行未开启（在设置里打开「允许 AI 执行命令」）"
         val os = System.getProperty("os.name").lowercase()
-        val cmd = if (os.contains("win")) {
-            listOf("cmd.exe", "/c", command)
-        } else {
-            listOf("sh", "-c", command)
-        }
+        val cmd = if (os.contains("win")) listOf("cmd.exe", "/c", command) else listOf("sh", "-c", command)
         return runCatching {
             val p = ProcessBuilder(cmd).directory(root).redirectErrorStream(true).start()
             val out = p.inputStream.bufferedReader().readText()
@@ -112,46 +72,4 @@ class Workspace(private val rootPath: String, private val allowCommands: Boolean
         walk(root, "")
         return result
     }
-}
-
-fun workspaceTools(): List<ToolSpec> = listOf(
-    ToolSpec(
-        name = "list_dir",
-        description = "列出工作区目录内容。path 为相对工作区根目录的路径，默认 \".\"。",
-        parameters = objSchema(mapOf("path" to "相对工作区根目录的目录路径"), emptyList()),
-    ),
-    ToolSpec(
-        name = "read_file",
-        description = "读取工作区内的文本文件。",
-        parameters = objSchema(mapOf("path" to "相对工作区根目录的文件路径"), listOf("path")),
-    ),
-    ToolSpec(
-        name = "write_file",
-        description = "把内容写入工作区内的文件（不存在则创建，父目录自动创建）。",
-        parameters = objSchema(
-            mapOf("path" to "相对路径", "content" to "要写入的完整文本"),
-            listOf("path", "content"),
-        ),
-    ),
-    ToolSpec(
-        name = "run_command",
-        description = "在工作区根目录执行一条 shell 命令并返回输出。仅在用户开启命令执行时可用。",
-        parameters = objSchema(mapOf("command" to "要执行的命令"), listOf("command")),
-    ),
-)
-
-suspend fun executeWorkspaceTool(settings: AppSettings, call: ToolCall): String {
-    val ws = Workspace(settings.workspaceDir, settings.allowCommands)
-    val args = runCatching { Json.parseToJsonElement(call.function.arguments).jsonObject }
-        .getOrElse { JsonObject(emptyMap()) }
-    fun str(k: String) = args[k]?.jsonPrimitive?.contentOrNull ?: ""
-    return runCatching {
-        when (call.function.name) {
-            "list_dir" -> ws.listDir(str("path"))
-            "read_file" -> ws.readFile(str("path"))
-            "write_file" -> ws.writeFile(str("path"), str("content"))
-            "run_command" -> ws.runCommand(str("command"))
-            else -> "未知工具：${call.function.name}"
-        }
-    }.getOrElse { "工具执行失败：${it.message}" }
 }
