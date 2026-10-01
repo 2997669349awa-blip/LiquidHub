@@ -68,30 +68,37 @@ private fun createDesktopStartTool(
     needsApproval: (String) -> Boolean,
 ) = Tool(
     name = "desktop_start",
-    description = "Start the workspace remote desktop (Fluxbox + Chromium + VNC + noVNC). " +
-        "The desktop environment must have been installed once by the user first. " +
+    description = "Start the workspace remote desktop (X server + window manager + VNC + browser). " +
+        "The desktop is embedded and fully AI-driven: if it is not installed yet it is installed " +
+        "automatically (this can take a few minutes), so the user never has to install anything by hand. " +
         "After starting, wait a few seconds before calling desktop_screenshot.",
     parameters = { InputSchema.Obj(properties = buildJsonObject { }) },
     needsApproval = { needsApproval("desktop_start") },
     execute = {
-        val check = workspaceRepository.executeCommand(
+        val installed = workspaceRepository.executeCommand(
             id = workspaceId,
             command = "command -v Xvfb >/dev/null 2>&1 && echo INSTALLED || echo MISSING",
             timeoutMillis = 30_000,
-        )
-        if (check.stdout.contains("MISSING")) {
-            return@Tool listOf(
-                UIMessagePart.Text(
-                    buildJsonObject {
-                        put("ok", false)
-                        put(
-                            "error",
-                            "Desktop environment is not installed. Ask the user to open the workspace " +
-                                "remote desktop page and tap \"install\" first."
-                        )
-                    }.toString()
-                )
+        ).stdout.contains("INSTALLED")
+        if (!installed) {
+            // 内嵌桌面：首次由 AI 自动安装，用户无需手动操作
+            desktopManager.ensureScript(workspaceId)
+            val install = workspaceRepository.executeCommand(
+                id = workspaceId,
+                command = "sh /workspace/${WorkspaceDesktopManager.SCRIPT_PATH} install",
+                timeoutMillis = 30 * 60_000L,
             )
+            if (install.exitCode != 0) {
+                return@Tool listOf(
+                    UIMessagePart.Text(
+                        buildJsonObject {
+                            put("ok", false)
+                            put("error", "Desktop auto-install failed (exit ${install.exitCode}).")
+                            put("log", (install.stdout + install.stderr).takeLast(2000))
+                        }.toString()
+                    )
+                )
+            }
         }
         desktopManager.runAction(workspaceId, "start")
         desktopManager.runAction(workspaceId, "browser")

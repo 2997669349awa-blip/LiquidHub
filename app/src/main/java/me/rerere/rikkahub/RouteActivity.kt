@@ -100,7 +100,6 @@ import me.rerere.rikkahub.ui.pages.extensions.skills.SkillDetailPage
 import me.rerere.rikkahub.ui.pages.extensions.skills.SkillsPage
 import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspacePage
 import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceDetailPage
-import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceDesktopPage
 import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceFileEditorPage
 import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceTerminalPage
 import me.rerere.workspace.WorkspaceStorageArea
@@ -538,10 +537,6 @@ class RouteActivity : ComponentActivity() {
 
                             entry<Screen.WorkspaceTerminal> { key ->
                                 WorkspaceTerminalPage(key.id)
-                            }
-
-                            entry<Screen.WorkspaceDesktop> { key ->
-                                WorkspaceDesktopPage(key.id)
                             }
 
                             entry<Screen.WorkspaceFileEditor> { key ->

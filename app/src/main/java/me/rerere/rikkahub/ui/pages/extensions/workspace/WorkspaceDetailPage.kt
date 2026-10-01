@@ -179,9 +179,6 @@ fun WorkspaceDetailPage(id: String) {
                         Icon(HugeIcons.Refresh01, contentDescription = null)
                     }
                     if (state.workspace?.shellStatus != WorkspaceShellStatus.DISABLED.name) {
-                        IconButton(onClick = { navController.navigate(Screen.WorkspaceDesktop(id)) }) {
-                            Icon(HugeIcons.ComputerDesk01, contentDescription = "远程桌面")
-                        }
                         IconButton(onClick = { navController.navigate(Screen.WorkspaceTerminal(id)) }) {
                             Icon(HugeIcons.ComputerTerminal01, contentDescription = null)
                         }
