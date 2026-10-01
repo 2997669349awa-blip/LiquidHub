@@ -1,0 +1,2 @@
+# APK 构建产物体积过大，不纳入版本库；发布时改用 GitHub Releases 挂载。
+downloads/
