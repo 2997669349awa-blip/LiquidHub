@@ -17,6 +17,7 @@ import me.rerere.ai.core.InputSchema
 import me.rerere.ai.core.Tool
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.rikkahub.data.music.MusicControllerHolder
+import me.rerere.rikkahub.data.music.MusicSession
 import me.rerere.rikkahub.data.music.MusicSong
 import me.rerere.rikkahub.data.music.NeteaseApi
 import org.koin.core.component.KoinComponent
@@ -58,9 +59,7 @@ fun createMusicTools(): List<Tool> = listOf(
                 ?: error("keyword is required")
             val artist = it.jsonObject["artist"]?.jsonPrimitive?.contentOrNull.orEmpty().trim()
             val query = listOf(keyword.trim(), artist).filter { it.isNotBlank() }.joinToString(" ")
-            val songs = withContext(Dispatchers.IO) {
-                runCatching { NeteaseApi.search(query) }.getOrDefault(emptyList())
-            }
+            val songs = searchSongs(query, keyword.trim())
             val arr = buildJsonArray {
                 songs.forEach { s ->
                     add(buildJsonObject {
@@ -135,9 +134,7 @@ fun createMusicTools(): List<Tool> = listOf(
 
             // 只给了关键词：先搜一次，取最匹配的那首直接播放（一步到位）
             val autoTop = if (id.isBlank() && keyword.isNotBlank()) {
-                withContext(Dispatchers.IO) {
-                    runCatching { NeteaseApi.search(query) }.getOrDefault(emptyList())
-                }.firstOrNull()
+                searchSongs(query, keyword).firstOrNull()
             } else {
                 null
             }
@@ -182,3 +179,19 @@ fun createMusicTools(): List<Tool> = listOf(
         }
     ),
 )
+
+/**
+ * 依次尝试多个关键词，返回第一个有结果列表的搜索结果。
+ * 会在搜索前确保网易云登录 Cookie 已加载，让 AI 搜索与手动搜索走同一账号身份。
+ */
+private suspend fun searchSongs(vararg queries: String): List<MusicSong> {
+    MusicSession.ensure(MusicToolKoin.context)
+    val tries = queries.map { it.trim() }.filter { it.isNotBlank() }.distinct()
+    for (q in tries) {
+        val list = withContext(Dispatchers.IO) {
+            runCatching { NeteaseApi.search(q) }.getOrDefault(emptyList())
+        }
+        if (list.isNotEmpty()) return list
+    }
+    return emptyList()
+}

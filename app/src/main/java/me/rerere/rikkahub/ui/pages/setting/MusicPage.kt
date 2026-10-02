@@ -8,6 +8,12 @@ package me.rerere.rikkahub.ui.pages.setting
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +22,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,9 +31,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
@@ -34,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -49,7 +61,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -66,13 +83,25 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import me.rerere.hugeicons.HugeIcons
+import me.rerere.hugeicons.stroke.ArrowDown01
+import me.rerere.hugeicons.stroke.Heart
+import me.rerere.hugeicons.stroke.MoreHorizontal
+import me.rerere.hugeicons.stroke.Next
+import me.rerere.hugeicons.stroke.Pause
+import me.rerere.hugeicons.stroke.Play
+import me.rerere.hugeicons.stroke.Playlist01
+import me.rerere.hugeicons.stroke.Previous
+import me.rerere.hugeicons.stroke.Repeat
+import me.rerere.hugeicons.stroke.RepeatOne01
+import me.rerere.hugeicons.stroke.Shuffle
 import me.rerere.rikkahub.data.music.MusicControllerHolder
+import me.rerere.rikkahub.data.music.MusicSession
 import me.rerere.rikkahub.data.music.MusicSong
 import me.rerere.rikkahub.data.music.MusicUser
 import me.rerere.rikkahub.data.music.NeteaseApi
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.theme.CustomColors
-import java.io.File
 
 private val BG_PRESETS = listOf(
     0xFF101014, 0xFF14202B, 0xFF1B1230, 0xFF12211A, 0xFF2A1416, 0xFF202020, 0xFF000000,
@@ -144,7 +173,6 @@ fun MusicPage() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    val cookieFile = remember { File(context.filesDir, "music_cookie.txt") }
 
     var controller by remember { mutableStateOf<MediaController?>(null) }
     var user by remember { mutableStateOf<MusicUser?>(null) }
@@ -160,7 +188,7 @@ fun MusicPage() {
 
     LaunchedEffect(Unit) {
         controller = MusicControllerHolder.ensure(context)
-        runCatching { if (cookieFile.exists()) NeteaseApi.cookie = cookieFile.readText().trim() }
+        runCatching { MusicSession.ensure(context) }
         if (NeteaseApi.cookie.isNotBlank()) {
             withContext(Dispatchers.IO) { runCatching { NeteaseApi.account() } }.getOrNull()?.let {
                 user = it
@@ -205,7 +233,7 @@ fun MusicPage() {
     }
 
     fun afterLogin() {
-        runCatching { cookieFile.writeText(NeteaseApi.cookie) }
+        runCatching { MusicSession.save(context) }
         scope.launch {
             user = withContext(Dispatchers.IO) { runCatching { NeteaseApi.account() }.getOrNull() }
             refreshLikes()
@@ -229,8 +257,7 @@ fun MusicPage() {
                             modifier = Modifier.padding(end = 8.dp),
                         )
                         TextButton(onClick = {
-                            NeteaseApi.cookie = ""
-                            cookieFile.delete()
+                            MusicSession.clear(context)
                             user = null
                             likes = emptyList()
                         }) { Text("退出") }
@@ -319,6 +346,17 @@ fun MusicPage() {
         NowPlayingScreen(
             controller = controller,
             snap = snap,
+            liked = likes.any { it.id == snap.mediaId },
+            onToggleLike = {
+                val id = snap.mediaId
+                if (!id.isNullOrBlank()) {
+                    val likedNow = likes.any { it.id == id }
+                    scope.launch {
+                        withContext(Dispatchers.IO) { runCatching { NeteaseApi.like(id, !likedNow) } }
+                        refreshLikes()
+                    }
+                }
+            },
             onClose = { showPlayer = false },
         )
     }
@@ -366,14 +404,26 @@ private fun MiniPlayer(
 private fun NowPlayingScreen(
     controller: MediaController?,
     snap: PlayerSnapshot,
+    liked: Boolean,
+    onToggleLike: () -> Unit,
     onClose: () -> Unit,
 ) {
     var bg by remember { mutableStateOf(BG_PRESETS.first()) }
     var lyrics by remember { mutableStateOf<List<Pair<Long, String>>?>(null) }
+    var showFullLyrics by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
     val meta = controller?.currentMediaItem?.mediaMetadata
     val title = meta?.title?.toString().orEmpty().ifBlank { "未知歌曲" }
     val artist = meta?.artist?.toString().orEmpty()
     val cover = meta?.artworkUri?.toString().orEmpty()
+
+    val accent = Color(0xFFFF8A3D)
+    val rotation by rememberInfiniteTransition(label = "disc").animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(28_000, easing = LinearEasing), RepeatMode.Restart),
+        label = "discRotation",
+    )
 
     LaunchedEffect(snap.mediaId) {
         val id = snap.mediaId ?: return@LaunchedEffect
@@ -383,80 +433,270 @@ private fun NowPlayingScreen(
     }
 
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Column(
-            modifier = Modifier.fillMaxSize().background(bg).padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Brush.verticalGradient(listOf(bg, Color(0xFF070707)))),
         ) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onClose) { Text("⌄", color = Color.White) }
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = {
-                    bg = BG_PRESETS[(BG_PRESETS.indexOf(bg) + 1).mod(BG_PRESETS.size)]
-                }) {
-                    Text("背景色", color = Color.White.copy(alpha = 0.8f))
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-            Box(
-                modifier = Modifier.size(220.dp).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.06f)),
-                contentAlignment = Alignment.Center,
+            Column(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                if (cover.isNotBlank()) {
-                    AsyncImage(model = cover, contentDescription = null, modifier = Modifier.fillMaxSize())
-                } else {
-                    Text("♪", color = Color.White, style = MaterialTheme.typography.displayLarge)
+                // 顶栏：收起 / 歌名歌手 / 收藏 / 更多
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onClose) {
+                        Icon(HugeIcons.ArrowDown01, contentDescription = "收起", tint = Color.White)
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            title,
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (artist.isNotBlank()) {
+                            Text(
+                                artist,
+                                color = Color.White.copy(alpha = 0.6f),
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                    IconButton(onClick = onToggleLike) {
+                        Icon(
+                            HugeIcons.Heart,
+                            contentDescription = "收藏",
+                            tint = if (liked) accent else Color.White.copy(alpha = 0.85f),
+                        )
+                    }
+                    Box {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(HugeIcons.MoreHorizontal, contentDescription = "更多", tint = Color.White.copy(alpha = 0.85f))
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text(if (showFullLyrics) "收起歌词" else "查看完整歌词") },
+                                onClick = { showFullLyrics = !showFullLyrics; menuOpen = false },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("切换背景色") },
+                                onClick = {
+                                    bg = BG_PRESETS[(BG_PRESETS.indexOf(bg) + 1).mod(BG_PRESETS.size)]
+                                    menuOpen = false
+                                },
+                            )
+                        }
+                    }
                 }
-            }
-            Spacer(Modifier.height(16.dp))
-            Text(title, color = Color.White, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (artist.isNotBlank()) {
-                Text(artist, color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-            }
 
-            Spacer(Modifier.height(12.dp))
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                if (lyrics == null) {
-                    Text(
-                        "暂无歌词",
-                        color = Color.White.copy(alpha = 0.5f),
-                        modifier = Modifier.align(Alignment.Center),
+                // 黑胶唱片
+                Box(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    VinylDisc(
+                        cover = cover,
+                        accent = accent,
+                        rotation = rotation,
+                        modifier = Modifier.fillMaxWidth(0.82f).aspectRatio(1f),
                     )
-                } else {
-                    LyricsList(lyrics = lyrics!!, position = snap.position)
+                }
+
+                // 歌词预览（点按展开完整歌词）
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(76.dp).clickable { showFullLyrics = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    LyricPreview(lyrics = lyrics, position = snap.position, accent = accent)
+                }
+
+                Spacer(Modifier.height(6.dp))
+                Slider(
+                    value = if (snap.duration > 0) snap.position.toFloat() / snap.duration else 0f,
+                    onValueChange = { frac -> if (snap.duration > 0) controller?.seekTo((frac * snap.duration).toLong()) },
+                    modifier = Modifier.fillMaxWidth().height(24.dp),
+                    colors = SliderDefaults.colors(
+                        thumbColor = accent,
+                        activeTrackColor = accent,
+                        inactiveTrackColor = Color.White.copy(alpha = 0.18f),
+                    ),
+                )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(formatTime(snap.position), color = Color.White.copy(alpha = 0.55f), style = MaterialTheme.typography.labelSmall)
+                    Text(formatTime(snap.duration), color = Color.White.copy(alpha = 0.55f), style = MaterialTheme.typography.labelSmall)
+                }
+
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    IconButton(onClick = { cycleMode(controller, snap) }) {
+                        Icon(modeIcon(snap), contentDescription = modeLabel(snap), tint = Color.White.copy(alpha = 0.85f))
+                    }
+                    IconButton(onClick = { controller?.seekToPreviousMediaItem() }) {
+                        Icon(HugeIcons.Previous, contentDescription = "上一首", tint = Color.White, modifier = Modifier.size(34.dp))
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(66.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                            .clickable { if (snap.playing) controller?.pause() else controller?.play() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = if (snap.playing) HugeIcons.Pause else HugeIcons.Play,
+                            contentDescription = if (snap.playing) "暂停" else "播放",
+                            tint = Color(0xFF111111),
+                            modifier = Modifier.size(32.dp),
+                        )
+                    }
+                    IconButton(onClick = { controller?.seekToNextMediaItem() }) {
+                        Icon(HugeIcons.Next, contentDescription = "下一首", tint = Color.White, modifier = Modifier.size(34.dp))
+                    }
+                    IconButton(onClick = { showFullLyrics = !showFullLyrics }) {
+                        Icon(HugeIcons.Playlist01, contentDescription = "歌词", tint = Color.White.copy(alpha = 0.85f))
+                    }
                 }
             }
 
-            Text(
-                "${formatTime(snap.position)}   ${formatTime(snap.duration)}",
-                color = Color.White.copy(alpha = 0.6f),
-                style = MaterialTheme.typography.labelSmall,
-            )
-            Slider(
-                value = if (snap.duration > 0) snap.position.toFloat() / snap.duration else 0f,
-                onValueChange = { frac -> if (snap.duration > 0) controller?.seekTo((frac * snap.duration).toLong()) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                IconButton(onClick = { controller?.seekToPreviousMediaItem() }) { Text("⏮", color = Color.White, style = MaterialTheme.typography.headlineSmall) }
-                IconButton(onClick = { if (snap.playing) controller?.pause() else controller?.play() }) {
-                    Text(if (snap.playing) "⏸" else "▶", color = Color.White, style = MaterialTheme.typography.displaySmall)
+            // 完整歌词浮层
+            if (showFullLyrics) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(bg.copy(alpha = 0.97f))
+                        .clickable { showFullLyrics = false }
+                        .padding(horizontal = 22.dp, vertical = 10.dp),
+                ) {
+                    if (lyrics.isNullOrEmpty()) {
+                        Text("暂无歌词", color = Color.White.copy(alpha = 0.6f), modifier = Modifier.align(Alignment.Center))
+                    } else {
+                        LyricsList(lyrics = lyrics!!, position = snap.position, accent = accent)
+                    }
+                    IconButton(
+                        onClick = { showFullLyrics = false },
+                        modifier = Modifier.align(Alignment.TopStart),
+                    ) {
+                        Icon(HugeIcons.ArrowDown01, contentDescription = "收起歌词", tint = Color.White)
+                    }
                 }
-                IconButton(onClick = { controller?.seekToNextMediaItem() }) { Text("⏭", color = Color.White, style = MaterialTheme.typography.headlineSmall) }
-            }
-            TextButton(onClick = { cycleMode(controller, snap) }) {
-                Text("播放模式：${modeLabel(snap)}", color = Color.White.copy(alpha = 0.8f))
             }
         }
     }
 }
 
+private fun modeIcon(snap: PlayerSnapshot): ImageVector = when {
+    snap.shuffle -> HugeIcons.Shuffle
+    snap.repeatMode == Player.REPEAT_MODE_ONE -> HugeIcons.RepeatOne01
+    else -> HugeIcons.Repeat
+}
+
+/** 黑胶唱片：外圈光晕 + 唱片纹理 + 中心旋转的专辑封面。 */
 @Composable
-private fun LyricsList(lyrics: List<Pair<Long, String>>, position: Long) {
+private fun VinylDisc(
+    cover: String,
+    accent: Color,
+    rotation: Float,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier.matchParentSize().drawBehind {
+                val r = size.minDimension / 2f
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(accent.copy(alpha = 0.5f), accent.copy(alpha = 0.10f), Color.Transparent),
+                        radius = r * 1.2f,
+                    ),
+                    radius = r * 1.2f,
+                )
+            },
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(CircleShape)
+                .background(Color(0xFF0E0A08))
+                .rotate(rotation)
+                .drawBehind {
+                    val r = size.minDimension / 2f
+                    var ring = r * 0.99f
+                    while (ring > r * 0.62f) {
+                        drawCircle(Color.White.copy(alpha = 0.04f), radius = ring, style = Stroke(1f))
+                        ring -= r * 0.035f
+                    }
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color.Transparent, accent.copy(alpha = 0.32f)),
+                            radius = r,
+                        ),
+                        radius = r,
+                        style = Stroke(4f),
+                    )
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(0.64f).clip(CircleShape).background(Color(0xFF201612)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (cover.isNotBlank()) {
+                    AsyncImage(model = cover, contentDescription = null, modifier = Modifier.fillMaxSize())
+                } else {
+                    Text("♪", color = Color.White, style = MaterialTheme.typography.displayMedium)
+                }
+            }
+        }
+    }
+}
+
+/** 唱片下方两行歌词：当前行高亮，下一行弱化。 */
+@Composable
+private fun LyricPreview(
+    lyrics: List<Pair<Long, String>>?,
+    position: Long,
+    accent: Color,
+) {
+    if (lyrics.isNullOrEmpty()) {
+        Text("暂无歌词", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.bodyMedium)
+        return
+    }
+    val idx = lyrics.indexOfLast { it.first <= position }.coerceAtLeast(0)
+    val current = lyrics.getOrNull(idx)?.second.orEmpty()
+    val next = lyrics.getOrNull(idx + 1)?.second.orEmpty()
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            current,
+            color = accent,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (next.isNotBlank()) {
+            Text(
+                next,
+                color = Color.White.copy(alpha = 0.55f),
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LyricsList(lyrics: List<Pair<Long, String>>, position: Long, accent: Color = Color.White) {
     val currentIndex = remember(position, lyrics) {
         lyrics.indexOfLast { it.first <= position }.coerceAtLeast(0)
     }
@@ -477,7 +717,7 @@ private fun LyricsList(lyrics: List<Pair<Long, String>>, position: Long) {
                 text = lyrics[i].second,
                 style = if (active) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
                 fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                color = if (active) Color.White else Color.White.copy(alpha = 0.45f),
+                color = if (active) accent else Color.White.copy(alpha = 0.45f),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )

@@ -18,6 +18,7 @@ import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import me.rerere.rikkahub.data.files.FileFolders
+import me.rerere.rikkahub.data.music.MusicSession
 import java.io.File
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -100,6 +101,9 @@ class RikkaHubApp : Application() {
 
         // delete temp files
         deleteTempFiles()
+
+        // 提前加载网易云登录 Cookie，保证 AI 音乐搜索也带上用户 Cookie
+        runCatching { MusicSession.ensure(this) }
 
         // 提前解压 jieba 词典 (约 14MB), 避免数据库首次打开时才拷贝而拖慢首屏
         get<AppScope>().launch(Dispatchers.IO) {
