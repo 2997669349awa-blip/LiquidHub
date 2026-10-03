@@ -1,11 +1,11 @@
 {
-  "version": "0.2.7Data",
-  "publishedAt": "2026-10-02T18:31:00Z",
-  "changelog": "LiquidHub V0.2.7Data\n\n- AI 音乐搜索接入登录 Cookie：AI 搜歌与手动搜索使用同一账号身份，不再出现搜不到结果\n- AI 搜索在“歌名+歌手”无结果时自动用纯歌名重试\n- 全屏播放器重做：黑胶唱片封面与光晕、两行歌词预览（点击查看完整歌词）、收藏与更多菜单、圆形播放键",
+  "version": "0.2.8Data",
+  "publishedAt": "2026-10-03T20:15:00Z",
+  "changelog": "LiquidHub V0.2.8Data\n\n- 网页版：输入框支持指定 skill，本条消息只允许该技能，AI 不再乱调；手机端界面更接近 App\n- 手机控制（新）：Shizuku + 无障碍，AI 可返回桌面、打开应用、点击、滑动、输入、截图、读屏；右上角悬浮球实时显示动作，单击即停止；支持自动刷短视频\n- 工作区：授予「所有文件访问」后，用户文件保存到 /sdcard/LiquidHub/workspaces，卸载重装不丢失；Linux 系统镜像仍在应用内\n- 桌面安装优化：镜像自动切换（清华/阿里/中科大）+ 失败重试 + 超时，减少下载失败；工作区详情页可手动安装/重装桌面",
   "downloads": [
     {
-      "name": "liquidhub-release-1002-1831.apk",
-      "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1002-1831.apk",
+      "name": "liquidhub-release-1003-2015.apk",
+      "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1003-2015.apk",
       "size": "约 54 MB"
     }
   ]
