@@ -5,6 +5,8 @@ export interface Draft {
   parts: UIMessagePart[];
   modeInjectionIds?: string[];
   lorebookIds?: string[];
+  // 本条消息显式指定的 skill；null/undefined 表示不限制。
+  skill?: string | null;
 }
 
 export interface SettingsSlice {
@@ -25,6 +27,8 @@ export interface ChatInputSlice {
     modeInjectionIds: string[];
     lorebookIds: string[];
   };
+  setSkill: (conversationId: string, skill: string | null) => void;
+  getSkill: (conversationId: string) => string | null;
   clearDraft: (conversationId: string) => void;
   isEmpty: (conversationId: string) => boolean;
   getSubmitParts: (conversationId: string) => UIMessagePart[];

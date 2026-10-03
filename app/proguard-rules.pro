@@ -31,3 +31,8 @@
     kotlinx.serialization.KSerializer serializer(...);
 }
 -keep,includedescriptorclasses class com.gaurav.avnc.**$$serializer { *; }
+
+# Shizuku user service must keep its class name so the Shizuku process can instantiate it.
+-keep class me.rerere.rikkahub.data.phone.PhoneShellService { *; }
+-keep class me.rerere.rikkahub.phone.IPhoneShell { *; }
+-keep class me.rerere.rikkahub.phone.IPhoneShell$Stub { *; }

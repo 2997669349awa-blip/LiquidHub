@@ -19,6 +19,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import me.rerere.rikkahub.data.files.FileFolders
 import me.rerere.rikkahub.data.music.MusicSession
+import me.rerere.rikkahub.data.phone.PhoneControlManager
+import me.rerere.rikkahub.data.workspace.WorkspaceStorage
 import java.io.File
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -104,6 +106,15 @@ class RikkaHubApp : Application() {
 
         // 提前加载网易云登录 Cookie，保证 AI 音乐搜索也带上用户 Cookie
         runCatching { MusicSession.ensure(this) }
+
+        // 初始化手机控制管理器（悬浮球 / 无障碍 / Shizuku 工具依赖它的 context）
+        runCatching { PhoneControlManager.init(this) }
+
+        // 已授予「所有文件访问」时，把工作区从私有目录迁移到 /sdcard/LiquidHub/workspaces
+        get<AppScope>().launch(Dispatchers.IO) {
+            runCatching { WorkspaceStorage.migrateIfNeeded(this@RikkaHubApp) }
+                .onFailure { Log.e(TAG, "workspace migration failed", it) }
+        }
 
         // 提前解压 jieba 词典 (约 14MB), 避免数据库首次打开时才拷贝而拖慢首屏
         get<AppScope>().launch(Dispatchers.IO) {

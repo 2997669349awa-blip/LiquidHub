@@ -334,12 +334,17 @@ class ChatService(
         dispatchNextQueuedMessage(conversationId)
     }
 
-    fun sendMessage(conversationId: Uuid, content: List<UIMessagePart>, answer: Boolean = true) {
+    fun sendMessage(
+        conversationId: Uuid,
+        content: List<UIMessagePart>,
+        answer: Boolean = true,
+        skill: String? = null,
+    ) {
         if (content.isEmptyInputMessage()) return
         val session = sessionManager.getOrCreate(conversationId)
         synchronized(session) {
             if (session.messageQueue.state.value.messages.isEmpty()) session.messageQueue.resume()
-            session.messageQueue.enqueue(content, answer)
+            session.messageQueue.enqueue(content, answer, skill)
             dispatchNextQueuedMessage(conversationId)
         }
     }
@@ -380,6 +385,8 @@ class ChatService(
         val conversationId = session.id
         val content = queued.parts
         val answer = queued.answer
+        // 本回合（含工具审批续跑）固定使用用户选择的 skill；未选则为 null。
+        session.pinnedSkill = queued.skill
         val job = launchGenerationJob(
             conversationId = conversationId,
             keepAliveInBackground = answer,
@@ -465,6 +472,8 @@ class ChatService(
         regenerateAssistantMsg: Boolean = true
     ) = synchronized(sessionManager.getOrCreate(conversationId)) {
         val session = sessionManager.getOrCreate(conversationId)
+        // 重新生成不继承上一条消息的 skill 绑定。
+        session.pinnedSkill = null
         val previousJob = session.getJob()
 
         val job = launchGenerationJob(
@@ -631,6 +640,7 @@ class ChatService(
                     assistant = assistant,
                     model = model,
                     workspaceCwd = conversation.workspaceCwd,
+                    pinnedSkill = sessionManager.get(conversationId)?.pinnedSkill,
                 )
             } catch (error: InvalidMcpServerNamesException) {
                 sessionManager.get(conversationId)?.messageQueue?.pause()

@@ -53,6 +53,7 @@ appcompat = "1.8.0"
 material = "1.14.0"
 ucrop = "2.2.11-native"
 floatingx = "3.0.0"
+shizuku = "13.1.5"
 haze = "2.0.0-rc02"
 uiautomator = "2.4.0"
 benchmarkMacroJunit4 = "1.5.0"
@@ -153,6 +154,8 @@ material = { group = "com.google.android.material", name = "material", version.r
 ucrop = { group = "com.github.yalantis", name = "ucrop", version.ref = "ucrop" }
 floatingx-app = { group = "io.github.petterpx", name = "floatingx-app", version.ref = "floatingx" }
 floatingx-compose = { group = "io.github.petterpx", name = "floatingx-compose", version.ref = "floatingx" }
+shizuku-api = { group = "dev.rikka.shizuku", name = "api", version.ref = "shizuku" }
+shizuku-provider = { group = "dev.rikka.shizuku", name = "provider", version.ref = "shizuku" }
 haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
 haze-blur = { module = "dev.chrisbanes.haze:haze-blur", version.ref = "haze" }
 haze-blur-material3 = { module = "dev.chrisbanes.haze:haze-blur-material3", version.ref = "haze" }

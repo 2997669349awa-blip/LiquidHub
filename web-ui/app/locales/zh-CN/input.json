@@ -7,6 +7,12 @@
     "tools_enabled": "已启用 {{enabled}}/{{total}} 个工具",
     "empty": "暂无可用 MCP 服务器"
   },
+  "skill": {
+    "title": "指定技能",
+    "default": "默认（不指定）",
+    "empty": "暂无技能，请先在应用内添加",
+    "hint": "选择后本次请求只允许该技能"
+  },
   "injection": {
     "title": "扩展",
     "description": "为当前助手启用快捷消息、模式注入和 Lorebook",

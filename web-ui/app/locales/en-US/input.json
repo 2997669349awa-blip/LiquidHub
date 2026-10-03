@@ -7,6 +7,12 @@
     "tools_enabled": "{{enabled}}/{{total}} tools enabled",
     "empty": "No MCP servers available"
   },
+  "skill": {
+    "title": "Skill",
+    "default": "Default (none)",
+    "empty": "No skills yet. Add one in the app first.",
+    "hint": "When selected, only this skill is available for this message."
+  },
   "injection": {
     "title": "Extensions",
     "description": "Enable quick messages, mode injections and lorebooks for current assistant",

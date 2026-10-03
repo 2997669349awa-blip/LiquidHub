@@ -23,6 +23,7 @@ import { ReasoningPickerButton } from "~/components/input/reasoning-picker";
 import { SearchPickerButton } from "~/components/input/search-picker";
 import { McpPickerButton } from "~/components/input/mcp-picker";
 import { ExtensionPickerButton } from "~/components/input/extension-picker";
+import { SkillPickerButton } from "~/components/input/skill-picker";
 import { useSettingsStore } from "~/stores";
 import { Button } from "~/components/ui/button";
 import {
@@ -498,7 +499,7 @@ function ChatInputInner({
         className,
       )}
     >
-      <div className="mx-auto w-full max-w-3xl px-4 py-4">
+      <div className="mx-auto w-full max-w-3xl px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-4 sm:py-4">
         <div
           className={cn(
             "relative flex flex-col gap-2 rounded-3xl border border-border/60 bg-muted/50 p-2.5 transition-colors focus-within:border-border",
@@ -708,6 +709,7 @@ function ChatInputInner({
                 draftKey={draftKey}
                 disabled={!canSwitchModel}
               />
+              <SkillPickerButton draftKey={draftKey} disabled={!canSwitchModel} />
               <QuickMessageButton
                 quickMessages={quickMessages}
                 disabled={!canUseQuickMessage}

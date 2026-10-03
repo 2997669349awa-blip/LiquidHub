@@ -1393,4 +1393,11 @@
   <string name="setting_display_page_background_effect_type">Background effect type</string>
   <string name="setting_display_page_background_effect_blur">Blur</string>
   <string name="setting_display_page_background_effect_glass">Glass</string>
+  <string name="phone_accessibility_label">LiquidHub 手机控制</string>
+  <string name="phone_accessibility_description">允许 AI 在授权后操作本机界面（返回桌面、点击、滑动、输入、截图、读屏）。仅在你开启手机控制时使用。</string>
+  <string name="assistant_page_local_tools_phone_control_title">手机控制（Shizuku/无障碍）</string>
+  <string name="assistant_page_local_tools_phone_control_desc">允许 AI 通过无障碍与 Shizuku 操作手机，例如自动刷短视频。需要授予无障碍、悬浮窗和 Shizuku 权限。</string>
+  <string name="workspace_page_public_storage_title">让工作区在卸载后保留</string>
+  <string name="workspace_page_public_storage_desc">授予「所有文件访问」后，工作区里的文件会保存到 /sdcard/LiquidHub/workspaces，卸载重装不会丢失（Linux 系统镜像仍存在应用内，重装后重新安装系统即可）。未授权则只能存在应用私有目录，卸载即删。授权后请重启应用生效。</string>
+  <string name="workspace_page_public_storage_action">去授权</string>
 </resources>

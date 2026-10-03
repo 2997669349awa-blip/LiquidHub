@@ -14,9 +14,11 @@ import me.rerere.rikkahub.data.files.SkillPaths
 fun createSkillTools(
     enabledSkills: Set<String>,
     allSkills: List<SkillMetadata>,
+    pinnedSkill: String? = null,
 ): List<Tool> {
     val available = allSkills.filter { it.name in enabledSkills }
     if (available.isEmpty()) return emptyList()
+    val pinned = pinnedSkill?.takeIf { name -> available.any { it.name == name } }
 
     return listOf(
         Tool(
@@ -28,7 +30,12 @@ fun createSkillTools(
             systemPrompt = { _, _ ->
                 buildString {
                     appendLine("**Skills**")
-                    appendLine("You have access to the following skills. Use the `use_skill` tool to load a skill's instructions when the user's request matches.")
+                    if (pinned != null) {
+                        // 用户在输入框里明确选了这一个 skill：只暴露它，并要求模型先加载。
+                        appendLine("The user explicitly selected the skill `$pinned` for this request. You MUST call the `use_skill` tool with name=\"$pinned\" before answering, then follow the instructions it returns.")
+                    } else {
+                        appendLine("You have access to the following skills. Use the `use_skill` tool to load a skill's instructions when the user's request matches.")
+                    }
                     appendLine("<available_skills>")
                     available.forEach { skill ->
                         appendLine("  <skill>")

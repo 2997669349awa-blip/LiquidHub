@@ -9,6 +9,9 @@ import java.nio.file.Files
 
 class WorkspaceManager(
     private val baseDir: File,
+    // 用户文件区(files)可指向公共存储以便卸载后保留；rootfs(linux)/tmp 必须留在私有目录，
+    // 因为 PRoot 需要真实 POSIX 文件系统，公共存储(FUSE)对 rootfs 不可靠。
+    private val filesBaseDir: File = baseDir,
     private val config: WorkspaceConfig = WorkspaceConfig(),
     private val shellRunner: WorkspaceShellRunner = HostShellRunner(),
     private val bindMounts: List<WorkspaceBindMount> = emptyList(),
@@ -35,7 +38,7 @@ class WorkspaceManager(
         return File(baseDir, root)
     }
 
-    fun filesDir(root: String): File = File(workspaceDir(root), FILES_DIR)
+    fun filesDir(root: String): File = File(File(filesBaseDir, root), FILES_DIR)
 
     fun linuxDir(root: String): File = File(workspaceDir(root), LINUX_DIR)
 
@@ -50,7 +53,12 @@ class WorkspaceManager(
         return sh.isFile || Files.isSymbolicLink(sh.toPath())
     }
 
-    fun deleteWorkspace(root: String): Boolean = workspaceDir(root).deleteRecursively()
+    fun deleteWorkspace(root: String): Boolean {
+        // files 可能位于公共存储，需与私有目录分开删除。
+        val filesDeleted = filesDir(root).deleteRecursively()
+        val workspaceDeleted = workspaceDir(root).deleteRecursively()
+        return filesDeleted || workspaceDeleted
+    }
 
     fun listFiles(
         root: String,

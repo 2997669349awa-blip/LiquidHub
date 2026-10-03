@@ -42,6 +42,7 @@ class ChatToolFactory(
         assistant: Assistant,
         model: Model,
         workspaceCwd: String? = null,
+        pinnedSkill: String? = null,
     ): List<Tool> = buildList {
         if (assistant.enableMemory) {
             val memoryAssistantId = if (assistant.useGlobalMemory) {
@@ -67,11 +68,13 @@ class ChatToolFactory(
             addAll(createConversationTools(conversationRepository, assistant.id))
         }
         addAll(createWorkspaceToolsIfReady(assistant.workspaceId?.toString(), workspaceCwd))
-        if (assistant.enabledSkills.isNotEmpty()) {
+        val effectiveSkills = if (!pinnedSkill.isNullOrBlank()) setOf(pinnedSkill) else assistant.enabledSkills
+        if (effectiveSkills.isNotEmpty()) {
             addAll(
                 createSkillTools(
-                    enabledSkills = assistant.enabledSkills,
+                    enabledSkills = effectiveSkills,
                     allSkills = skillManager.listSkills(),
+                    pinnedSkill = pinnedSkill?.takeIf { it.isNotBlank() },
                 )
             )
         }

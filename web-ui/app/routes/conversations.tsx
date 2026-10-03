@@ -443,6 +443,7 @@ function useDraftInputController({
   const removeDraftPart = useChatInputStore((state) => state.removePartAt);
   const getSubmitParts = useChatInputStore((state) => state.getSubmitParts);
   const getPromptInjectionIds = useChatInputStore((state) => state.getPromptInjectionIds);
+  const getSkill = useChatInputStore((state) => state.getSkill);
   const clearDraft = useChatInputStore((state) => state.clearDraft);
 
   const inputText = draft?.text ?? "";
@@ -478,8 +479,14 @@ function useDraftInputController({
     const parts = getSubmitParts(draftKey);
     if (parts.length === 0) return;
 
+    const skill = getSkill(draftKey);
+    const skillBody = skill ? { skill } : {};
+
     if (activeId) {
-      await api.post<{ status: string }>(`conversations/${activeId}/messages`, { parts });
+      await api.post<{ status: string }>(`conversations/${activeId}/messages`, {
+        parts,
+        ...skillBody,
+      });
       clearDraft(draftKey);
       return;
     }
@@ -490,6 +497,7 @@ function useDraftInputController({
 
     await api.post<{ status: string }>(`conversations/${conversationId}/messages`, {
       parts,
+      ...skillBody,
       ...(useConversationPromptInjection
         ? {
             modeInjectionIds: promptInjectionIds.modeInjectionIds,
@@ -506,6 +514,7 @@ function useDraftInputController({
     clearDraft,
     draftKey,
     getPromptInjectionIds,
+    getSkill,
     getSubmitParts,
     navigate,
     refreshList,
@@ -1156,7 +1165,7 @@ function ConversationsPageInner() {
         onMoveToFolder={handleMoveConversationToFolder}
       />
       <SidebarInset className="flex min-h-svh flex-col overflow-hidden">
-        <div className="flex items-center gap-2 border-b px-4 py-3">
+        <div className="sticky top-0 z-10 flex items-center gap-2 border-b bg-background/80 px-4 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-3 backdrop-blur">
           <SidebarTrigger />
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm text-muted-foreground">

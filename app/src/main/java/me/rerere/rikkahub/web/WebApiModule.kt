@@ -22,6 +22,7 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.files.FilesManager
+import me.rerere.rikkahub.data.files.SkillManager
 import me.rerere.rikkahub.data.repository.ConversationRepository
 import me.rerere.rikkahub.data.repository.FolderRepository
 import me.rerere.rikkahub.service.ChatService
@@ -36,6 +37,7 @@ import me.rerere.rikkahub.web.routes.eventsRoutes
 import me.rerere.rikkahub.web.routes.filesRoutes
 import me.rerere.rikkahub.web.routes.folderRoutes
 import me.rerere.rikkahub.web.routes.settingsRoutes
+import me.rerere.rikkahub.web.routes.skillRoutes
 import java.security.MessageDigest
 import java.util.Date
 import java.util.UUID
@@ -64,7 +66,8 @@ fun Application.configureWebApi(
     conversationRepo: ConversationRepository,
     folderRepo: FolderRepository,
     settingsStore: SettingsStore,
-    filesManager: FilesManager
+    filesManager: FilesManager,
+    skillManager: SkillManager,
 ) {
     val jwtEnabled = settingsStore.settingsFlow.value.webServerJwtEnabled
 
@@ -173,6 +176,7 @@ fun Application.configureWebApi(
                     folderRoutes(chatService, folderRepo, settingsStore)
                     eventsRoutes(chatService, conversationRepo, folderRepo, settingsStore)
                     settingsRoutes(settingsStore)
+                    skillRoutes(skillManager, settingsStore)
                     filesRoutes(filesManager, context)
                     assetsRoutes(context)
                 }
@@ -181,6 +185,7 @@ fun Application.configureWebApi(
                 folderRoutes(chatService, folderRepo, settingsStore)
                 eventsRoutes(chatService, conversationRepo, folderRepo, settingsStore)
                 settingsRoutes(settingsStore)
+                skillRoutes(skillManager, settingsStore)
                 filesRoutes(filesManager, context)
                 assetsRoutes(context)
             }

@@ -274,7 +274,7 @@ fun Route.conversationRoutes(
                 modeInjectionIds = request.modeInjectionIds,
                 lorebookIds = request.lorebookIds,
             )
-            chatService.sendMessage(uuid, request.parts, answer = true)
+            chatService.sendMessage(uuid, request.parts, answer = true, skill = request.skill)
 
             call.respond(HttpStatusCode.Accepted, mapOf("status" to "accepted"))
         }

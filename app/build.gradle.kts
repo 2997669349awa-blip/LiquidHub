@@ -128,6 +128,7 @@ android {
         compose = true
         buildConfig = true
         dataBinding = true
+        aidl = true
     }
     sourceSets {
         getByName("androidTest").assets.srcDirs("$projectDir/schemas")
@@ -188,6 +189,8 @@ configurations.matching { it.name.endsWith("UnitTestRuntimeClasspath") }.configu
 dependencies {
     implementation(libs.quickjs)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.shizuku.api)
+    implementation(libs.shizuku.provider)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.work.runtime.ktx)

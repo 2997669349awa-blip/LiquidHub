@@ -18,6 +18,8 @@ import com.termux.view.TerminalViewClient
 import me.rerere.rikkahub.data.files.FileFolders
 import me.rerere.workspace.RootfsPatchOptions
 import me.rerere.workspace.RootfsPatcher
+import me.rerere.workspace.WorkspaceManager
+import org.koin.core.context.GlobalContext
 import java.io.File
 import java.nio.file.Files
 
@@ -28,10 +30,10 @@ internal fun createWorkspaceTerminalSession(
     shellCompatibilityMode: Boolean,
 ): TerminalSession {
     val appContext = context.applicationContext
-    val workspaceDir = File(File(appContext.filesDir, "workspaces"), root)
-    val filesDir = File(workspaceDir, "files")
-    val linuxDir = File(workspaceDir, "linux")
-    val tempDir = File(workspaceDir, "tmp")
+    val manager: WorkspaceManager = GlobalContext.get().get()
+    val filesDir = manager.filesDir(root)
+    val linuxDir = manager.linuxDir(root)
+    val tempDir = manager.tempDir(root)
     val skillsDir = File(appContext.filesDir, FileFolders.SKILLS).apply { mkdirs() }
     val nativeLibraryDir = File(appContext.applicationInfo.nativeLibraryDir)
     val proot = File(nativeLibraryDir, "libproot_exec.so")
@@ -96,10 +98,10 @@ internal fun createWorkspaceTerminalSession(
 
 internal fun prepareWorkspaceTerminalSession(context: Context, root: String) {
     val appContext = context.applicationContext
-    val workspaceDir = File(File(appContext.filesDir, "workspaces"), root)
-    val linuxDir = File(workspaceDir, "linux")
-    File(workspaceDir, "files").mkdirs()
-    File(workspaceDir, "tmp").mkdirs()
+    val manager: WorkspaceManager = GlobalContext.get().get()
+    val linuxDir = manager.linuxDir(root)
+    manager.filesDir(root).mkdirs()
+    manager.tempDir(root).mkdirs()
     File(appContext.filesDir, FileFolders.SKILLS).mkdirs()
     RootfsPatcher().patch(
         linuxDir,
@@ -108,7 +110,8 @@ internal fun prepareWorkspaceTerminalSession(context: Context, root: String) {
 }
 
 internal fun workspaceRootfsReady(context: Context, root: String): Boolean {
-    val linuxDir = File(File(File(context.applicationContext.filesDir, "workspaces"), root), "linux")
+    val manager: WorkspaceManager = GlobalContext.get().get()
+    val linuxDir = manager.linuxDir(root)
     if (!linuxDir.isDirectory) return false
     // Alpine 的 /bin/sh 是绝对符号链接（-> /bin/busybox），isFile 会沿宿主机解析而失败，
     // 必须把符号链接本身也算作「存在」，否则会误判为「没有安装系统」

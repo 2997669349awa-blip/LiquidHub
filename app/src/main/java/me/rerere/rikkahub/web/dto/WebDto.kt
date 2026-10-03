@@ -16,6 +16,15 @@ data class SendMessageRequest(
     val parts: List<UIMessagePart>,
     val modeInjectionIds: List<String>? = null,
     val lorebookIds: List<String>? = null,
+    // 用户为本条消息显式指定的 skill；非空时本次生成只暴露该 skill。
+    val skill: String? = null,
+)
+
+@Serializable
+data class SkillDto(
+    val name: String,
+    val description: String,
+    val enabled: Boolean,
 )
 
 @Serializable

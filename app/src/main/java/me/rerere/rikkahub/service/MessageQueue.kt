@@ -14,6 +14,8 @@ data class QueuedMessage(
     val parts: List<UIMessagePart>,
     val answer: Boolean = true,
     val isEditing: Boolean = false,
+    // 本条消息显式指定的 skill；null 表示不限制。
+    val skill: String? = null,
     // Optional in-memory observer; null result means the queued message was withdrawn.
     val reply: CompletableDeferred<String?>? = null,
 )
@@ -42,7 +44,12 @@ class MessageQueue {
     val state = mutableState.asStateFlow()
 
     @Synchronized
-    fun enqueue(parts: List<UIMessagePart>, answer: Boolean = true, reply: CompletableDeferred<String?>? = null) {
+    fun enqueue(
+        parts: List<UIMessagePart>,
+        answer: Boolean = true,
+        skill: String? = null,
+        reply: CompletableDeferred<String?>? = null,
+    ) {
         if (parts.isEmptyInputMessage()) {
             reply?.complete(null)
             return
@@ -51,6 +58,7 @@ class MessageQueue {
             messages = state.value.messages + QueuedMessage(
                 parts = parts.toList(),
                 answer = answer,
+                skill = skill?.takeIf { it.isNotBlank() },
                 reply = reply,
             ),
         )

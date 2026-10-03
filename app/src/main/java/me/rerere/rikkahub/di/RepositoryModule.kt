@@ -11,6 +11,7 @@ import me.rerere.rikkahub.data.repository.FilesRepository
 import me.rerere.rikkahub.data.repository.GenMediaRepository
 import me.rerere.rikkahub.data.repository.MemoryRepository
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
+import me.rerere.rikkahub.data.workspace.WorkspaceStorage
 import me.rerere.workspace.ProotShellRunner
 import me.rerere.workspace.RootfsInstaller
 import me.rerere.workspace.WorkspaceBindMount
@@ -46,7 +47,8 @@ val repositoryModule = module {
     single {
         val context: Context = get()
         WorkspaceManager(
-            baseDir = File(context.filesDir, "workspaces"),
+            baseDir = WorkspaceStorage.privateBaseDir(context),
+            filesBaseDir = WorkspaceStorage.resolveFilesBaseDir(context),
             shellRunner = ProotShellRunner(
                 nativeLibraryDir = File(context.applicationInfo.nativeLibraryDir),
             ),

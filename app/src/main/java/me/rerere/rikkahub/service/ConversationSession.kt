@@ -88,6 +88,12 @@ class ConversationSession(
     var submittingMessage: QueuedMessage? = null
         internal set
 
+    // 用户为本回合显式指定的 skill（来自输入框）；在发送与工具审批续跑期间保持不变。
+    // null 表示不限制，按助手 enabledSkills 走默认行为。
+    @Volatile
+    var pinnedSkill: String? = null
+        internal set
+
     // 原子引用计数
     private val refCount = AtomicInteger(0)
 
