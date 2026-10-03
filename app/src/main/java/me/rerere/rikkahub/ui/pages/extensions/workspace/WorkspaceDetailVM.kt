@@ -128,7 +128,6 @@ class WorkspaceDetailVM(
         if (state.value.workspace == null) return
         viewModelScope.launch {
             try {
-                _desktopMessage.value = if (reinstall) "正在重装桌面…" else "正在安装桌面…"
                 desktopManager.runAction(id, if (reinstall) "reinstall" else "install")
                 _desktopMessage.value = "桌面安装已在后台开始，进度见工作区日志"
             } catch (error: CancellationException) {
