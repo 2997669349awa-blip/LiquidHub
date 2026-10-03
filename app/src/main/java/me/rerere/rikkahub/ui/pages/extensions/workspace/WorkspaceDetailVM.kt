@@ -113,6 +113,32 @@ class WorkspaceDetailVM(
     private val _settingsError = MutableStateFlow<String?>(null)
     val settingsError = _settingsError.asStateFlow()
 
+    private val _desktopMessage = MutableStateFlow<String?>(null)
+    val desktopMessage = _desktopMessage.asStateFlow()
+
+    fun consumeDesktopMessage() {
+        _desktopMessage.value = null
+    }
+
+    /**
+     * 用户手动安装/重装工作区桌面。桌面本身只给 AI 使用（应用内没有观看入口），
+     * 这里只是提供一个手动触发安装的入口，避免完全依赖 AI 首次调用。
+     */
+    fun installDesktop(reinstall: Boolean = false) {
+        if (state.value.workspace == null) return
+        viewModelScope.launch {
+            try {
+                _desktopMessage.value = if (reinstall) "正在重装桌面…" else "正在安装桌面…"
+                desktopManager.runAction(id, if (reinstall) "reinstall" else "install")
+                _desktopMessage.value = "桌面安装已在后台开始，进度见工作区日志"
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                _desktopMessage.value = "桌面安装失败：${error.message}"
+            }
+        }
+    }
+
     fun dismissSettingsError() {
         _settingsError.value = null
     }

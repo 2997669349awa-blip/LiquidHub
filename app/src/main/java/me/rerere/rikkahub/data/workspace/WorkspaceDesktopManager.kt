@@ -140,6 +140,60 @@ rotate_log() {
   return 0
 }
 
+# 在 tuna / aliyun / iscas 三个国内镜像之间切换，应对单镜像故障/限速。
+# /etc/hosts 里已预置这三个域名的 IP（App 侧解析），所以切换后无需依赖 proot 里脆弱的 DNS。
+switch_mirror() {
+  NEW="${'$'}1"
+  [ -n "${'$'}NEW" ] || return 0
+  for f in /etc/apk/repositories /etc/apt/sources.list /etc/apt/sources.list.d/*.sources \
+           /etc/apt/sources.list.d/*.list /etc/pacman.d/mirrorlist; do
+    [ -f "${'$'}f" ] || continue
+    sed -i "s#mirrors\.tuna\.tsinghua\.edu\.cn#${'$'}{NEW}#g; s#mirrors\.aliyun\.com#${'$'}{NEW}#g; s#mirror\.iscas\.ac\.cn#${'$'}{NEW}#g" "${'$'}f" 2>/dev/null
+  done
+  log "已切换镜像源 -> ${'$'}NEW"
+}
+
+mirror_for_attempt() {
+  case "$((${'$'}{1} % 3))" in
+    0) echo "mirrors.tuna.tsinghua.edu.cn" ;;
+    1) echo "mirrors.aliyun.com" ;;
+    *) echo "mirror.iscas.ac.cn" ;;
+  esac
+}
+
+# apt：更新索引 / 安装，失败就切镜像重试（最多 3 次），并加超时避免卡死。
+apt_do() {
+  ACTION="${'$'}1"; shift
+  n=0
+  while [ "${'$'}n" -lt 3 ]; do
+    if [ "${'$'}ACTION" = "update" ]; then
+      if apt-get update -y -o Acquire::Retries=5 -o Acquire::ForceIPv4=true \
+          -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30; then return 0; fi
+    else
+      if DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends --fix-missing \
+          -o Acquire::Retries=5 -o Acquire::ForceIPv4=true \
+          -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 "${'$'}@"; then return 0; fi
+    fi
+    n=${'$'}((n+1))
+    switch_mirror "${'$'}(mirror_for_attempt ${'$'}n)"
+    sleep 2
+  done
+  return 1
+}
+
+# apk：更新索引并安装，失败就切镜像重试（最多 3 次）。
+apk_do() {
+  n=0
+  while [ "${'$'}n" -lt 3 ]; do
+    apk update >/dev/null 2>&1 || true
+    if apk add --no-cache --allow-untrusted "${'$'}@"; then return 0; fi
+    n=${'$'}((n+1))
+    switch_mirror "${'$'}(mirror_for_attempt ${'$'}n)"
+    sleep 2
+  done
+  return 1
+}
+
 # 确保 TigerVNC 的 Xvnc 可用（VNC 走 Unix socket 需要它）。best-effort，失败返回非 0。
 # 失败后写标记，避免每次 start 都反复 apt/apk；重装时清除标记。
 ensure_xvnc() {
@@ -149,11 +203,11 @@ ensure_xvnc() {
   fi
   log "TigerVNC 未安装，尝试安装（用于 Unix socket VNC）"
   if command -v apk >/dev/null 2>&1; then
-    apk add --no-cache --allow-untrusted tigervnc 2>/dev/null || true
+    apk_do tigervnc >/dev/null 2>&1 || true
   elif command -v apt-get >/dev/null 2>&1; then
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update -y -o Acquire::Retries=3 -o Acquire::ForceIPv4=true >/dev/null 2>&1 || true
-    apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true tigervnc-standalone-server 2>/dev/null || true
+    apt_do update >/dev/null 2>&1 || true
+    apt_do install tigervnc-standalone-server >/dev/null 2>&1 || true
   elif command -v pacman >/dev/null 2>&1; then
     pacman -Sy --noconfirm --needed tigervnc 2>/dev/null || true
   fi
@@ -183,17 +237,17 @@ install_browser() {
   if [ "${'$'}TIER" = "mini" ]; then log "tier=mini：跳过浏览器"; return 0; fi
   log "installing browser (tier ${'$'}TIER)"
   if command -v apk >/dev/null 2>&1; then
-    [ "${'$'}TIER" = "full" ] && { apk add --no-cache --allow-untrusted firefox 2>/dev/null || true; }
-    apk add --no-cache --allow-untrusted chromium 2>/dev/null || true
+    [ "${'$'}TIER" = "full" ] && { apk_do firefox 2>/dev/null || true; }
+    apk_do chromium 2>/dev/null || true
   elif command -v apt-get >/dev/null 2>&1; then
     if [ "${'$'}TIER" = "full" ]; then
-      apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true firefox-esr 2>/dev/null \
-        || apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true firefox 2>/dev/null || true
+      apt_do install firefox-esr 2>/dev/null \
+        || apt_do install firefox 2>/dev/null || true
     fi
-    apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true chromium 2>/dev/null \
-      || apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true chromium-browser 2>/dev/null \
-      || apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true epiphany-browser 2>/dev/null \
-      || apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true falkon 2>/dev/null \
+    apt_do install chromium 2>/dev/null \
+      || apt_do install chromium-browser 2>/dev/null \
+      || apt_do install epiphany-browser 2>/dev/null \
+      || apt_do install falkon 2>/dev/null \
       || log "WARN: 没有可用的浏览器"
   elif command -v pacman >/dev/null 2>&1; then
     [ "${'$'}TIER" = "full" ] && { pacman -Sy --noconfirm --needed firefox 2>/dev/null || true; }
@@ -224,38 +278,36 @@ install_pkgs() {
   rm -f /workspace/.liquidhub/xvnc_unavailable 2>/dev/null
   if command -v apk >/dev/null 2>&1; then
     log "Alpine(apk): installing desktop packages"
-    apk add --no-cache --allow-untrusted ca-certificates xvfb x11vnc fluxbox openbox xdotool bash coreutils || RC=1
+    apk_do ca-certificates xvfb x11vnc fluxbox openbox xdotool bash coreutils || RC=1
     if [ "${'$'}TIER" != "mini" ]; then
-      apk add --no-cache --allow-untrusted xterm imagemagick scrot dbus font-noto font-noto-cjk \
+      apk_do xterm imagemagick scrot dbus font-noto font-noto-cjk \
         pulseaudio pulseaudio-utils ffmpeg || log "WARN: 部分可选组件安装失败（不影响桌面）"
     fi
     if [ "${'$'}TIER" = "full" ]; then
-      apk add --no-cache --allow-untrusted pcmanfm firefox 2>/dev/null || true
+      apk_do pcmanfm firefox 2>/dev/null || true
     fi
   elif command -v apt-get >/dev/null 2>&1; then
     log "Debian/Ubuntu(apt): installing desktop packages"
     export DEBIAN_FRONTEND=noninteractive
     ensure_universe
     getent hosts mirrors.tuna.tsinghua.edu.cn >/dev/null 2>&1 || log "WARN: 无法解析镜像域名，DNS 可能有问题"
-    apt-get update -y -o Acquire::Retries=5 -o Acquire::ForceIPv4=true || log "WARN: apt-get update 失败，继续尝试"
+    apt_do update || log "WARN: apt-get update 失败，继续尝试"
     apt-cache policy xvfb x11vnc fluxbox xdotool 2>/dev/null | head -n 30
-    if ! apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true \
-        ca-certificates xvfb x11vnc fluxbox openbox xdotool; then
+    if ! apt_do install ca-certificates xvfb x11vnc fluxbox openbox xdotool; then
       log "核心包整体安装失败，逐包重试定位："
       for p in ca-certificates xvfb x11vnc fluxbox openbox xdotool; do
-        apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true "${'$'}p" || echo "[desktop]   FAIL ${'$'}p"
+        apt_do install "${'$'}p" || echo "[desktop]   FAIL ${'$'}p"
       done
     fi
     for p in Xvfb x11vnc fluxbox xdotool; do
       command -v "${'$'}p" >/dev/null 2>&1 || RC=1
     done
     if [ "${'$'}TIER" != "mini" ]; then
-      apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true \
-        xterm imagemagick scrot dbus-x11 fonts-noto-cjk pulseaudio pulseaudio-utils ffmpeg \
+      apt_do install xterm imagemagick scrot dbus-x11 fonts-noto-cjk pulseaudio pulseaudio-utils ffmpeg \
         || log "WARN: 部分可选组件安装失败（不影响桌面）"
     fi
     if [ "${'$'}TIER" = "full" ]; then
-      apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true pcmanfm 2>/dev/null || true
+      apt_do install pcmanfm 2>/dev/null || true
     fi
   elif command -v pacman >/dev/null 2>&1; then
     log "Arch(pacman): installing desktop packages"

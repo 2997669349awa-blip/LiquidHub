@@ -53,7 +53,9 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import android.widget.Toast
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -117,12 +119,20 @@ fun WorkspaceDetailPage(id: String) {
     val installProgress by vm.installProgress.collectAsStateWithLifecycle()
     val installError by vm.installError.collectAsStateWithLifecycle()
     val settingsError by vm.settingsError.collectAsStateWithLifecycle()
+    val desktopMessage by vm.desktopMessage.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState { 2 }
     val scope = rememberCoroutineScope()
     var deleteTarget by remember { mutableStateOf<WorkspaceFileEntry?>(null) }
     var showInstallDialog by remember { mutableStateOf(false) }
     var previewImageUri by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    var desktopMenu by remember { mutableStateOf(false) }
+    LaunchedEffect(desktopMessage) {
+        desktopMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            vm.consumeDesktopMessage()
+        }
+    }
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -181,6 +191,32 @@ fun WorkspaceDetailPage(id: String) {
                     if (state.workspace?.shellStatus != WorkspaceShellStatus.DISABLED.name) {
                         IconButton(onClick = { navController.navigate(Screen.WorkspaceTerminal(id)) }) {
                             Icon(HugeIcons.ComputerTerminal01, contentDescription = null)
+                        }
+                    }
+                    if (state.workspace?.shellStatus == WorkspaceShellStatus.READY.name) {
+                        Box {
+                            IconButton(onClick = { desktopMenu = true }) {
+                                Icon(HugeIcons.MoreVertical, contentDescription = "桌面")
+                            }
+                            DropdownMenu(
+                                expanded = desktopMenu,
+                                onDismissRequest = { desktopMenu = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("安装桌面") },
+                                    onClick = {
+                                        desktopMenu = false
+                                        vm.installDesktop(reinstall = false)
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("重装桌面") },
+                                    onClick = {
+                                        desktopMenu = false
+                                        vm.installDesktop(reinstall = true)
+                                    },
+                                )
+                            }
                         }
                     }
                 },
