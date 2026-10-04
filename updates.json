@@ -1,22 +1,22 @@
 {
-  "version": "1.0.4",
-  "publishedAt": "2026-10-04T17:55:00Z",
-  "changelog": "LiquidHub 1.0.4\n\n- 音乐改为插件式：本应用不再内置任何音乐接口，音乐由你在“设置 > 其他 > 音乐源”自行添加（导入 manifest.json 与 index.js）\n- 对话框命令：大小写不敏感，可用任务编号或会话编号寻址，新增命令指南页\n- 歌词：显示翻译、实时高亮与平滑切换；播放器默认纯黑\n- 动画：歌词与进度条平滑过渡，思考等级选择改为动画滑动\n- 桌面：修复 VNC 套接字与浏览器启动，安装进度显示在通知栏\n- 全新自带的中文介绍与下载页面",
+  "version": "1.0.5",
+  "publishedAt": "2026-10-04T19:12:00Z",
+  "changelog": "LiquidHub 1.0.5\n\n- 音乐源支持「喜欢」：源实现 liked/like 后，音乐页出现「喜欢」标签，列表与播放页可加红心\n- 音乐源验证改为真实搜索：搜不到结果即判定不可用，不再出现“测试通过却搜不到”的情况\n- 网易云插件修复：自动从 Cookie 提取 __csrf 填入 csrf_token，解决带 Cookie 搜索返回空的问题\n- 提示：音乐接口仍由你自行添加的音乐源提供，本应用未内置任何音乐接口",
   "downloads": [
     {
-      "name": "liquidhub-release-1004-1755.apk",
-      "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1004-1755.apk",
+      "name": "liquidhub-release-1004-1912.apk",
+      "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1004-1912.apk",
       "size": "约 54 MB"
     }
   ],
   "stable": {
-    "version": "1.0.4",
-    "publishedAt": "2026-10-04T17:55:00Z",
-    "changelog": "LiquidHub 1.0.4\n\n- 音乐改为插件式：本应用不再内置任何音乐接口，音乐由你在“设置 > 其他 > 音乐源”自行添加（导入 manifest.json 与 index.js）\n- 对话框命令：大小写不敏感，可用任务编号或会话编号寻址，新增命令指南页\n- 歌词：显示翻译、实时高亮与平滑切换；播放器默认纯黑\n- 动画：歌词与进度条平滑过渡，思考等级选择改为动画滑动\n- 桌面：修复 VNC 套接字与浏览器启动，安装进度显示在通知栏\n- 全新自带的中文介绍与下载页面",
+    "version": "1.0.5",
+    "publishedAt": "2026-10-04T19:12:00Z",
+    "changelog": "LiquidHub 1.0.5\n\n- 音乐源支持「喜欢」：源实现 liked/like 后，音乐页出现「喜欢」标签，列表与播放页可加红心\n- 音乐源验证改为真实搜索：搜不到结果即判定不可用，不再出现“测试通过却搜不到”的情况\n- 网易云插件修复：自动从 Cookie 提取 __csrf 填入 csrf_token，解决带 Cookie 搜索返回空的问题\n- 提示：音乐接口仍由你自行添加的音乐源提供，本应用未内置任何音乐接口",
     "downloads": [
       {
-        "name": "liquidhub-release-1004-1755.apk",
-        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1004-1755.apk",
+        "name": "liquidhub-release-1004-1912.apk",
+        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1004-1912.apk",
         "size": "约 54 MB"
       }
     ]
