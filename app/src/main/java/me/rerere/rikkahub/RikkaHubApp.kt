@@ -19,6 +19,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import me.rerere.rikkahub.data.files.FileFolders
 import me.rerere.rikkahub.data.music.MusicSession
+import me.rerere.rikkahub.data.music.MusicSourceManager
 import me.rerere.rikkahub.data.phone.PhoneControlManager
 import java.io.File
 import kotlinx.coroutines.SupervisorJob
@@ -105,6 +106,9 @@ class RikkaHubApp : Application() {
 
         // 提前加载网易云登录 Cookie，保证 AI 音乐搜索也带上用户 Cookie
         runCatching { MusicSession.ensure(this) }
+
+        // 加载音乐源解锁状态（默认隐藏音乐功能）
+        runCatching { MusicSourceManager.init(this) }
 
         // 初始化手机控制管理器（悬浮球 / 无障碍 / Shizuku 工具依赖它的 context）
         runCatching { PhoneControlManager.init(this) }

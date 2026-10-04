@@ -280,15 +280,25 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
             }
 
             item("otherSettings") {
+                val musicUnlocked by me.rerere.rikkahub.data.music.MusicSourceManager.state
+                    .collectAsStateWithLifecycle()
                 CardGroup(
                     modifier = Modifier.padding(horizontal = 8.dp),
                     title = { Text("其他") },
                 ) {
+                    if (musicUnlocked) {
+                        item(
+                            onClick = { navController.navigate(Screen.Music) },
+                            leadingContent = { Icon(HugeIcons.MusicNote01, null) },
+                            supportingContent = { Text("AI 搜索/播放音乐、歌词、喜欢（网易云）") },
+                            headlineContent = { Text("音乐") },
+                        )
+                    }
                     item(
-                        onClick = { navController.navigate(Screen.Music) },
+                        onClick = { navController.navigate(Screen.MusicSource) },
                         leadingContent = { Icon(HugeIcons.MusicNote01, null) },
-                        supportingContent = { Text("AI 搜索/播放音乐、歌词、喜欢（网易云）") },
-                        headlineContent = { Text("音乐") },
+                        supportingContent = { Text("输入 LiquidHub 生成音乐源，再用 32 位密码解锁内置音乐") },
+                        headlineContent = { Text("音乐源") },
                     )
                     item(
                         onClick = { navController.navigate(Screen.PhoneControl) },

@@ -5,6 +5,7 @@
 
 package me.rerere.rikkahub.data.ai.tools
 
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -95,12 +96,34 @@ private fun createDesktopStartTool(
             }
         }
         desktopManager.runAction(workspaceId, "start")
-        desktopManager.runAction(workspaceId, "browser")
+        // 校验桌面是否真的起来了（读取 start 的输出），避免误报 ok
+        var started = false
+        var logTail = ""
+        for (i in 0 until 20) {
+            delay(1000)
+            logTail = workspaceRepository.readTextOrNull(
+                workspaceId,
+                "${WorkspaceDesktopManager.LOG_DIR}/last.log",
+            ).orEmpty()
+            if (logTail.contains("STARTED") || logTail.contains("already running")) {
+                started = true
+                break
+            }
+            if (logTail.contains("ERROR")) break
+        }
+        if (started) {
+            desktopManager.runAction(workspaceId, "browser")
+        }
         listOf(
             UIMessagePart.Text(
                 buildJsonObject {
-                    put("ok", true)
-                    put("message", "Desktop is starting. Wait ~5 seconds, then call desktop_screenshot.")
+                    put("ok", started)
+                    if (started) {
+                        put("message", "Desktop started. Wait ~5 seconds, then call desktop_screenshot.")
+                    } else {
+                        put("error", "Desktop did not start. Check the desktop logs (desktop.sh logs).")
+                        put("log", logTail.takeLast(1500))
+                    }
                 }.toString()
             )
         )

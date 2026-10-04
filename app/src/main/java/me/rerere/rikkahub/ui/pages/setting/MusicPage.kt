@@ -113,6 +113,13 @@ private val BG_PRESETS = listOf(
     0xFF101014, 0xFF14202B, 0xFF1B1230, 0xFF12211A, 0xFF2A1416, 0xFF202020, 0xFF000000,
 ).map { Color(it) }
 
+/** 一行歌词：原文 + 翻译（无翻译时为空）。 */
+private data class LyricLine(
+    val time: Long,
+    val text: String,
+    val translation: String,
+)
+
 private data class PlayerSnapshot(
     val mediaId: String? = null,
     val position: Long = 0,
@@ -426,10 +433,18 @@ private fun NowPlayingScreen(
     onToggleLike: () -> Unit,
     onClose: () -> Unit,
 ) {
-    var bg by remember { mutableStateOf(BG_PRESETS.first()) }
-    var lyrics by remember { mutableStateOf<List<Pair<Long, String>>?>(null) }
+    var bg by remember { mutableStateOf(Color(0xFF000000)) }
+    var lyrics by remember { mutableStateOf<List<LyricLine>?>(null) }
     var showFullLyrics by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
+    var livePos by remember { mutableStateOf(snap.position) }
+    LaunchedEffect(snap.mediaId, snap.playing) {
+        // 高频取播放位置，让歌词高亮实时跟随（避免 500ms 轮询造成的延迟感）
+        while (true) {
+            livePos = controller?.currentPosition?.coerceAtLeast(0) ?: snap.position
+            delay(80)
+        }
+    }
     val meta = controller?.currentMediaItem?.mediaMetadata
     val title = meta?.title?.toString().orEmpty().ifBlank { "未知歌曲" }
     val artist = meta?.artist?.toString().orEmpty()
@@ -446,8 +461,10 @@ private fun NowPlayingScreen(
     LaunchedEffect(snap.mediaId) {
         val id = snap.mediaId ?: return@LaunchedEffect
         lyrics = null
-        val lrc = withContext(Dispatchers.IO) { runCatching { NeteaseApi.lyrics(id) }.getOrNull() }
-        lyrics = lrc?.takeIf { it.isNotBlank() }?.let { parseLrc(it) }?.takeIf { it.isNotEmpty() }
+        val data = withContext(Dispatchers.IO) { runCatching { NeteaseApi.lyrics(id) }.getOrNull() }
+        lyrics = data?.takeIf { it.lyric.isNotBlank() }
+            ?.let { parseLrc(it.lyric, it.translation) }
+            ?.takeIf { it.isNotEmpty() }
     }
 
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -541,12 +558,12 @@ private fun NowPlayingScreen(
                     modifier = Modifier.fillMaxWidth().height(132.dp).clickable { showFullLyrics = true },
                     contentAlignment = Alignment.Center,
                 ) {
-                    LyricPreview(lyrics = lyrics, position = snap.position, accent = accent)
+                    LyricPreview(lyrics = lyrics, position = livePos, accent = accent)
                 }
 
                 Spacer(Modifier.height(6.dp))
                 Slider(
-                    value = if (snap.duration > 0) snap.position.toFloat() / snap.duration else 0f,
+                    value = if (snap.duration > 0) livePos.toFloat() / snap.duration else 0f,
                     onValueChange = { frac -> if (snap.duration > 0) controller?.seekTo((frac * snap.duration).toLong()) },
                     modifier = Modifier.fillMaxWidth().height(24.dp),
                     colors = SliderDefaults.colors(
@@ -556,7 +573,7 @@ private fun NowPlayingScreen(
                     ),
                 )
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(formatTime(snap.position), color = Color.White.copy(alpha = 0.55f), style = MaterialTheme.typography.labelSmall)
+                    Text(formatTime(livePos), color = Color.White.copy(alpha = 0.55f), style = MaterialTheme.typography.labelSmall)
                     Text(formatTime(snap.duration), color = Color.White.copy(alpha = 0.55f), style = MaterialTheme.typography.labelSmall)
                 }
 
@@ -608,7 +625,7 @@ private fun NowPlayingScreen(
                     if (lyrics.isNullOrEmpty()) {
                         Text("暂无歌词", color = Color.White.copy(alpha = 0.6f), modifier = Modifier.align(Alignment.Center))
                     } else {
-                        LyricsList(lyrics = lyrics!!, position = snap.position, accent = accent)
+                        LyricsList(lyrics = lyrics!!, position = livePos, accent = accent)
                     }
                     IconButton(
                         onClick = { showFullLyrics = false },
@@ -687,10 +704,10 @@ private fun VinylDisc(
     }
 }
 
-/** 唱片下方四行歌词预览：当前行高亮，其余弱化。 */
+/** 唱片下方四行歌词预览：当前行高亮，其余弱化；有翻译时在原文下方显示。 */
 @Composable
 private fun LyricPreview(
-    lyrics: List<Pair<Long, String>>?,
+    lyrics: List<LyricLine>?,
     position: Long,
     accent: Color,
 ) {
@@ -698,28 +715,41 @@ private fun LyricPreview(
         Text("暂无歌词", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.bodyMedium)
         return
     }
-    val idx = lyrics.indexOfLast { it.first <= position }.coerceAtLeast(0)
+    val idx = lyrics.indexOfLast { it.time <= position }.coerceAtLeast(0)
     val visible = (idx until minOf(idx + 4, lyrics.size)).toList()
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         visible.forEach { i ->
             val isCurrent = i == idx
-            Text(
-                text = lyrics[i].second,
-                color = if (isCurrent) accent else Color.White.copy(alpha = 0.5f),
-                style = if (isCurrent) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
-                fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            val line = lyrics[i]
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = line.text,
+                    color = if (isCurrent) accent else Color.White.copy(alpha = 0.5f),
+                    style = if (isCurrent) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (line.translation.isNotBlank()) {
+                    Text(
+                        text = line.translation,
+                        color = if (isCurrent) Color.White.copy(alpha = 0.75f) else Color.White.copy(alpha = 0.35f),
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun LyricsList(lyrics: List<Pair<Long, String>>, position: Long, accent: Color = Color.White) {
+private fun LyricsList(lyrics: List<LyricLine>, position: Long, accent: Color = Color.White) {
     val currentIndex = remember(position, lyrics) {
-        lyrics.indexOfLast { it.first <= position }.coerceAtLeast(0)
+        lyrics.indexOfLast { it.time <= position }.coerceAtLeast(0)
     }
     val listState = rememberLazyListState()
     LaunchedEffect(currentIndex) {
@@ -730,27 +760,45 @@ private fun LyricsList(lyrics: List<Pair<Long, String>>, position: Long, accent:
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         contentPadding = PaddingValues(vertical = 80.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(lyrics.indices.toList(), key = { it }) { i ->
             val active = i == currentIndex
-            Text(
-                text = lyrics[i].second,
-                style = if (active) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
-                fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                color = if (active) accent else Color.White.copy(alpha = 0.45f),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            val line = lyrics[i]
+            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = line.text,
+                    style = if (active) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                    color = if (active) accent else Color.White.copy(alpha = 0.45f),
+                    textAlign = TextAlign.Center,
+                )
+                if (line.translation.isNotBlank()) {
+                    Text(
+                        text = line.translation,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (active) Color.White.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.35f),
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
         }
     }
 }
 
-/** 解析 LRC：返回 (毫秒, 文本) 列表。 */
-private fun parseLrc(lrc: String): List<Pair<Long, String>> {
-    val out = mutableListOf<Pair<Long, String>>()
+/** 解析 LRC（可带翻译），返回按时间排序的歌词行。 */
+private fun parseLrc(lrc: String, translation: String = ""): List<LyricLine> {
+    val textMap = parseTimedText(lrc)
+    val transMap = parseTimedText(translation)
+    return textMap.entries
+        .sortedBy { it.key }
+        .map { (time, text) -> LyricLine(time, text, transMap[time].orEmpty()) }
+}
+
+private fun parseTimedText(raw: String): Map<Long, String> {
+    val out = LinkedHashMap<Long, String>()
     val tag = Regex("\\[(\\d{1,2}):(\\d{1,2})(?:[.:](\\d{1,3}))?]")
-    lrc.lineSequence().forEach { line ->
+    raw.lineSequence().forEach { line ->
         tag.findAll(line).forEach { m ->
             val min = m.groupValues[1].toLongOrNull() ?: return@forEach
             val sec = m.groupValues[2].toLongOrNull() ?: return@forEach
@@ -762,10 +810,10 @@ private fun parseLrc(lrc: String): List<Pair<Long, String>> {
                 else -> fracStr.toLongOrNull() ?: 0
             }
             val text = line.substringAfterLast(']').trim()
-            if (text.isNotEmpty()) out += (min * 60_000 + sec * 1000 + fracMs) to text
+            if (text.isNotEmpty()) out[min * 60_000 + sec * 1000 + fracMs] = text
         }
     }
-    return out.sortedBy { it.first }
+    return out
 }
 
 @Composable

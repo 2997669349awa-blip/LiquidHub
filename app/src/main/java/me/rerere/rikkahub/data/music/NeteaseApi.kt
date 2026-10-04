@@ -37,6 +37,12 @@ data class MusicUser(
     val vip: Boolean,
 )
 
+/** 歌词：原文 + 翻译（日语/英语歌通常带 tlyric 翻译）。 */
+data class MusicLyrics(
+    val lyric: String,
+    val translation: String,
+)
+
 object NeteaseApi {
     private val json = Json { ignoreUnknownKeys = true }
     private val random = SecureRandom()
@@ -205,7 +211,7 @@ object NeteaseApi {
         return url?.takeIf { it.isNotBlank() }
     }
 
-    fun lyrics(id: String): String {
+    fun lyrics(id: String): MusicLyrics {
         val res = post(
             "/weapi/song/lyric?csrf_token=",
             buildJsonObject {
@@ -214,8 +220,10 @@ object NeteaseApi {
                 put("kv", -1)
                 put("tv", -1)
             },
-        ) ?: return ""
-        return res.jsonObject["lrc"]?.jsonObject?.get("lyric")?.jsonPrimitive?.content.orEmpty()
+        ) ?: return MusicLyrics("", "")
+        val lyric = res.jsonObject["lrc"]?.jsonObject?.get("lyric")?.jsonPrimitive?.content.orEmpty()
+        val translation = res.jsonObject["tlyric"]?.jsonObject?.get("lyric")?.jsonPrimitive?.content.orEmpty()
+        return MusicLyrics(lyric, translation)
     }
 
     /** 当前登录账号（用于拿 uid / VIP）。 */

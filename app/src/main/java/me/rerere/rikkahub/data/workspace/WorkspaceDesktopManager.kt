@@ -69,6 +69,10 @@ class WorkspaceDesktopManager internal constructor(
         val session = withContext(sessionDispatcher) {
             sessionFor(workspace.root, workspace.shellCompatibilityMode)
         }
+        // 会话没起来时 write() 会被静默丢弃，这里显式报错，避免桌面 start 误报 ok
+        if (session.emulator == null || !session.isRunning) {
+            error("Desktop session failed to start (workspace shell not running). Check the rootfs / shell status.")
+        }
         val cmd = "mkdir -p /workspace/.liquidhub/logs; " +
             "sh /workspace/$SCRIPT_PATH $action > /workspace/.liquidhub/logs/last.log 2>&1; " +
             "echo \"__DONE__\" >> /workspace/.liquidhub/logs/last.log; " +
@@ -169,7 +173,7 @@ WEB_PORT=6080
 # 2) App 可直接读取文件，启动过程中也能实时刷新，无需再起一个 proot。
 LOGDIR=/workspace/.liquidhub/logs
 RUNDIR="${'$'}LOGDIR"
-VNC_SOCK=/workspace/.vnc
+VNC_SOCK=/tmp/.liquidhub-vnc
 NOVNC_DIR=""
 FORCE_INSTALL=0
 

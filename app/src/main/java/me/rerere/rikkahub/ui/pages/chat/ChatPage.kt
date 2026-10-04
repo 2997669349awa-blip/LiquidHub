@@ -6,7 +6,10 @@ package me.rerere.rikkahub.ui.pages.chat
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyListState
@@ -41,11 +44,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,6 +69,7 @@ import me.rerere.ai.provider.ProviderSetting
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Cancel01
+import me.rerere.hugeicons.stroke.ComputerTerminal01
 import me.rerere.hugeicons.stroke.LeftToRightListBullet
 import me.rerere.hugeicons.stroke.Menu03
 import me.rerere.hugeicons.stroke.MessageAdd01
@@ -294,6 +300,10 @@ private fun ChatPageContent(
     val workspaceRepository: WorkspaceRepository = koinInject()
     var previewMode by rememberSaveable { mutableStateOf(false) }
     var pinnedSkill by remember { mutableStateOf<String?>(null) }
+    var commandResult by remember { mutableStateOf<String?>(null) }
+    commandResult?.let { result ->
+        CommandResultDialog(result) { commandResult = null }
+    }
     val hazeState = rememberHazeState()
     val assistant = setting.getCurrentAssistant()
     var showFilesSheet by remember { mutableStateOf(false) }
@@ -402,7 +412,7 @@ private fun ChatPageContent(
                         if (trimmed.startsWith("//")) {
                             val result = vm.runCommand(trimmed)
                             inputState.clearInput()
-                            toaster.show(message = result, duration = 6.seconds, type = ToastType.Normal)
+                            commandResult = result
                             return@ChatInput
                         }
                         if (currentChatModel == null) {
@@ -638,6 +648,49 @@ private fun ChatFilesPickerSheet(
                 }
             } else null,
         )
+    }
+}
+
+@Composable
+private fun CommandResultDialog(result: String, onDismiss: () -> Unit) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        androidx.compose.material3.Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp,
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.Icon(
+                        imageVector = HugeIcons.ComputerTerminal01,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = "命令结果",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+                Text(
+                    text = result,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    androidx.compose.material3.TextButton(onClick = onDismiss) {
+                        Text("关闭")
+                    }
+                }
+            }
+        }
     }
 }
 
