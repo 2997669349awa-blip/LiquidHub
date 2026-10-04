@@ -29,6 +29,7 @@ function weapi(obj) {
 }
 
 function post(path, obj) {
+  path = path.replace("csrf_token=", "csrf_token=" + csrf());
   var body = weapi(obj);
   var headers = {
     "Content-Type": "application/x-www-form-urlencoded",
@@ -38,6 +39,11 @@ function post(path, obj) {
   };
   if (COOKIE) headers["Cookie"] = COOKIE;
   return __http("POST", "https://music.163.com" + path, JSON.stringify(headers), body);
+}
+
+function csrf() {
+  var m = /(?:^|;\s*)__csrf=([^;]+)/.exec(COOKIE);
+  return m ? m[1] : "";
 }
 
 function search(keyword) {
@@ -83,4 +89,40 @@ function lyrics(id) {
   var lrc = (j.lrc || {}).lyric || "";
   var tr = (j.tlyric || {}).lyric || "";
   return JSON.stringify({ lyric: lrc, translation: tr });
+}
+
+function account() {
+  var res = post("/weapi/w/nuser/account/get?csrf_token=", {});
+  return (JSON.parse(res).profile || {});
+}
+
+function liked() {
+  var profile = account();
+  if (!profile.userId) return "[]";
+  var al = post("/weapi/song/like/get?csrf_token=", { uid: String(profile.userId) });
+  var ids = JSON.parse(al).ids || [];
+  if (!ids.length) return "[]";
+  var detail = post("/weapi/v3/song/detail?csrf_token=", {
+    c: JSON.stringify(ids.slice(0, 1000).map(function (i) { return { id: String(i) }; }))
+  });
+  var songs = JSON.parse(detail).songs || [];
+  return JSON.stringify(songs.map(function (s) {
+    var ar = (s.ar || s.artists || []).map(function (a) { return a.name; }).join("/");
+    var alb = s.al || s.album || {};
+    return {
+      id: String(s.id),
+      name: s.name,
+      artist: ar,
+      album: alb.name || "",
+      cover: (alb.picUrl || "").replace("http://", "https://")
+    };
+  }));
+}
+
+function like(id, likeFlag) {
+  var res = post("/weapi/song/like?csrf_token=", {
+    trackId: String(id),
+    like: likeFlag === true
+  });
+  return JSON.parse(res).code === 200;
 }

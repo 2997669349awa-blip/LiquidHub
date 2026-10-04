@@ -29,6 +29,11 @@ interface MusicSource {
     suspend fun search(keyword: String): List<MusicSong>
     suspend fun songUrl(id: String): String?
     suspend fun lyrics(id: String): MusicLyrics
+
+    /** 音乐源是否支持「喜欢」。 */
+    suspend fun supportsLikes(): Boolean = false
+    suspend fun liked(): List<MusicSong> = emptyList()
+    suspend fun like(id: String, like: Boolean): Boolean = false
 }
 
 data class MusicSong(
@@ -230,10 +235,15 @@ class JsMusicSource(
         enc.toString(16).padStart(256, '0')
     }.getOrDefault("")
 
-    /** 校验 index.js 是否提供了必需函数。 */
+    /** 校验 index.js：必须有 search/songUrl，且实际搜索能返回结果（搜不到结果视为不可用）。 */
     suspend fun validate(): Boolean = runCatching {
         withQuickJs { quickJs ->
-            quickJs.evaluate<Any?>("typeof search === 'function' && typeof songUrl === 'function'") == true
+            val hasFns = quickJs.evaluate<Any?>(
+                "typeof search === 'function' && typeof songUrl === 'function'"
+            ) == true
+            if (!hasFns) return@withQuickJs false
+            val sample = quickJs.evaluate<Any?>("search(${JsonPrimitive("hello")})")?.toString().orEmpty()
+            parseSongs(sample).isNotEmpty()
         }
     }.getOrDefault(false)
 
@@ -259,6 +269,26 @@ class JsMusicSource(
             MusicLyrics(lyric = raw, translation = "")
         }
     }.getOrDefault(MusicLyrics("", ""))
+
+    override suspend fun supportsLikes(): Boolean = runCatching {
+        withQuickJs { quickJs ->
+            quickJs.evaluate<Any?>("typeof liked === 'function' && typeof like === 'function'") == true
+        }
+    }.getOrDefault(false)
+
+    override suspend fun liked(): List<MusicSong> = runCatching {
+        withQuickJs { quickJs ->
+            parseSongs(quickJs.evaluate<Any?>("liked()")?.toString().orEmpty())
+        }
+    }.getOrDefault(emptyList())
+
+    override suspend fun like(id: String, like: Boolean): Boolean = runCatching {
+        withQuickJs { quickJs ->
+            quickJs.evaluate<Any?>(
+                "typeof like === 'function' && like(${JsonPrimitive(id)}, ${if (like) "true" else "false"}) === true"
+            ) == true
+        }
+    }.getOrDefault(false)
 
     private fun parseSongs(raw: String): List<MusicSong> {
         if (raw.isBlank() || raw == "null") return emptyList()
@@ -287,4 +317,13 @@ object MusicSources {
 
     suspend fun lyrics(id: String): MusicLyrics =
         MusicSourceRegistry.current()?.lyrics(id) ?: MusicLyrics("", "")
+
+    suspend fun supportsLikes(): Boolean =
+        MusicSourceRegistry.current()?.supportsLikes() ?: false
+
+    suspend fun liked(): List<MusicSong> =
+        MusicSourceRegistry.current()?.liked() ?: emptyList()
+
+    suspend fun like(id: String, like: Boolean): Boolean =
+        MusicSourceRegistry.current()?.like(id, like) ?: false
 }

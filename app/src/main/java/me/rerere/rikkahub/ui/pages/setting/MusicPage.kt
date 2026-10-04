@@ -196,9 +196,36 @@ fun MusicPage() {
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var showPlayer by remember { mutableStateOf(false) }
+    var likesAvailable by remember { mutableStateOf(false) }
+    var likedSongs by remember { mutableStateOf<List<MusicSong>>(emptyList()) }
+    var likedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var tab by remember { mutableStateOf(0) }
+
+    fun refreshLiked() {
+        scope.launch {
+            val l = withContext(Dispatchers.IO) { runCatching { MusicSources.liked() }.getOrNull() }.orEmpty()
+            likedSongs = l
+            likedIds = l.map { it.id }.toSet()
+        }
+    }
+
+    fun toggleLike(song: MusicSong) {
+        val want = song.id !in likedIds
+        likedIds = if (want) likedIds + song.id else likedIds - song.id
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) { runCatching { MusicSources.like(song.id, want) }.getOrDefault(false) }
+            if (!ok) {
+                likedIds = if (want) likedIds - song.id else likedIds + song.id
+            } else {
+                refreshLiked()
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         controller = MusicControllerHolder.ensure(context)
+        likesAvailable = withContext(Dispatchers.IO) { runCatching { MusicSources.supportsLikes() }.getOrDefault(false) }
+        if (likesAvailable) refreshLiked()
     }
 
     val snap = rememberPlayerSnapshot(controller)
@@ -248,17 +275,27 @@ fun MusicPage() {
                 )
                 Button(onClick = { doSearch() }) { Text("搜索") }
             }
+            if (likesAvailable) {
+                androidx.compose.material3.TabRow(
+                    selectedTabIndex = tab,
+                    containerColor = Color.Transparent,
+                ) {
+                    androidx.compose.material3.Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("搜索") })
+                    androidx.compose.material3.Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("喜欢") })
+                }
+            }
             if (loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 12.dp)) }
+            val list = if (likesAvailable && tab == 1) likedSongs else songs
             Box(modifier = Modifier.weight(1f)) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    items(songs, key = { it.id }) { item ->
+                    items(list, key = { it.id }) { item ->
                         Row(
-                            modifier = Modifier.fillMaxWidth().clickable { play(songs, songs.indexOf(item)) }.padding(8.dp),
+                            modifier = Modifier.fillMaxWidth().clickable { play(list, list.indexOf(item)) }.padding(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Box(
@@ -278,6 +315,16 @@ fun MusicPage() {
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
+                            }
+                            if (likesAvailable) {
+                                val liked = item.id in likedIds
+                                IconButton(onClick = { toggleLike(item) }) {
+                                    Icon(
+                                        imageVector = HugeIcons.Heart,
+                                        contentDescription = if (liked) "取消喜欢" else "喜欢",
+                                        tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
                     }
@@ -355,6 +402,16 @@ private fun NowPlayingScreen(
     var showFullLyrics by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var livePos by remember { mutableStateOf(snap.position) }
+    var likeAvailable by remember { mutableStateOf(false) }
+    var liked by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(snap.mediaId) {
+        val id = snap.mediaId
+        likeAvailable = withContext(Dispatchers.IO) { runCatching { MusicSources.supportsLikes() }.getOrDefault(false) }
+        liked = if (likeAvailable && id != null) {
+            withContext(Dispatchers.IO) { runCatching { MusicSources.liked() }.getOrDefault(emptyList()) }.any { it.id == id }
+        } else false
+    }
     LaunchedEffect(snap.mediaId, snap.playing) {
         // 高频取播放位置，让歌词高亮实时跟随（避免 500ms 轮询造成的延迟感）
         while (true) {
@@ -427,6 +484,23 @@ private fun NowPlayingScreen(
                                 color = Color.White.copy(alpha = 0.6f),
                                 style = MaterialTheme.typography.labelSmall,
                                 maxLines = 1,
+                            )
+                        }
+                    }
+                    if (likeAvailable) {
+                        IconButton(onClick = {
+                            val id = snap.mediaId ?: return@IconButton
+                            val want = !liked
+                            liked = want
+                            scope.launch {
+                                val ok = withContext(Dispatchers.IO) { runCatching { MusicSources.like(id, want) }.getOrDefault(false) }
+                                if (!ok) liked = !want
+                            }
+                        }) {
+                            Icon(
+                                imageVector = HugeIcons.Heart,
+                                contentDescription = if (liked) "取消喜欢" else "喜欢",
+                                tint = if (liked) accent else Color.White.copy(alpha = 0.85f),
                             )
                         }
                     }
