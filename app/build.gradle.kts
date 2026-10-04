@@ -32,7 +32,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "teto.rikkahub.X"
+        applicationId = "LiquidHub.teto.x"
         minSdk = 26
         targetSdk = 37
         versionCode = 189

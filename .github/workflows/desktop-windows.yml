@@ -23,7 +23,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p app
-          printf '{"project_info":{"project_number":"0","project_id":"dummy","storage_bucket":"dummy.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:0:android:0","android_client_info":{"package_name":"me.rerere.rikkahub"}},"oauth_client":[],"api_key":[{"current_key":"dummy"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}},{"client_info":{"mobilesdk_app_id":"1:0:android:1","android_client_info":{"package_name":"me.rerere.rikkahub.debug"}},"oauth_client":[],"api_key":[{"current_key":"dummy"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}' > app/google-services.json
+          printf '{"project_info":{"project_number":"0","project_id":"dummy","storage_bucket":"dummy.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:0:android:0","android_client_info":{"package_name":"LiquidHub.teto.x"}},"oauth_client":[],"api_key":[{"current_key":"dummy"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}},{"client_info":{"mobilesdk_app_id":"1:0:android:1","android_client_info":{"package_name":"LiquidHub.teto.x.debug"}},"oauth_client":[],"api_key":[{"current_key":"dummy"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}' > app/google-services.json
 
       - name: Install WiX Toolset
         run: choco install wixtoolset --no-progress -y
