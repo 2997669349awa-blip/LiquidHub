@@ -85,8 +85,8 @@ class UpdateChecker(
         val current = Version(BuildConfig.VERSION_NAME.trimStart('V', 'v'))
         val previewNewer = preview?.takeIf { runCatching { Version(it.version) > current }.getOrDefault(false) }
         val stableNewer = stable?.takeIf { runCatching { Version(it.version) > current }.getOrDefault(false) }
-        // 正式版和预览版都检测；只要有更新的预览版，就优先推预览版。
-        return previewNewer ?: stableNewer ?: preview ?: stable
+        // 优先正式版；正式版没有更新时，再看预览版是否有更新。
+        return stableNewer ?: previewNewer ?: stable ?: preview
             ?: throw Exception("No update info")
     }
 
