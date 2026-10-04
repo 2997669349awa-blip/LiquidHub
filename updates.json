@@ -1,22 +1,22 @@
 {
-  "version": "1.0.3",
-  "publishedAt": "2026-10-04T10:38:00Z",
-  "changelog": "LiquidHub 1.0.3\n\n- 关于页修复：名称显示 LiquidHub，版本显示真实版本号（之前写死为 RikkaHub / V0.1.0Data）\n- 音乐源验证：设置 > 其他 > 音乐源，输入 LiquidHub 生成加密音乐源，再用 32 位密码解锁内置网易云\n- 歌词：显示翻译（日语/英语歌），实时高亮不再延迟；播放器默认纯黑（含状态栏）\n- 对话框命令结果改为圆角主题弹窗\n- 桌面：VNC socket 改到 rootfs /tmp（工作区在 sdcard 建不了 socket）；desktop_start 校验真实启动结果",
+  "version": "1.0.4",
+  "publishedAt": "2026-10-04T17:55:00Z",
+  "changelog": "LiquidHub 1.0.4\n\n- 音乐改为插件式：本应用不再内置任何音乐接口，音乐由你在“设置 > 其他 > 音乐源”自行添加（导入 manifest.json 与 index.js）\n- 对话框命令：大小写不敏感，可用任务编号或会话编号寻址，新增命令指南页\n- 歌词：显示翻译、实时高亮与平滑切换；播放器默认纯黑\n- 动画：歌词与进度条平滑过渡，思考等级选择改为动画滑动\n- 桌面：修复 VNC 套接字与浏览器启动，安装进度显示在通知栏\n- 全新自带的中文介绍与下载页面",
   "downloads": [
     {
-      "name": "liquidhub-release-1004-1038.apk",
-      "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1004-1038.apk",
+      "name": "liquidhub-release-1004-1755.apk",
+      "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1004-1755.apk",
       "size": "约 54 MB"
     }
   ],
   "stable": {
-    "version": "1.0.3",
-    "publishedAt": "2026-10-04T10:38:00Z",
-    "changelog": "LiquidHub 1.0.3\n\n- 关于页修复：名称显示 LiquidHub，版本显示真实版本号（之前写死为 RikkaHub / V0.1.0Data）\n- 音乐源验证：设置 > 其他 > 音乐源，输入 LiquidHub 生成加密音乐源，再用 32 位密码解锁内置网易云\n- 歌词：显示翻译（日语/英语歌），实时高亮不再延迟；播放器默认纯黑（含状态栏）\n- 对话框命令结果改为圆角主题弹窗\n- 桌面：VNC socket 改到 rootfs /tmp（工作区在 sdcard 建不了 socket）；desktop_start 校验真实启动结果",
+    "version": "1.0.4",
+    "publishedAt": "2026-10-04T17:55:00Z",
+    "changelog": "LiquidHub 1.0.4\n\n- 音乐改为插件式：本应用不再内置任何音乐接口，音乐由你在“设置 > 其他 > 音乐源”自行添加（导入 manifest.json 与 index.js）\n- 对话框命令：大小写不敏感，可用任务编号或会话编号寻址，新增命令指南页\n- 歌词：显示翻译、实时高亮与平滑切换；播放器默认纯黑\n- 动画：歌词与进度条平滑过渡，思考等级选择改为动画滑动\n- 桌面：修复 VNC 套接字与浏览器启动，安装进度显示在通知栏\n- 全新自带的中文介绍与下载页面",
     "downloads": [
       {
-        "name": "liquidhub-release-1004-1038.apk",
-        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1004-1038.apk",
+        "name": "liquidhub-release-1004-1755.apk",
+        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1004-1755.apk",
         "size": "约 54 MB"
       }
     ]
