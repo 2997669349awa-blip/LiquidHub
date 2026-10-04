@@ -47,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
@@ -301,8 +302,24 @@ private fun ChatPageContent(
     var previewMode by rememberSaveable { mutableStateOf(false) }
     var pinnedSkill by remember { mutableStateOf<String?>(null) }
     var commandResult by remember { mutableStateOf<String?>(null) }
+    var showNeteaseUnlock by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     commandResult?.let { result ->
         CommandResultDialog(result) { commandResult = null }
+    }
+    if (showNeteaseUnlock) {
+        NeteaseUnlockDialog(
+            onDismiss = { showNeteaseUnlock = false },
+            onUnlock = { password ->
+                val ok = me.rerere.rikkahub.data.music.MusicSourceManager.unlockWithPassword(context, password)
+                showNeteaseUnlock = false
+                if (ok) {
+                    toaster.show(message = "解锁成功，音乐已启用", type = ToastType.Success)
+                } else {
+                    toaster.show(message = "密码错误", type = ToastType.Error)
+                }
+            },
+        )
     }
     val hazeState = rememberHazeState()
     val assistant = setting.getCurrentAssistant()
@@ -410,6 +427,12 @@ private fun ChatPageContent(
                     onSendClick = {
                         val trimmed = inputState.textContent.text.toString().trim()
                         if (trimmed.startsWith("//")) {
+                            val bare = trimmed.removePrefix("//").replace(" ", "").lowercase()
+                            if (bare == "neteasecloudmusic") {
+                                inputState.clearInput()
+                                showNeteaseUnlock = true
+                                return@ChatInput
+                            }
                             val result = vm.runCommand(trimmed)
                             inputState.clearInput()
                             commandResult = result
@@ -688,6 +711,51 @@ private fun CommandResultDialog(result: String, onDismiss: () -> Unit) {
                     androidx.compose.material3.TextButton(onClick = onDismiss) {
                         Text("关闭")
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NeteaseUnlockDialog(onDismiss: () -> Unit, onUnlock: (String) -> Unit) {
+    var password by remember { mutableStateOf("") }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        androidx.compose.material3.Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp,
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = "网易云音乐解锁",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "输入 32 位密码以启用内置网易云音乐",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                androidx.compose.material3.OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    singleLine = true,
+                    label = { Text("32 位密码") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    androidx.compose.material3.TextButton(onClick = onDismiss) { Text("取消") }
+                    androidx.compose.material3.TextButton(
+                        onClick = { onUnlock(password) },
+                        enabled = password.isNotBlank(),
+                    ) { Text("解锁") }
                 }
             }
         }

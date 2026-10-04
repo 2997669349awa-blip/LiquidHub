@@ -43,6 +43,16 @@ object MusicSourceManager {
 
     fun isUnlockedCached(): Boolean = _state.value
 
+    /** 只校验 32 位密码（不依赖本地加密包），用于 //NetEase Cloud Music 弹框解锁。 */
+    fun unlockWithPassword(context: Context, password: String): Boolean {
+        val ok = sha256(password.trim()).contentEquals(hexToBytes(PASSWORD_SHA256))
+        if (ok) {
+            prefs(context).edit().putBoolean(KEY_FLAG, true).apply()
+            _state.value = true
+        }
+        return ok
+    }
+
     fun generateArchive(context: Context): File? = runCatching {
         val key = SecretKeySpec(hexToBytes(PASSWORD_SHA256), "AES")
         val cipher = Cipher.getInstance(ALGO)
