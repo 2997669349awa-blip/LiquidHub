@@ -8,12 +8,20 @@ package me.rerere.rikkahub.ui.pages.setting
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -68,6 +76,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -563,8 +572,13 @@ private fun NowPlayingScreen(
                 }
 
                 Spacer(Modifier.height(6.dp))
+                val progressFraction by animateFloatAsState(
+                    targetValue = if (snap.duration > 0) livePos.toFloat() / snap.duration else 0f,
+                    animationSpec = tween(200, easing = LinearEasing),
+                    label = "progress",
+                )
                 Slider(
-                    value = if (snap.duration > 0) livePos.toFloat() / snap.duration else 0f,
+                    value = progressFraction,
                     onValueChange = { frac -> if (snap.duration > 0) controller?.seekTo((frac * snap.duration).toLong()) },
                     modifier = Modifier.fillMaxWidth().height(24.dp),
                     colors = SliderDefaults.colors(
@@ -717,30 +731,40 @@ private fun LyricPreview(
         return
     }
     val idx = lyrics.indexOfLast { it.time <= position }.coerceAtLeast(0)
-    val visible = (idx until minOf(idx + 4, lyrics.size)).toList()
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        visible.forEach { i ->
-            val isCurrent = i == idx
-            val line = lyrics[i]
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = line.text,
-                    color = if (isCurrent) accent else Color.White.copy(alpha = 0.5f),
-                    style = if (isCurrent) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (line.translation.isNotBlank()) {
+    AnimatedContent(
+        targetState = idx,
+        transitionSpec = {
+            val dir = if (targetState >= initialState) 1 else -1
+            (slideInVertically { full -> dir * full / 3 } + fadeIn()) togetherWith
+                (slideOutVertically { full -> -dir * full / 3 } + fadeOut())
+        },
+        label = "lyricPreview",
+    ) { current ->
+        val visible = (current until minOf(current + 4, lyrics.size)).toList()
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            visible.forEach { i ->
+                val isCurrent = i == current
+                val line = lyrics[i]
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = line.translation,
-                        color = if (isCurrent) Color.White.copy(alpha = 0.75f) else Color.White.copy(alpha = 0.35f),
-                        style = MaterialTheme.typography.bodySmall,
+                        text = line.text,
+                        color = if (isCurrent) accent else Color.White.copy(alpha = 0.5f),
+                        style = if (isCurrent) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
                         textAlign = TextAlign.Center,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    if (line.translation.isNotBlank()) {
+                        Text(
+                            text = line.translation,
+                            color = if (isCurrent) Color.White.copy(alpha = 0.75f) else Color.White.copy(alpha = 0.35f),
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
@@ -766,12 +790,28 @@ private fun LyricsList(lyrics: List<LyricLine>, position: Long, accent: Color = 
         items(lyrics.indices.toList(), key = { it }) { i ->
             val active = i == currentIndex
             val line = lyrics[i]
-            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            val lineColor by animateColorAsState(
+                targetValue = if (active) accent else Color.White.copy(alpha = 0.45f),
+                animationSpec = tween(300),
+                label = "lyricColor",
+            )
+            val lineScale by animateFloatAsState(
+                targetValue = if (active) 1f else 0.94f,
+                animationSpec = tween(300),
+                label = "lyricScale",
+            )
+            Column(
+                modifier = Modifier.fillMaxWidth().graphicsLayer {
+                    scaleX = lineScale
+                    scaleY = lineScale
+                },
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 Text(
                     text = line.text,
                     style = if (active) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
                     fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                    color = if (active) accent else Color.White.copy(alpha = 0.45f),
+                    color = lineColor,
                     textAlign = TextAlign.Center,
                 )
                 if (line.translation.isNotBlank()) {

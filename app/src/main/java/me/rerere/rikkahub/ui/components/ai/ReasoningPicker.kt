@@ -2,6 +2,8 @@ package me.rerere.rikkahub.ui.components.ai
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -105,8 +107,13 @@ fun ReasoningPicker(
         )
     }
 
-    LaunchedEffect(currentIndex) {
-        sliderState.value = currentIndex.toFloat()
+    val animatedIndex by animateFloatAsState(
+        targetValue = currentIndex.toFloat(),
+        animationSpec = tween(300),
+        label = "reasoningIndex",
+    )
+    LaunchedEffect(animatedIndex) {
+        sliderState.value = animatedIndex
     }
 
     ModalBottomSheet(
