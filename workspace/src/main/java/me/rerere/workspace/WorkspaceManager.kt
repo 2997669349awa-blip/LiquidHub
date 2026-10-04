@@ -9,9 +9,9 @@ import java.nio.file.Files
 
 class WorkspaceManager(
     private val baseDir: File,
-    // 用户文件区(files)可指向公共存储以便卸载后保留；rootfs(linux)/tmp 必须留在私有目录，
-    // 因为 PRoot 需要真实 POSIX 文件系统，公共存储(FUSE)对 rootfs 不可靠。
-    private val filesBaseDir: File = baseDir,
+    // 有「所有文件访问」时传入公共存储根；每个工作区是否把 files 放公共存储由 .persist_files 标记决定。
+    // rootfs(linux)/tmp 始终留在私有目录，因为 PRoot 需要真实 POSIX 文件系统，公共存储(FUSE)不可靠。
+    private val publicFilesBaseDir: File? = null,
     private val config: WorkspaceConfig = WorkspaceConfig(),
     private val shellRunner: WorkspaceShellRunner = HostShellRunner(),
     private val bindMounts: List<WorkspaceBindMount> = emptyList(),
@@ -38,7 +38,69 @@ class WorkspaceManager(
         return File(baseDir, root)
     }
 
-    fun filesDir(root: String): File = File(File(filesBaseDir, root), FILES_DIR)
+    private fun privateFilesDir(root: String): File = File(File(baseDir, root), FILES_DIR)
+
+    private fun publicFilesDir(root: String): File? =
+        publicFilesBaseDir?.let { File(File(it, root), FILES_DIR) }
+
+    private fun persistMarker(root: String): File = File(File(baseDir, root), PERSIST_MARKER)
+
+    /**
+     * 用户文件区。默认私有；若该工作区标记了保留(或曾迁移到公共存储)且已授予「所有文件访问」，
+     * 则落在公共存储，卸载重装不丢。
+     */
+    fun filesDir(root: String): File {
+        val pub = publicFilesDir(root) ?: return privateFilesDir(root)
+        val marker = persistMarker(root)
+        val usePublic = marker.isFile || (!marker.exists() && pub.exists() && !privateFilesDir(root).exists())
+        return if (usePublic) pub else privateFilesDir(root)
+    }
+
+    fun isPersistFiles(root: String): Boolean =
+        publicFilesDir(root)?.let { filesDir(root) == it } ?: false
+
+    /** 切换某工作区是否把用户文件保留到公共存储，并迁移已有文件。返回是否成功。 */
+    fun setPersistFiles(root: String, enabled: Boolean): Boolean {
+        ensureWorkspace(root)
+        val pub = publicFilesDir(root)
+        val marker = persistMarker(root)
+        if (!enabled) {
+            if (pub != null && pub.exists()) {
+                moveDirectory(pub.toPath(), privateFilesDir(root).toPath())
+            }
+            marker.delete()
+            return true
+        }
+        if (pub == null) return false
+        if (privateFilesDir(root).exists()) {
+            moveDirectory(privateFilesDir(root).toPath(), pub.toPath())
+        }
+        pub.mkdirs()
+        marker.parentFile?.mkdirs()
+        marker.writeText("1")
+        return true
+    }
+
+    private fun moveDirectory(source: java.nio.file.Path, target: java.nio.file.Path) {
+        if (!Files.exists(source)) return
+        Files.walk(source).use { stream ->
+            stream.forEach { path ->
+                val destination = target.resolve(source.relativize(path).toString())
+                if (Files.isDirectory(path)) {
+                    Files.createDirectories(destination)
+                } else {
+                    destination.parent?.let { Files.createDirectories(it) }
+                    Files.copy(
+                        path,
+                        destination,
+                        java.nio.file.LinkOption.NOFOLLOW_LINKS,
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                    )
+                }
+            }
+        }
+        source.toFile().deleteRecursively()
+    }
 
     fun linuxDir(root: String): File = File(workspaceDir(root), LINUX_DIR)
 
@@ -263,6 +325,7 @@ class WorkspaceManager(
     companion object {
         private const val FILES_DIR = "files"
         private const val LINUX_DIR = "linux"
+        private const val PERSIST_MARKER = ".persist_files"
         private const val TEMP_DIR = "tmp"
         const val DEFAULT_COMMAND_TIMEOUT_MS = 30_000L
 

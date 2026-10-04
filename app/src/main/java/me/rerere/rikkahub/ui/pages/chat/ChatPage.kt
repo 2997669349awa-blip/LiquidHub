@@ -292,6 +292,7 @@ private fun ChatPageContent(
     val toaster = LocalToaster.current
     val workspaceRepository: WorkspaceRepository = koinInject()
     var previewMode by rememberSaveable { mutableStateOf(false) }
+    var pinnedSkill by remember { mutableStateOf<String?>(null) }
     val hazeState = rememberHazeState()
     val assistant = setting.getCurrentAssistant()
     var showFilesSheet by remember { mutableStateOf(false) }
@@ -363,6 +364,8 @@ private fun ChatPageContent(
                         vm.stopGeneration()
                     },
                     enableSearch = enableWebSearch,
+                    pinnedSkill = pinnedSkill,
+                    onUpdatePinnedSkill = { pinnedSkill = it },
                     onUpdateSearchMode = { mode ->
                         val current = setting.getCurrentAssistant()
                         val model = setting.getCurrentChatModel()
@@ -404,7 +407,8 @@ private fun ChatPageContent(
                                 messageId = inputState.editingMessage!!,
                             )
                         } else {
-                            vm.handleMessageSend(inputState.getContents())
+                            vm.handleMessageSend(inputState.getContents(), skill = pinnedSkill)
+                            pinnedSkill = null
                             scope.launch {
                                 delay(100.milliseconds)
                                 chatListState.requestScrollToItem(conversation.currentMessages.size + 5)

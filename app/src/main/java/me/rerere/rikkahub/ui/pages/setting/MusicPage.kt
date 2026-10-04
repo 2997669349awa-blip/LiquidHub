@@ -22,12 +22,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -69,6 +72,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -76,6 +80,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import coil3.compose.AsyncImage
@@ -322,7 +328,12 @@ fun MusicPage() {
                                 )
                             }
                             IconButton(onClick = { toggleLike(item) }) {
-                                Text(if (likes.any { it.id == item.id }) "♥" else "♡")
+                                val liked = likes.any { it.id == item.id }
+                                Icon(
+                                    imageVector = HugeIcons.Heart,
+                                    contentDescription = if (liked) "取消喜欢" else "喜欢",
+                                    tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                         }
                     }
@@ -395,8 +406,15 @@ private fun MiniPlayer(
             Text(title.ifBlank { "正在播放" }, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
-        IconButton(onClick = onPlayPause) { Text(if (snap.playing) "⏸" else "▶") }
-        IconButton(onClick = onNext) { Text("⏭") }
+        IconButton(onClick = onPlayPause) {
+            Icon(
+                imageVector = if (snap.playing) HugeIcons.Pause else HugeIcons.Play,
+                contentDescription = if (snap.playing) "暂停" else "播放",
+            )
+        }
+        IconButton(onClick = onNext) {
+            Icon(HugeIcons.Next, contentDescription = "下一首")
+        }
     }
 }
 
@@ -433,13 +451,24 @@ private fun NowPlayingScreen(
     }
 
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        val dialogView = LocalView.current
+        val dialogWindow = (dialogView.parent as? DialogWindowProvider)?.window
+        LaunchedEffect(dialogWindow) {
+            dialogWindow?.let { window ->
+                WindowCompat.setDecorFitsSystemWindows(window, false)
+                WindowCompat.getInsetsController(window, dialogView).isAppearanceLightStatusBars = false
+            }
+        }
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Brush.verticalGradient(listOf(bg, Color(0xFF070707)))),
         ) {
             Column(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 10.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(horizontal = 22.dp, vertical = 10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 // 顶栏：收起 / 歌名歌手 / 收藏 / 更多
@@ -509,7 +538,7 @@ private fun NowPlayingScreen(
 
                 // 歌词预览（点按展开完整歌词）
                 Box(
-                    modifier = Modifier.fillMaxWidth().height(76.dp).clickable { showFullLyrics = true },
+                    modifier = Modifier.fillMaxWidth().height(132.dp).clickable { showFullLyrics = true },
                     contentAlignment = Alignment.Center,
                 ) {
                     LyricPreview(lyrics = lyrics, position = snap.position, accent = accent)
@@ -658,7 +687,7 @@ private fun VinylDisc(
     }
 }
 
-/** 唱片下方两行歌词：当前行高亮，下一行弱化。 */
+/** 唱片下方四行歌词预览：当前行高亮，其余弱化。 */
 @Composable
 private fun LyricPreview(
     lyrics: List<Pair<Long, String>>?,
@@ -670,23 +699,15 @@ private fun LyricPreview(
         return
     }
     val idx = lyrics.indexOfLast { it.first <= position }.coerceAtLeast(0)
-    val current = lyrics.getOrNull(idx)?.second.orEmpty()
-    val next = lyrics.getOrNull(idx + 1)?.second.orEmpty()
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            current,
-            color = accent,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (next.isNotBlank()) {
+    val visible = (idx until minOf(idx + 4, lyrics.size)).toList()
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        visible.forEach { i ->
+            val isCurrent = i == idx
             Text(
-                next,
-                color = Color.White.copy(alpha = 0.55f),
-                style = MaterialTheme.typography.bodyMedium,
+                text = lyrics[i].second,
+                color = if (isCurrent) accent else Color.White.copy(alpha = 0.5f),
+                style = if (isCurrent) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,

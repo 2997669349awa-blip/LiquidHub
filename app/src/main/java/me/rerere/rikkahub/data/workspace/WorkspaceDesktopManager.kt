@@ -9,7 +9,12 @@ import android.content.Context
 import android.os.Handler
 import android.os.HandlerThread
 import com.termux.terminal.TerminalSession
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.android.asCoroutineDispatcher
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
 import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceTerminalSessionClient
@@ -34,6 +39,7 @@ class WorkspaceDesktopManager internal constructor(
     // 因此必须在有 Looper 的线程上创建；用专用 HandlerThread 既满足要求又不阻塞主线程。
     private val sessionThread = HandlerThread("liquidhub-desktop-session").apply { start() }
     private val sessionDispatcher = Handler(sessionThread.looper).asCoroutineDispatcher()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** Writes the helper script into the workspace files area (bind mounted at /workspace). */
     suspend fun ensureScript(workspaceId: String) {
@@ -41,6 +47,21 @@ class WorkspaceDesktopManager internal constructor(
     }
 
     suspend fun runAction(workspaceId: String, action: String) {
+        writeAction(workspaceId, action)
+        if (action == "install" || action == "reinstall") {
+            DesktopInstallNotifier.start(appContext, action == "reinstall")
+            scope.launch { pollInstall(workspaceId) }
+        }
+    }
+
+    /** 安装/重装桌面并等待完成（AI 的 desktop_start 用），同时更新通知栏进度。 */
+    suspend fun installAndWait(workspaceId: String, reinstall: Boolean = false): Boolean {
+        writeAction(workspaceId, if (reinstall) "reinstall" else "install")
+        DesktopInstallNotifier.start(appContext, reinstall)
+        return pollInstall(workspaceId)
+    }
+
+    private suspend fun writeAction(workspaceId: String, action: String) {
         ensureScript(workspaceId)
         val workspace = workspaceRepository.getById(workspaceId)
             ?: error("Workspace not found: $workspaceId")
@@ -50,9 +71,48 @@ class WorkspaceDesktopManager internal constructor(
         }
         val cmd = "mkdir -p /workspace/.liquidhub/logs; " +
             "sh /workspace/$SCRIPT_PATH $action > /workspace/.liquidhub/logs/last.log 2>&1; " +
+            "echo \"__DONE__\" >> /workspace/.liquidhub/logs/last.log; " +
             "cat /workspace/.liquidhub/logs/last.log\n"
         val bytes = cmd.toByteArray(Charsets.UTF_8)
         session.write(bytes, 0, bytes.size)
+    }
+
+    private suspend fun pollInstall(workspaceId: String): Boolean = withContext(Dispatchers.IO) {
+        val hostDir = workspaceRepository.workspaceHostDir(workspaceId)
+        if (hostDir == null) {
+            DesktopInstallNotifier.fail(appContext, "找不到工作区目录")
+            return@withContext false
+        }
+        val logFile = java.io.File(hostDir, "$LOG_DIR/last.log")
+        val deadline = System.currentTimeMillis() + 30 * 60_000L
+        var lastLine = ""
+        while (System.currentTimeMillis() < deadline) {
+            delay(2_000)
+            val text = runCatching { logFile.readText() }.getOrNull().orEmpty()
+            val tail = text.lineSequence().lastOrNull { it.isNotBlank() }?.take(140).orEmpty()
+            if (tail.isNotBlank() && tail != lastLine && tail != "__DONE__") {
+                lastLine = tail
+                DesktopInstallNotifier.progress(appContext, tail)
+            }
+            when {
+                text.contains("install done") -> {
+                    DesktopInstallNotifier.success(appContext)
+                    return@withContext true
+                }
+
+                text.contains("desktop install failed") || text.contains("ERROR:") -> {
+                    DesktopInstallNotifier.fail(appContext, tail)
+                    return@withContext false
+                }
+
+                text.contains("__DONE__") -> {
+                    DesktopInstallNotifier.fail(appContext, tail.ifBlank { "安装结束但未完成" })
+                    return@withContext false
+                }
+            }
+        }
+        DesktopInstallNotifier.fail(appContext, "安装超时")
+        false
     }
 
     fun closeWorkspace(root: String) {

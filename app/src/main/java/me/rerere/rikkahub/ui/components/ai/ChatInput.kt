@@ -136,6 +136,8 @@ fun ChatInput(
     onUpdateChatModel: (Model) -> Unit,
     onUpdateAssistant: (Assistant) -> Unit,
     onUpdateSearchService: (Int) -> Unit,
+    pinnedSkill: String? = null,
+    onUpdatePinnedSkill: (String?) -> Unit = {},
     onMoreClick: () -> Unit,
     onCancelClick: () -> Unit,
     onSendClick: () -> Unit,
@@ -320,6 +322,13 @@ fun ChatInput(
                                     onlyIcon = true,
                                 )
                             }
+
+                            // Skill（本条消息指定技能）
+                            SkillPickerButton(
+                                enabledSkills = assistant.enabledSkills.toList(),
+                                pinnedSkill = pinnedSkill,
+                                onUpdate = onUpdatePinnedSkill,
+                            )
 
                         }
 

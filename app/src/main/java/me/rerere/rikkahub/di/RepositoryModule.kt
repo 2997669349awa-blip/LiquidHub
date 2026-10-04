@@ -48,7 +48,7 @@ val repositoryModule = module {
         val context: Context = get()
         WorkspaceManager(
             baseDir = WorkspaceStorage.privateBaseDir(context),
-            filesBaseDir = WorkspaceStorage.resolveFilesBaseDir(context),
+            publicFilesBaseDir = if (WorkspaceStorage.isPublicStorageEnabled()) WorkspaceStorage.publicBaseDir() else null,
             shellRunner = ProotShellRunner(
                 nativeLibraryDir = File(context.applicationInfo.nativeLibraryDir),
             ),

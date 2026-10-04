@@ -120,6 +120,7 @@ fun WorkspaceDetailPage(id: String) {
     val installError by vm.installError.collectAsStateWithLifecycle()
     val settingsError by vm.settingsError.collectAsStateWithLifecycle()
     val desktopMessage by vm.desktopMessage.collectAsStateWithLifecycle()
+    val persistFiles by vm.persistFiles.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState { 2 }
     val scope = rememberCoroutineScope()
     var deleteTarget by remember { mutableStateOf<WorkspaceFileEntry?>(null) }
@@ -251,6 +252,8 @@ fun WorkspaceDetailPage(id: String) {
                 0 -> WorkspaceBasicPage(
                     workspace = state.workspace,
                     installProgress = installProgress,
+                    persistFiles = persistFiles,
+                    onPersistFilesChange = vm::setPersistFiles,
                     onInstallRootfs = { showInstallDialog = true },
                     onToolApprovalChange = vm::setToolApproval,
                     onBypassAll = vm::setAllToolApprovals,
@@ -410,6 +413,8 @@ fun WorkspaceDetailPage(id: String) {
 private fun WorkspaceBasicPage(
     workspace: WorkspaceEntity?,
     installProgress: RootfsInstallProgress?,
+    persistFiles: Boolean,
+    onPersistFilesChange: (Boolean) -> Unit,
     onInstallRootfs: () -> Unit,
     onToolApprovalChange: (String, Boolean) -> Unit,
     onBypassAll: (Boolean) -> Unit,
@@ -442,6 +447,13 @@ private fun WorkspaceBasicPage(
                 item(
                     headlineContent = { Text(stringResource(R.string.workspace_detail_shell_status)) },
                     supportingContent = { Text(shellStatus?.toShellStatusLabel() ?: "-") },
+                )
+                item(
+                    headlineContent = { Text(stringResource(R.string.workspace_detail_persist_files)) },
+                    supportingContent = { Text(stringResource(R.string.workspace_detail_persist_files_desc)) },
+                    trailingContent = {
+                        Switch(checked = persistFiles, onCheckedChange = onPersistFilesChange)
+                    },
                 )
             }
         }

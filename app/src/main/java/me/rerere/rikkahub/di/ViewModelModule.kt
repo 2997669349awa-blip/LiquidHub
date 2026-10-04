@@ -73,6 +73,7 @@ val viewModelModule = module {
             repository = get(),
             terminalSessionManager = get(),
             desktopManager = get(),
+            workspaceManager = get(),
         )
     }
     viewModel<me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceDesktopVM> {

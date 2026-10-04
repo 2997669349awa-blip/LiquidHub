@@ -31,6 +31,7 @@ class WorkspaceDetailVM(
     private val repository: WorkspaceRepository,
     private val terminalSessionManager: WorkspaceTerminalSessionManager,
     private val desktopManager: me.rerere.rikkahub.data.workspace.WorkspaceDesktopManager,
+    private val workspaceManager: me.rerere.workspace.WorkspaceManager,
 ) : ViewModel() {
     private val _state = MutableStateFlow(WorkspaceDetailState())
     val state = _state.asStateFlow()
@@ -115,6 +116,25 @@ class WorkspaceDetailVM(
 
     private val _desktopMessage = MutableStateFlow<String?>(null)
     val desktopMessage = _desktopMessage.asStateFlow()
+
+    private val _persistFiles = MutableStateFlow(false)
+    val persistFiles = _persistFiles.asStateFlow()
+
+    /** 切换该工作区是否把用户文件保留到公共存储（需已授予「所有文件访问」）。 */
+    fun setPersistFiles(enabled: Boolean) {
+        val workspace = state.value.workspace ?: return
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching { workspaceManager.setPersistFiles(workspace.root, enabled) }.getOrDefault(false)
+            }
+            _persistFiles.value = workspaceManager.isPersistFiles(workspace.root)
+            _desktopMessage.value = when {
+                ok && enabled -> "已开启：工作区文件保存到公共存储，卸载重装不丢失"
+                ok -> "已关闭：工作区文件改回应用私有目录"
+                else -> "开启失败：请先授予「所有文件访问」"
+            }
+        }
+    }
 
     fun consumeDesktopMessage() {
         _desktopMessage.value = null
@@ -399,6 +419,7 @@ class WorkspaceDetailVM(
             try {
                 val workspace = repository.getById(id)
                 _state.update { it.copy(workspace = workspace) }
+                _persistFiles.value = workspace?.let { workspaceManager.isPersistFiles(it.root) } ?: false
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {

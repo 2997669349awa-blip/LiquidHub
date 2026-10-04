@@ -1400,4 +1400,17 @@
   <string name="workspace_page_public_storage_title">让工作区在卸载后保留</string>
   <string name="workspace_page_public_storage_desc">授予「所有文件访问」后，工作区里的文件会保存到 /sdcard/LiquidHub/workspaces，卸载重装不会丢失（Linux 系统镜像仍存在应用内，重装后重新安装系统即可）。未授权则只能存在应用私有目录，卸载即删。授权后请重启应用生效。</string>
   <string name="workspace_page_public_storage_action">去授权</string>
+  <string name="workspace_detail_persist_files">文件保留在公共存储</string>
+  <string name="workspace_detail_persist_files_desc">开启后该工作区文件保存到 /sdcard/LiquidHub/workspaces，卸载重装不丢失（需先授予「所有文件访问」）</string>
+  <string name="permission_go_grant">去授权</string>
+  <string name="phone_control_page_title">手机控制</string>
+  <string name="phone_control_page_shizuku">Shizuku 授权</string>
+  <string name="phone_control_page_shizuku_not_running">未检测到 Shizuku，请先安装并启动 Shizuku 应用</string>
+  <string name="phone_control_page_granted">已授权</string>
+  <string name="phone_control_page_not_granted">未授权</string>
+  <string name="phone_control_page_accessibility">无障碍服务</string>
+  <string name="phone_control_page_overlay">悬浮窗权限</string>
+  <string name="phone_control_page_enable">为当前助手启用手机控制</string>
+  <string name="phone_control_page_enable_desc">开启后，AI 才能通过手机控制工具操作本机</string>
+  <string name="phone_control_page_hint">授权完成后，在对话里让 AI 调用 phone_start 即可开始；悬浮球会实时显示 AI 的动作，单击悬浮球停止。手机控制默认只对当前助手生效。</string>
 </resources>

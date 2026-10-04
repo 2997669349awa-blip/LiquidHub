@@ -51,6 +51,7 @@ import me.rerere.hugeicons.stroke.Book03
 import me.rerere.hugeicons.stroke.Bookshelf01
 import me.rerere.hugeicons.stroke.Brain02
 import me.rerere.hugeicons.stroke.Clapping01
+import me.rerere.hugeicons.stroke.ComputerPhoneSync
 import me.rerere.hugeicons.stroke.Database02
 import me.rerere.hugeicons.stroke.Download04
 import me.rerere.hugeicons.stroke.Folder01
@@ -287,6 +288,12 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                         leadingContent = { Icon(HugeIcons.MusicNote01, null) },
                         supportingContent = { Text("AI 搜索/播放音乐、歌词、喜欢（网易云）") },
                         headlineContent = { Text("音乐") },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.PhoneControl) },
+                        leadingContent = { Icon(HugeIcons.ComputerPhoneSync, null) },
+                        supportingContent = { Text("授权 Shizuku/无障碍/悬浮窗，让 AI 操作手机") },
+                        headlineContent = { Text("手机控制") },
                     )
                 }
             }

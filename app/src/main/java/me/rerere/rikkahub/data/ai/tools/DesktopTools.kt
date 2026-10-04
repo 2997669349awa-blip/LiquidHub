@@ -81,20 +81,14 @@ private fun createDesktopStartTool(
             timeoutMillis = 30_000,
         ).stdout.contains("INSTALLED")
         if (!installed) {
-            // 内嵌桌面：首次由 AI 自动安装，用户无需手动操作
-            desktopManager.ensureScript(workspaceId)
-            val install = workspaceRepository.executeCommand(
-                id = workspaceId,
-                command = "sh /workspace/${WorkspaceDesktopManager.SCRIPT_PATH} install",
-                timeoutMillis = 30 * 60_000L,
-            )
-            if (install.exitCode != 0) {
+            // 内嵌桌面：首次由 AI 自动安装，用户无需手动操作；安装进度显示在通知栏
+            val ok = desktopManager.installAndWait(workspaceId)
+            if (!ok) {
                 return@Tool listOf(
                     UIMessagePart.Text(
                         buildJsonObject {
                             put("ok", false)
-                            put("error", "Desktop auto-install failed (exit ${install.exitCode}).")
-                            put("log", (install.stdout + install.stderr).takeLast(2000))
+                            put("error", "Desktop auto-install failed. Check the install notification or the workspace logs.")
                         }.toString()
                     )
                 )
