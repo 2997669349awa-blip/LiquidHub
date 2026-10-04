@@ -1402,8 +1402,8 @@
   <string name="workspace_page_public_storage_action">去授权</string>
   <string name="workspace_detail_persist_files">文件保留在公共存储</string>
   <string name="workspace_detail_persist_files_desc">开启后该工作区文件保存到 /sdcard/LiquidHub/workspaces，卸载重装不丢失（需先授予「所有文件访问」）</string>
-  <string name="dialog_commands_title">对话框命令</string>
-  <string name="dialog_commands_desc">在对话输入框里直接输入以 // 开头的命令即可本地执行，不会发给 AI。资源异常卡住时可用它们强行停止或恢复任务。</string>
+  <string name="dialog_commands_title">命令指南</string>
+  <string name="dialog_commands_desc">在对话输入框里直接输入以 // 开头的命令即可本地执行，不会发给 AI；大小写不敏感，命令与参数之间可用 - 或空格。资源异常卡住时可用它们强行停止或恢复任务。</string>
   <string name="music_source_title">音乐源</string>
   <string name="music_source_desc">出于风险考虑，音乐功能默认隐藏。先在下方输入 LiquidHub 生成加密音乐源，再用 32 位密码解锁，即可启用内置的网易云音乐。</string>
   <string name="music_source_step1">第一步：生成音乐源</string>

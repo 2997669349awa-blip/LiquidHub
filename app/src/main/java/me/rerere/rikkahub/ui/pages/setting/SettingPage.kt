@@ -309,8 +309,8 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                     item(
                         onClick = { navController.navigate(Screen.DialogCommands) },
                         leadingContent = { Icon(HugeIcons.ComputerTerminal01, null) },
-                        supportingContent = { Text("输入框里以 // 开头的本地命令，如 //tasks、//kill-<ID>") },
-                        headlineContent = { Text("对话框命令") },
+                        supportingContent = { Text("输入框里以 // 开头的本地命令，含解释说明") },
+                        headlineContent = { Text("命令指南") },
                     )
                 }
             }

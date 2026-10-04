@@ -233,12 +233,17 @@ class ChatVM(
 
             lower == "killall" -> "已请求停止 ${ChatTaskManager.killAll()} 个任务"
 
+            lower == "kill" -> {
+                stopGeneration()
+                "已停止当前会话的生成"
+            }
+
             lower.startsWith("kill-") || lower.startsWith("kill ") -> {
                 val id = cmd.dropWhile { it != '-' && !it.isWhitespace() }.drop(1).trim()
                 if (id.isBlank()) {
-                    "用法：//kill-<任务ID>（任务ID 用 //tasks 查看）"
-                } else if (ChatTaskManager.kill(id)) {
-                    "已请求停止任务 $id"
+                    "用法：//kill <任务ID 或 会话ID>（用 //tasks 查看）"
+                } else if (ChatTaskManager.killByArg(id)) {
+                    "已请求停止：$id"
                 } else {
                     "未找到进行中的任务：$id（用 //tasks 查看可用 ID）"
                 }
@@ -246,12 +251,12 @@ class ChatVM(
 
             lower.startsWith("recover-") || lower.startsWith("recover ") -> {
                 val id = cmd.dropWhile { it != '-' && !it.isWhitespace() }.drop(1).trim()
-                val task = if (id.isBlank()) null else ChatTaskManager.find(id)
+                val task = if (id.isBlank()) null else ChatTaskManager.findByArg(id)
                 if (task == null) {
                     "未找到任务：$id（用 //tasks 查看可用 ID）"
                 } else {
                     chatService.recoverTask(task.conversationId)
-                    "已尝试恢复任务 $id"
+                    "已尝试恢复任务 ${task.id}"
                 }
             }
 

@@ -53,6 +53,36 @@ object ChatTaskManager {
         return true
     }
 
+    /** 按任务 ID 或会话 ID（前缀即可）停止任务。 */
+    @Synchronized
+    fun killByArg(arg: String): Boolean {
+        val key = arg.trim()
+        if (key.isEmpty()) return false
+        active[key]?.let { it.job?.cancel(); return true }
+        val match = active.values.firstOrNull {
+            it.conversationId.toString().startsWith(key, ignoreCase = true)
+        } ?: return false
+        match.job?.cancel()
+        return true
+    }
+
+    /** 按任务 ID 或会话 ID（前缀即可）查找任务（含最近完成的）。 */
+    @Synchronized
+    fun findByArg(arg: String): Task? {
+        val key = arg.trim()
+        if (key.isEmpty()) return null
+        active[key]?.let { return it }
+        recent.firstOrNull { it.id.equals(key, ignoreCase = true) }?.let { return it }
+        return (active.values + recent).firstOrNull {
+            it.conversationId.toString().startsWith(key, ignoreCase = true)
+        }
+    }
+
+    /** 当前会话是否有进行中的任务。 */
+    @Synchronized
+    fun hasActive(conversationId: Uuid): Boolean =
+        active.values.any { it.conversationId == conversationId }
+
     @Synchronized
     fun killAll(): Int {
         val count = active.size
