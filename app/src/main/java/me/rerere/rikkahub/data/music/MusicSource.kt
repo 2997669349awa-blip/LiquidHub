@@ -248,8 +248,16 @@ class JsMusicSource(
     }.getOrNull()?.takeIf { it.isNotBlank() && it != "null" }
 
     override suspend fun lyrics(id: String): MusicLyrics = runCatching {
-        val text = withQuickJs { quickJs -> quickJs.evaluate<Any?>("lyrics(${JsonPrimitive(id)})")?.toString() }.orEmpty()
-        MusicLyrics(lyric = text, translation = "")
+        val raw = withQuickJs { quickJs -> quickJs.evaluate<Any?>("lyrics(${JsonPrimitive(id)})")?.toString() }.orEmpty()
+        if (raw.trimStart().startsWith("{")) {
+            val o = runCatching { json.parseToJsonElement(raw).jsonObject }.getOrNull()
+            MusicLyrics(
+                lyric = o?.get("lyric")?.jsonPrimitive?.contentOrNull.orEmpty(),
+                translation = o?.get("translation")?.jsonPrimitive?.contentOrNull.orEmpty(),
+            )
+        } else {
+            MusicLyrics(lyric = raw, translation = "")
+        }
     }.getOrDefault(MusicLyrics("", ""))
 
     private fun parseSongs(raw: String): List<MusicSong> {
