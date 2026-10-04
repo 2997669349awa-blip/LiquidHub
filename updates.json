@@ -1,22 +1,22 @@
 {
-  "version": "1.0.1",
-  "publishedAt": "2026-10-04T07:23:00Z",
-  "changelog": "LiquidHub 1.0.1\n\n- 品牌：应用名改为 LiquidHub，包名改为 LiquidHub.teto.x（新包，安装前请先卸载旧版）\n- 技能：对话框的星星按钮始终显示，列出全部技能，可选取\n- 手机控制：悬浮球实时显示 AI 思考，操作结束自动回到 App；打字一次写入整段，减少无效截图与等待\n- 桌面安装：通知栏显示安装进度，镜像自动切换与重试\n- 音乐：图标替换 emoji、四行歌词预览、播放器延伸到状态栏\n- 动画：消息列表入场动画、思考等级切换过渡\n- 更新：优先正式版，正式版无更新时再看预览版",
+  "version": "1.0.2",
+  "publishedAt": "2026-10-04T08:51:00Z",
+  "changelog": "LiquidHub 1.0.2\n\n- 修复应用名：中文等语言包里的名称也已改为 LiquidHub（之前被语言包覆盖显示为 RikkaHub）\n- 新增对话框命令：在输入框输入 //help、//tasks、//kill-<ID>、//killall、//recover-<ID>、//stop、//status，本地执行不发给 AI；每个任务有唯一 ID；设置 > 其他 > 对话框命令可查\n- 桌面浏览器：默认火狐，写入 user.js 关闭沙箱并软件渲染，解决 proot 下标签页崩溃；由桌面常驻会话启动，不再被回收\n- 桌面安装：去掉 imagemagick/dbus/pulseaudio/ffmpeg/pcmanfm 等冗余包与任务栏时钟，安装更快",
   "downloads": [
     {
-      "name": "liquidhub-release-1004-0723.apk",
-      "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1004-0723.apk",
+      "name": "liquidhub-release-1004-0851.apk",
+      "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1004-0851.apk",
       "size": "约 54 MB"
     }
   ],
   "stable": {
-    "version": "1.0.1",
-    "publishedAt": "2026-10-04T07:23:00Z",
-    "changelog": "LiquidHub 1.0.1\n\n- 品牌：应用名改为 LiquidHub，包名改为 LiquidHub.teto.x（新包，安装前请先卸载旧版）\n- 技能：对话框的星星按钮始终显示，列出全部技能，可选取\n- 手机控制：悬浮球实时显示 AI 思考，操作结束自动回到 App；打字一次写入整段，减少无效截图与等待\n- 桌面安装：通知栏显示安装进度，镜像自动切换与重试\n- 音乐：图标替换 emoji、四行歌词预览、播放器延伸到状态栏\n- 动画：消息列表入场动画、思考等级切换过渡\n- 更新：优先正式版，正式版无更新时再看预览版",
+    "version": "1.0.2",
+    "publishedAt": "2026-10-04T08:51:00Z",
+    "changelog": "LiquidHub 1.0.2\n\n- 修复应用名：中文等语言包里的名称也已改为 LiquidHub（之前被语言包覆盖显示为 RikkaHub）\n- 新增对话框命令：在输入框输入 //help、//tasks、//kill-<ID>、//killall、//recover-<ID>、//stop、//status，本地执行不发给 AI；每个任务有唯一 ID；设置 > 其他 > 对话框命令可查\n- 桌面浏览器：默认火狐，写入 user.js 关闭沙箱并软件渲染，解决 proot 下标签页崩溃；由桌面常驻会话启动，不再被回收\n- 桌面安装：去掉 imagemagick/dbus/pulseaudio/ffmpeg/pcmanfm 等冗余包与任务栏时钟，安装更快",
     "downloads": [
       {
-        "name": "liquidhub-release-1004-0723.apk",
-        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1004-0723.apk",
+        "name": "liquidhub-release-1004-0851.apk",
+        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1004-0851.apk",
         "size": "约 54 MB"
       }
     ]
