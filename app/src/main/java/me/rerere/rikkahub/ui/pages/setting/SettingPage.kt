@@ -280,15 +280,13 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
             }
 
             item("otherSettings") {
-                val musicUnlocked by me.rerere.rikkahub.data.music.MusicSourceManager.state
-                    .collectAsStateWithLifecycle()
                 val jsMusicSource by me.rerere.rikkahub.data.music.MusicSourceRegistry.state
                     .collectAsStateWithLifecycle()
                 CardGroup(
                     modifier = Modifier.padding(horizontal = 8.dp),
                     title = { Text("其他") },
                 ) {
-                    if (musicUnlocked || !jsMusicSource.isNullOrBlank()) {
+                    if (!jsMusicSource.isNullOrBlank()) {
                         item(
                             onClick = { navController.navigate(Screen.Music) },
                             leadingContent = { Icon(HugeIcons.MusicNote01, null) },

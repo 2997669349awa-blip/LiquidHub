@@ -31,6 +31,20 @@ interface MusicSource {
     suspend fun lyrics(id: String): MusicLyrics
 }
 
+data class MusicSong(
+    val id: String,
+    val name: String,
+    val artist: String,
+    val album: String,
+    val cover: String = "",
+)
+
+/** 歌词：原文 + 翻译（可为空）。 */
+data class MusicLyrics(
+    val lyric: String,
+    val translation: String,
+)
+
 @Serializable
 data class MusicSourceManifest(
     val name: String = "",
@@ -179,12 +193,42 @@ class JsMusicSource(
                     args.getOrNull(3)?.toString().orEmpty(),
                 )
             }
+            quickJs.func("__aesCbcBase64") { args: Array<Any?> ->
+                aesCbcBase64(
+                    args.getOrNull(0)?.toString().orEmpty(),
+                    args.getOrNull(1)?.toString().orEmpty(),
+                    args.getOrNull(2)?.toString().orEmpty(),
+                )
+            }
+            quickJs.func("__rsaEncryptHex") { args: Array<Any?> ->
+                rsaEncryptHex(
+                    args.getOrNull(0)?.toString().orEmpty(),
+                    args.getOrNull(1)?.toString().orEmpty(),
+                    args.getOrNull(2)?.toString().orEmpty(),
+                )
+            }
             quickJs.evaluate<Any?>(File(dir, mainFile).readText(), mainFile)
             return block(quickJs)
         } finally {
             quickJs.close()
         }
     }
+
+    private fun aesCbcBase64(text: String, key: String, iv: String): String = runCatching {
+        val cipher = javax.crypto.Cipher.getInstance("AES/CBC/PKCS5Padding")
+        cipher.init(
+            javax.crypto.Cipher.ENCRYPT_MODE,
+            javax.crypto.spec.SecretKeySpec(key.toByteArray(Charsets.UTF_8), "AES"),
+            javax.crypto.spec.IvParameterSpec(iv.toByteArray(Charsets.UTF_8)),
+        )
+        android.util.Base64.encodeToString(cipher.doFinal(text.toByteArray(Charsets.UTF_8)), android.util.Base64.NO_WRAP)
+    }.getOrDefault("")
+
+    private fun rsaEncryptHex(text: String, modulusHex: String, expHex: String): String = runCatching {
+        val reversed = java.math.BigInteger(1, text.toByteArray(Charsets.UTF_8).reversedArray())
+        val enc = reversed.modPow(java.math.BigInteger(expHex, 16), java.math.BigInteger(modulusHex, 16))
+        enc.toString(16).padStart(256, '0')
+    }.getOrDefault("")
 
     /** 校验 index.js 是否提供了必需函数。 */
     suspend fun validate(): Boolean = runCatching {
@@ -225,14 +269,14 @@ class JsMusicSource(
     }
 }
 
-/** 统一入口：有启用的音乐源就用它，否则回退内置网易云。 */
+/** 统一入口：只使用已启用的音乐源；未启用时不提供任何音乐接口。 */
 object MusicSources {
     suspend fun search(keyword: String): List<MusicSong> =
-        MusicSourceRegistry.current()?.search(keyword) ?: NeteaseApi.search(keyword)
+        MusicSourceRegistry.current()?.search(keyword) ?: emptyList()
 
     suspend fun songUrl(id: String): String? =
-        MusicSourceRegistry.current()?.songUrl(id) ?: NeteaseApi.songUrl(id)
+        MusicSourceRegistry.current()?.songUrl(id)
 
     suspend fun lyrics(id: String): MusicLyrics =
-        MusicSourceRegistry.current()?.lyrics(id) ?: NeteaseApi.lyrics(id)
+        MusicSourceRegistry.current()?.lyrics(id) ?: MusicLyrics("", "")
 }

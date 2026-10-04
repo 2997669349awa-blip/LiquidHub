@@ -5,9 +5,6 @@
 
 package me.rerere.rikkahub.ui.pages.setting
 
-import android.webkit.CookieManager
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
@@ -86,7 +83,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
@@ -111,11 +107,8 @@ import me.rerere.hugeicons.stroke.Repeat
 import me.rerere.hugeicons.stroke.RepeatOne01
 import me.rerere.hugeicons.stroke.Shuffle
 import me.rerere.rikkahub.data.music.MusicControllerHolder
-import me.rerere.rikkahub.data.music.MusicSession
 import me.rerere.rikkahub.data.music.MusicSong
-import me.rerere.rikkahub.data.music.MusicUser
 import me.rerere.rikkahub.data.music.MusicSources
-import me.rerere.rikkahub.data.music.NeteaseApi
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.theme.CustomColors
 
@@ -198,38 +191,19 @@ fun MusicPage() {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     var controller by remember { mutableStateOf<MediaController?>(null) }
-    var user by remember { mutableStateOf<MusicUser?>(null) }
     var query by remember { mutableStateOf("") }
     var songs by remember { mutableStateOf<List<MusicSong>>(emptyList()) }
-    var likes by remember { mutableStateOf<List<MusicSong>>(emptyList()) }
-    var tab by remember { mutableStateOf(0) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var showPlayer by remember { mutableStateOf(false) }
-    var showWebLogin by remember { mutableStateOf(false) }
-    var showPhone by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         controller = MusicControllerHolder.ensure(context)
-        runCatching { MusicSession.ensure(context) }
-        if (NeteaseApi.cookie.isNotBlank()) {
-            withContext(Dispatchers.IO) { runCatching { NeteaseApi.account() } }.getOrNull()?.let {
-                user = it
-                withContext(Dispatchers.IO) { runCatching { NeteaseApi.likeList(it.uid) } }.getOrNull()?.let { l -> likes = l }
-            }
-        }
     }
 
     val snap = rememberPlayerSnapshot(controller)
     val meta = controller?.currentMediaItem?.mediaMetadata
     val playingCover = meta?.artworkUri?.toString().orEmpty()
-
-    fun refreshLikes() {
-        val uid = user?.uid ?: return
-        scope.launch {
-            withContext(Dispatchers.IO) { runCatching { NeteaseApi.likeList(uid) } }.getOrNull()?.let { likes = it }
-        }
-    }
 
     fun doSearch() {
         if (query.isBlank()) return
@@ -238,7 +212,7 @@ fun MusicPage() {
         scope.launch {
             val list = withContext(Dispatchers.IO) { runCatching { MusicSources.search(query) }.getOrNull() }
             loading = false
-            if (list == null) error = "搜索失败（网络或被限制）" else songs = list
+            songs = list.orEmpty()
         }
     }
 
@@ -247,45 +221,11 @@ fun MusicPage() {
         scope.launch { controller = MusicControllerHolder.playQueue(context, list, index) }
     }
 
-    fun toggleLike(item: MusicSong) {
-        val liked = likes.any { it.id == item.id }
-        scope.launch {
-            withContext(Dispatchers.IO) { runCatching { NeteaseApi.like(item.id, !liked) } }
-            refreshLikes()
-        }
-    }
-
-    fun afterLogin() {
-        runCatching { MusicSession.save(context) }
-        scope.launch {
-            user = withContext(Dispatchers.IO) { runCatching { NeteaseApi.account() }.getOrNull() }
-            refreshLikes()
-        }
-    }
-
     Scaffold(
         topBar = {
             LargeFlexibleTopAppBar(
-                title = { Text("音乐（网易云）") },
+                title = { Text("音乐") },
                 navigationIcon = { BackButton() },
-                actions = {
-                    val u = user
-                    if (u == null) {
-                        TextButton(onClick = { showWebLogin = true }) { Text("网页登录") }
-                        TextButton(onClick = { showPhone = true }) { Text("手机号") }
-                    } else {
-                        Text(
-                            (if (u.vip) "VIP · " else "") + u.nickname,
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.padding(end = 8.dp),
-                        )
-                        TextButton(onClick = {
-                            MusicSession.clear(context)
-                            user = null
-                            likes = emptyList()
-                        }) { Text("退出") }
-                    }
-                },
                 scrollBehavior = scrollBehavior,
                 colors = CustomColors.topBarColors,
             )
@@ -310,20 +250,15 @@ fun MusicPage() {
             }
             if (loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 12.dp)) }
-            TabRow(selectedTabIndex = tab) {
-                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("搜索") })
-                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("喜欢") })
-            }
-            val list = if (tab == 0) songs else likes
             Box(modifier = Modifier.weight(1f)) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    items(list, key = { it.id }) { item ->
+                    items(songs, key = { it.id }) { item ->
                         Row(
-                            modifier = Modifier.fillMaxWidth().clickable { play(list, list.indexOf(item)) }.padding(8.dp),
+                            modifier = Modifier.fillMaxWidth().clickable { play(songs, songs.indexOf(item)) }.padding(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Box(
@@ -342,14 +277,6 @@ fun MusicPage() {
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            IconButton(onClick = { toggleLike(item) }) {
-                                val liked = likes.any { it.id == item.id }
-                                Icon(
-                                    imageVector = HugeIcons.Heart,
-                                    contentDescription = if (liked) "取消喜欢" else "喜欢",
-                                    tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
@@ -374,26 +301,8 @@ fun MusicPage() {
         NowPlayingScreen(
             controller = controller,
             snap = snap,
-            liked = likes.any { it.id == snap.mediaId },
-            onToggleLike = {
-                val id = snap.mediaId
-                if (!id.isNullOrBlank()) {
-                    val likedNow = likes.any { it.id == id }
-                    scope.launch {
-                        withContext(Dispatchers.IO) { runCatching { NeteaseApi.like(id, !likedNow) } }
-                        refreshLikes()
-                    }
-                }
-            },
             onClose = { showPlayer = false },
         )
-    }
-
-    if (showWebLogin) {
-        WebLoginDialog(onDismiss = { showWebLogin = false }, onLoggedIn = { showWebLogin = false; afterLogin() })
-    }
-    if (showPhone) {
-        PhoneLoginDialog(onDismiss = { showPhone = false }, onLoggedIn = { showPhone = false; afterLogin() })
     }
 }
 
@@ -439,8 +348,6 @@ private fun MiniPlayer(
 private fun NowPlayingScreen(
     controller: MediaController?,
     snap: PlayerSnapshot,
-    liked: Boolean,
-    onToggleLike: () -> Unit,
     onClose: () -> Unit,
 ) {
     var bg by remember { mutableStateOf(Color(0xFF000000)) }
@@ -522,13 +429,6 @@ private fun NowPlayingScreen(
                                 maxLines = 1,
                             )
                         }
-                    }
-                    IconButton(onClick = onToggleLike) {
-                        Icon(
-                            HugeIcons.Heart,
-                            contentDescription = "收藏",
-                            tint = if (liked) accent else Color.White.copy(alpha = 0.85f),
-                        )
                     }
                     Box {
                         IconButton(onClick = { menuOpen = true }) {
@@ -855,70 +755,4 @@ private fun parseTimedText(raw: String): Map<Long, String> {
         }
     }
     return out
-}
-
-@Composable
-private fun WebLoginDialog(onDismiss: () -> Unit, onLoggedIn: () -> Unit) {
-    var status by remember { mutableStateOf("在下方网页登录（扫码/账号），完成后点“我已登录，抓取”") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("网易云网页登录") },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                AndroidView(
-                    modifier = Modifier.fillMaxWidth().height(420.dp),
-                    factory = { ctx ->
-                        WebView(ctx).apply {
-                            settings.javaScriptEnabled = true
-                            settings.domStorageEnabled = true
-                            webViewClient = WebViewClient()
-                            loadUrl("https://music.163.com/#/login")
-                        }
-                    },
-                )
-                Text(status, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val cookie = CookieManager.getInstance().getCookie("https://music.163.com").orEmpty()
-                if (cookie.contains("MUSIC_U=")) {
-                    NeteaseApi.cookie = cookie
-                    runCatching { CookieManager.getInstance().flush() }
-                    onLoggedIn()
-                } else {
-                    status = "还没检测到登录，请先在网页里完成登录"
-                }
-            }) { Text("我已登录，抓取") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
-    )
-}
-
-@Composable
-private fun PhoneLoginDialog(onDismiss: () -> Unit, onLoggedIn: () -> Unit) {
-    var phone by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var message by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("手机号登录") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = phone, onValueChange = { phone = it }, singleLine = true, label = { Text("手机号") })
-                OutlinedTextField(value = password, onValueChange = { password = it }, singleLine = true, label = { Text("密码") })
-                message?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                scope.launch {
-                    val ok = withContext(Dispatchers.IO) { runCatching { NeteaseApi.cellphoneLogin(phone, password) }.getOrDefault(false) }
-                    if (ok) onLoggedIn() else message = "登录失败（可能需验证码/密码错误）"
-                }
-            }) { Text("登录") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
-    )
 }

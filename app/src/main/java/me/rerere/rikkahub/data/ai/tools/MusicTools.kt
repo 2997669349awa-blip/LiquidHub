@@ -17,10 +17,8 @@ import me.rerere.ai.core.InputSchema
 import me.rerere.ai.core.Tool
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.rikkahub.data.music.MusicControllerHolder
-import me.rerere.rikkahub.data.music.MusicSession
 import me.rerere.rikkahub.data.music.MusicSong
 import me.rerere.rikkahub.data.music.MusicSources
-import me.rerere.rikkahub.data.music.NeteaseApi
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 
@@ -182,11 +180,9 @@ fun createMusicTools(): List<Tool> = listOf(
 )
 
 /**
- * 依次尝试多个关键词，返回第一个有结果列表的搜索结果。
- * 会在搜索前确保网易云登录 Cookie 已加载，让 AI 搜索与手动搜索走同一账号身份。
+ * 依次尝试多个关键词，返回第一个有结果列表的搜索结果。音乐由已启用的音乐源提供。
  */
 private suspend fun searchSongs(vararg queries: String): List<MusicSong> {
-    MusicSession.ensure(MusicToolKoin.context)
     val tries = queries.map { it.trim() }.filter { it.isNotBlank() }.distinct()
     for (q in tries) {
         val list = withContext(Dispatchers.IO) {
