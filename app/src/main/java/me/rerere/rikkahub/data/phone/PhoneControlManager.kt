@@ -22,6 +22,10 @@ object PhoneControlManager {
     private val _status = MutableStateFlow("待命")
     val status: StateFlow<String> = _status.asStateFlow()
 
+    // 悬浮球上实时显示的 AI 思考/回复文本
+    private val _liveText = MutableStateFlow("")
+    val liveText: StateFlow<String> = _liveText.asStateFlow()
+
     @Volatile
     var stopRequested: Boolean = false
         private set
@@ -43,6 +47,7 @@ object PhoneControlManager {
 
     fun startSession() {
         stopRequested = false
+        _liveText.value = ""
         _active.value = true
         setStatus("手机控制已开启")
     }
@@ -50,10 +55,15 @@ object PhoneControlManager {
     fun stopSession() {
         stopRequested = true
         _active.value = false
+        _liveText.value = ""
         setStatus("手机控制已停止")
     }
 
     fun setStatus(text: String) {
         _status.value = text
+    }
+
+    fun setLiveText(text: String) {
+        _liveText.value = text
     }
 }

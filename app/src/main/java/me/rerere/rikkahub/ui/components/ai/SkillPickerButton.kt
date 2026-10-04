@@ -23,15 +23,23 @@ import androidx.compose.ui.unit.dp
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Sparkles
 
+/**
+ * 技能选择器。始终显示，列出磁盘上的全部技能（助手已启用的排在前面）。
+ * 若还没有任何技能，也会显示并提示如何添加。
+ */
 @Composable
 fun SkillPickerButton(
-    enabledSkills: List<String>,
+    skills: List<String>,
+    enabledSkills: Set<String>,
     pinnedSkill: String?,
     onUpdate: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (enabledSkills.isEmpty()) return
     var expanded by remember { mutableStateOf(false) }
+    val ordered = remember(skills, enabledSkills) {
+        (skills.filter { it in enabledSkills } + skills.filterNot { it in enabledSkills }).distinct()
+    }
+
     Box(modifier) {
         IconButton(
             onClick = { expanded = true },
@@ -55,14 +63,23 @@ fun SkillPickerButton(
                     onUpdate(null)
                 },
             )
-            enabledSkills.forEach { skill ->
+            if (ordered.isEmpty()) {
                 DropdownMenuItem(
-                    text = { Text(skill) },
-                    onClick = {
-                        expanded = false
-                        onUpdate(if (pinnedSkill == skill) null else skill)
-                    },
+                    text = { Text("暂无技能，请到 助手 > 扩展 > 技能 添加") },
+                    enabled = false,
+                    onClick = {},
                 )
+            } else {
+                ordered.forEach { skill ->
+                    val enabled = skill in enabledSkills
+                    DropdownMenuItem(
+                        text = { Text(if (enabled) skill else "$skill（未启用）") },
+                        onClick = {
+                            expanded = false
+                            onUpdate(if (pinnedSkill == skill) null else skill)
+                        },
+                    )
+                }
             }
         }
     }

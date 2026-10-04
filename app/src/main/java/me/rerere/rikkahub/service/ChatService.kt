@@ -34,6 +34,7 @@ import me.rerere.ai.provider.TextGenerationParams
 import me.rerere.ai.ui.ToolApprovalState
 import me.rerere.ai.ui.UIMessage
 import me.rerere.ai.ui.UIMessagePart
+import me.rerere.rikkahub.data.phone.PhoneControlManager
 import me.rerere.ai.ui.canResumeToolExecution
 import me.rerere.ai.ui.finishPendingTools
 import me.rerere.ai.ui.isEmptyInputMessage
@@ -709,6 +710,23 @@ class ChatService(
                             .updateCurrentMessages(chunk.messages)
                         updateConversation(conversationId, updatedConversation)
 
+                        // 手机控制进行中：把 AI 的实时思考/回复同步到悬浮球
+                        if (PhoneControlManager.active.value) {
+                            val live = updatedConversation.currentMessages
+                                .lastOrNull { it.role == MessageRole.ASSISTANT }
+                                ?.parts
+                                ?.joinToString("") { part ->
+                                    when (part) {
+                                        is UIMessagePart.Reasoning -> part.reasoning
+                                        is UIMessagePart.Text -> part.text
+                                        else -> ""
+                                    }
+                                }
+                                .orEmpty()
+                                .trim()
+                            if (live.isNotEmpty()) PhoneControlManager.setLiveText(live)
+                        }
+
                         // 通知等边缘副作用由 ChatNotificationManager 消费；
                         // tryEmit 不挂起，事件丢失只影响单次通知更新，不能反压生成链
                         chunk.messages.lastOrNull()?.let { lastMessage ->
@@ -730,6 +748,10 @@ class ChatService(
             Logging.log(TAG, "handleMessageComplete: $it")
             Logging.log(TAG, it.stackTraceToString())
         }.onSuccess {
+            // 手机控制：本轮操作结束后自动停止并回到 App，方便查看结果
+            if (PhoneControlManager.active.value) {
+                runCatching { PhoneControlService.stop(context) }
+            }
             val finalConversation = getConversationFlow(conversationId).value
 
             sessionManager.launchWithSession(conversationId) {

@@ -85,6 +85,13 @@ fun createPhoneTools(context: Context): List<Tool> = listOf(
         description = "开始手机控制会话：先返回桌面，再在右上角显示悬浮球，悬浮球会实时显示当前动作，单击即可停止。" +
             "若缺少无障碍/悬浮窗权限，会自动打开对应系统设置页，请用户开启后再次调用。",
         parameters = { noParams() },
+        systemPrompt = { _, _ ->
+            "**Phone control**\n" +
+                "- Type the ENTIRE text in ONE phone_text call. Never type character by character.\n" +
+                "- Do NOT screenshot after every action; screenshot only when you actually need to see the result.\n" +
+                "- Avoid phone_wait between simple actions; keep waits short (<=500ms) and only when needed.\n" +
+                "- Prefer phone_click_text over guessing coordinates."
+        },
         execute = {
             val ctx = PhoneControlManager.context()
             val problems = mutableListOf<String>()
@@ -293,12 +300,18 @@ fun createPhoneTools(context: Context): List<Tool> = listOf(
         },
         execute = {
             val text = it.str("text")
-            PhoneControlManager.setStatus("输入文本")
-            val ok = PhoneAccessibilityService.instance?.setTextOnFocus(text) ?: false
-            if (!ok) {
-                runCatching { runShell("input text ${text.replace(" ", "%s")}") }
+            PhoneControlManager.setStatus("输入文本（一次写入）")
+            val viaAccessibility = PhoneAccessibilityService.instance?.setText(text) ?: false
+            var viaShell = false
+            if (!viaAccessibility) {
+                viaShell = runCatching { runShell("input text ${text.replace(" ", "%s")}") }.isSuccess
             }
-            listOf(textResult { put("ok", ok) })
+            listOf(
+                textResult {
+                    put("ok", viaAccessibility || viaShell)
+                    put("method", if (viaAccessibility) "accessibility" else if (viaShell) "shell" else "failed")
+                }
+            )
         }
     ),
     Tool(

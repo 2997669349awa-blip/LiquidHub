@@ -74,6 +74,27 @@ class PhoneAccessibilityService : AccessibilityService() {
             .getOrDefault(false)
     }
 
+    /** 一次性把整段文本写入输入框：优先焦点输入框，其次页面里第一个可编辑控件。 */
+    fun setText(input: String): Boolean {
+        val root = rootInActiveWindow ?: return false
+        val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        val target = focused?.takeIf { it.isEditable } ?: findFirstEditable(root) ?: return false
+        val args = Bundle().apply {
+            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, input)
+        }
+        return runCatching { target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args) }
+            .getOrDefault(false)
+    }
+
+    private fun findFirstEditable(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
+        if (node == null) return null
+        if (node.isEditable) return node
+        for (i in 0 until node.childCount) {
+            findFirstEditable(node.getChild(i))?.let { return it }
+        }
+        return null
+    }
+
     fun clickByText(text: String): Boolean {
         val root = rootInActiveWindow ?: return false
         val target = findNodeByText(root, text) ?: return false

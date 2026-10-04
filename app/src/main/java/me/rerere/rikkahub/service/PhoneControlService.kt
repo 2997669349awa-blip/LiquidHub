@@ -48,6 +48,15 @@ class PhoneControlService : Service() {
         fun stop(context: Context) {
             PhoneControlManager.stopSession()
             runCatching { context.stopService(Intent(context, PhoneControlService::class.java)) }
+            bringAppToFront(context)
+        }
+
+        /** 手机控制结束时自动把 App 拉回前台，方便用户查看结果。 */
+        fun bringAppToFront(context: Context) {
+            val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                ?: return
+            runCatching { context.startActivity(intent) }
         }
     }
 
@@ -89,9 +98,10 @@ class PhoneControlService : Service() {
                 cornerRadius = dp(18).toFloat()
                 setColor(Color.parseColor("#CC2D6CDF"))
             }
-            text = "手机控制\n${PhoneControlManager.status.value}"
+            text = renderText()
             setOnClickListener {
                 PhoneControlManager.stopSession()
+                bringAppToFront(this@PhoneControlService)
                 stopSelf()
             }
         }
@@ -123,9 +133,24 @@ class PhoneControlService : Service() {
 
     private fun observeStatus() {
         scope.launch {
-            PhoneControlManager.status.collect { status ->
-                ballView?.text = "手机控制\n$status"
+            PhoneControlManager.status.collect {
+                ballView?.text = renderText()
             }
+        }
+        scope.launch {
+            PhoneControlManager.liveText.collect {
+                ballView?.text = renderText()
+            }
+        }
+    }
+
+    private fun renderText(): String {
+        val action = PhoneControlManager.status.value
+        val live = PhoneControlManager.liveText.value.trim()
+        return if (live.isNotBlank()) {
+            "手机控制 · $action\n${live.takeLast(200)}"
+        } else {
+            "手机控制\n$action"
         }
     }
 

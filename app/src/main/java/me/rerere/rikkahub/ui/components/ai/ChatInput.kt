@@ -98,6 +98,7 @@ import me.rerere.rikkahub.data.datastore.getCurrentAssistant
 import me.rerere.rikkahub.data.datastore.getCurrentChatModel
 import me.rerere.rikkahub.data.datastore.getQuickMessagesOfAssistant
 import me.rerere.rikkahub.data.files.FilesManager
+import me.rerere.rikkahub.data.files.SkillManager
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.QuickMessage
 import me.rerere.rikkahub.service.MessageQueueState
@@ -153,6 +154,10 @@ fun ChatInput(
 ) {
     val toaster = LocalToaster.current
     val assistant = settings.getCurrentAssistant()
+    val skillManager: SkillManager = koinInject()
+    val allSkills = remember(assistant.id) {
+        runCatching { skillManager.listSkills().map { it.name }.sorted() }.getOrDefault(emptyList())
+    }
     val hazeTintColor = MaterialTheme.colorScheme.surfaceContainerLow
 
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -325,7 +330,8 @@ fun ChatInput(
 
                             // Skill（本条消息指定技能）
                             SkillPickerButton(
-                                enabledSkills = assistant.enabledSkills.toList(),
+                                skills = allSkills,
+                                enabledSkills = assistant.enabledSkills,
                                 pinnedSkill = pinnedSkill,
                                 onUpdate = onUpdatePinnedSkill,
                             )
