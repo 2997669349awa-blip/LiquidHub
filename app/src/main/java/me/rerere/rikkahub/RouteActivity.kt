@@ -125,6 +125,7 @@ import me.rerere.rikkahub.ui.pages.setting.SettingProviderDetailPage
 import me.rerere.rikkahub.ui.pages.setting.LocalModelsPage
 import me.rerere.rikkahub.ui.pages.setting.MusicPage
 import me.rerere.rikkahub.ui.pages.setting.SettingPhoneControlPage
+import me.rerere.rikkahub.ui.pages.setting.SettingDialogCommandsPage
 import me.rerere.rikkahub.ui.pages.setting.SettingProviderPage
 import me.rerere.rikkahub.ui.pages.setting.SettingSearchDetailPage
 import me.rerere.rikkahub.ui.pages.setting.SettingSearchPage
@@ -508,6 +509,10 @@ class RouteActivity : ComponentActivity() {
                                 SettingPhoneControlPage()
                             }
 
+                            entry<Screen.DialogCommands> {
+                                SettingDialogCommandsPage()
+                            }
+
                             entry<Screen.Debug> {
                                 DebugPage()
                             }
@@ -735,6 +740,9 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data object PhoneControl : Screen
+
+    @Serializable
+    data object DialogCommands : Screen
 
     @Serializable
     data object Debug : Screen

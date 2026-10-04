@@ -240,23 +240,28 @@ class ChatService(
         keepAliveInBackground: Boolean = true,
         block: suspend () -> Unit,
     ): Job {
-        if (!keepAliveInBackground) return appScope.launch(start = CoroutineStart.LAZY) { block() }
-
-        return appScope.launch(start = CoroutineStart.LAZY) {
-            val generationId = Uuid.random()
-            val foregroundStarted = ChatGenerationForegroundService.acquire(
-                context = context,
-                generationId = generationId,
-                conversationId = conversationId,
-            )
-            try {
-                block()
-            } finally {
-                if (foregroundStarted) {
-                    ChatGenerationForegroundService.release(context, generationId)
+        val job = if (!keepAliveInBackground) {
+            appScope.launch(start = CoroutineStart.LAZY) { block() }
+        } else {
+            appScope.launch(start = CoroutineStart.LAZY) {
+                val generationId = Uuid.random()
+                val foregroundStarted = ChatGenerationForegroundService.acquire(
+                    context = context,
+                    generationId = generationId,
+                    conversationId = conversationId,
+                )
+                try {
+                    block()
+                } finally {
+                    if (foregroundStarted) {
+                        ChatGenerationForegroundService.release(context, generationId)
+                    }
                 }
             }
         }
+        val taskId = ChatTaskManager.register(conversationId, job)
+        job.invokeOnCompletion { ChatTaskManager.complete(taskId) }
+        return job
     }
 
     // ---- 初始化对话 ----
@@ -513,6 +518,22 @@ class ChatService(
         }
 
         session.setJob(job)
+    }
+
+    /** 输入框命令 //recover-<任务ID>：对指定会话的最后一个助手消息重新生成。 */
+    fun recoverTask(conversationId: Uuid) {
+        appScope.launch {
+            runCatching {
+                initializeConversation(conversationId)
+                val conversation = getConversationFlow(conversationId).value
+                val lastAssistant = conversation.messageNodes
+                    .lastOrNull { it.currentMessage.role == MessageRole.ASSISTANT }
+                    ?.currentMessage
+                if (lastAssistant != null) {
+                    regenerateAtMessage(conversationId, lastAssistant, regenerateAssistantMsg = true)
+                }
+            }
+        }
     }
 
     // ---- 处理工具调用审批 ----

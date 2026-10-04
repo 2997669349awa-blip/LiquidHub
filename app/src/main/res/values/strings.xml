@@ -894,7 +894,7 @@
   <string name="setting_page_search_title">Search Service</string>
   <string name="setting_page_share">Share</string>
   <string name="setting_page_share_desc">Share this app with friends</string>
-  <string name="setting_page_share_text">RikkaHub - Open Source Android AI Assistant\n\nWebsite: https://rikka-ai.com/</string>
+  <string name="setting_page_share_text">LiquidHub - Open Source Android AI Assistant\n\nWebsite: https://2997669349awa-blip.github.io/LiquidHub/</string>
   <string name="setting_page_sponsor_alert_confirm">Donate</string>
   <string name="setting_page_sponsor_alert_desc">You have launched the app over 100 times! If you enjoy using it, please consider supporting the developer.</string>
   <string name="setting_page_sponsor_alert_dismiss">Not Now</string>
@@ -923,7 +923,7 @@
   <string name="setting_page_web_server">Web Server</string>
   <string name="setting_page_web_server_address_note">Address Notes</string>
   <string name="setting_page_web_server_address_note_desc">LAN Address: Uses device WiFi IP, accessible to other devices on the same network. Unavailable on mobile data.\nLocal Address: Uses localhost, accessible on this device only.\nmDNS Address: Uses .local hostname, accessible by name from other devices on the same network without knowing the IP.</string>
-  <string name="setting_page_web_server_desc">Allow you access RikkaHub via Web</string>
+  <string name="setting_page_web_server_desc">Allow you access LiquidHub via Web</string>
   <string name="setting_page_web_server_error">Error</string>
   <string name="setting_page_web_server_jwt_enable">Enable authentication</string>
   <string name="setting_page_web_server_jwt_enable_desc">Require password verification when accessing the web interface</string>
@@ -1402,6 +1402,8 @@
   <string name="workspace_page_public_storage_action">去授权</string>
   <string name="workspace_detail_persist_files">文件保留在公共存储</string>
   <string name="workspace_detail_persist_files_desc">开启后该工作区文件保存到 /sdcard/LiquidHub/workspaces，卸载重装不丢失（需先授予「所有文件访问」）</string>
+  <string name="dialog_commands_title">对话框命令</string>
+  <string name="dialog_commands_desc">在对话输入框里直接输入以 // 开头的命令即可本地执行，不会发给 AI。资源异常卡住时可用它们强行停止或恢复任务。</string>
   <string name="permission_go_grant">去授权</string>
   <string name="phone_control_page_title">手机控制</string>
   <string name="phone_control_page_shizuku">Shizuku 授权</string>

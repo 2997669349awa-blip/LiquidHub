@@ -296,22 +296,20 @@ install_browser() {
   TIER=$(read_tier)
   if [ "${'$'}TIER" = "mini" ]; then log "tier=mini：跳过浏览器"; return 0; fi
   log "installing browser (tier ${'$'}TIER)"
+  # 默认火狐；chromium 在部分发行版是 snap 空壳，放到最后兜底
   if command -v apk >/dev/null 2>&1; then
-    [ "${'$'}TIER" = "full" ] && { apk_do firefox 2>/dev/null || true; }
-    apk_do chromium 2>/dev/null || true
+    apk_do firefox 2>/dev/null || apk_do chromium 2>/dev/null || true
   elif command -v apt-get >/dev/null 2>&1; then
-    if [ "${'$'}TIER" = "full" ]; then
-      apt_do install firefox-esr 2>/dev/null \
-        || apt_do install firefox 2>/dev/null || true
-    fi
-    apt_do install chromium 2>/dev/null \
-      || apt_do install chromium-browser 2>/dev/null \
+    apt_do install firefox-esr 2>/dev/null \
+      || apt_do install firefox 2>/dev/null \
       || apt_do install epiphany-browser 2>/dev/null \
       || apt_do install falkon 2>/dev/null \
+      || apt_do install chromium 2>/dev/null \
+      || apt_do install chromium-browser 2>/dev/null \
       || log "WARN: 没有可用的浏览器"
   elif command -v pacman >/dev/null 2>&1; then
-    [ "${'$'}TIER" = "full" ] && { pacman -Sy --noconfirm --needed firefox 2>/dev/null || true; }
-    pacman -Sy --noconfirm --needed chromium 2>/dev/null || true
+    pacman -Sy --noconfirm --needed firefox 2>/dev/null \
+      || pacman -Sy --noconfirm --needed chromium 2>/dev/null || true
   fi
 }
 
@@ -340,11 +338,7 @@ install_pkgs() {
     log "Alpine(apk): installing desktop packages"
     apk_do ca-certificates xvfb x11vnc fluxbox openbox xdotool bash coreutils || RC=1
     if [ "${'$'}TIER" != "mini" ]; then
-      apk_do xterm imagemagick scrot dbus font-noto font-noto-cjk \
-        pulseaudio pulseaudio-utils ffmpeg || log "WARN: 部分可选组件安装失败（不影响桌面）"
-    fi
-    if [ "${'$'}TIER" = "full" ]; then
-      apk_do pcmanfm firefox 2>/dev/null || true
+      apk_do xterm scrot font-noto-cjk || log "WARN: 部分可选组件安装失败（不影响桌面）"
     fi
   elif command -v apt-get >/dev/null 2>&1; then
     log "Debian/Ubuntu(apt): installing desktop packages"
@@ -363,11 +357,7 @@ install_pkgs() {
       command -v "${'$'}p" >/dev/null 2>&1 || RC=1
     done
     if [ "${'$'}TIER" != "mini" ]; then
-      apt_do install xterm imagemagick scrot dbus-x11 fonts-noto-cjk pulseaudio pulseaudio-utils ffmpeg \
-        || log "WARN: 部分可选组件安装失败（不影响桌面）"
-    fi
-    if [ "${'$'}TIER" = "full" ]; then
-      apt_do install pcmanfm 2>/dev/null || true
+      apt_do install xterm scrot fonts-noto-cjk || log "WARN: 部分可选组件安装失败（不影响桌面）"
     fi
   elif command -v pacman >/dev/null 2>&1; then
     log "Arch(pacman): installing desktop packages"
@@ -376,11 +366,8 @@ install_pkgs() {
     pacman -Sy --noconfirm --needed archlinux-keyring >/dev/null 2>&1 || true
     pacman -Sy --noconfirm --needed ca-certificates xorg-server-xvfb x11vnc fluxbox openbox xdotool || RC=1
     if [ "${'$'}TIER" != "mini" ]; then
-      pacman -Sy --noconfirm --needed xterm imagemagick scrot dbus noto-fonts pulseaudio \
+      pacman -Sy --noconfirm --needed xterm scrot noto-fonts \
         || log "WARN: 部分可选组件安装失败（不影响桌面）"
-    fi
-    if [ "${'$'}TIER" = "full" ]; then
-      pacman -Sy --noconfirm --needed pcmanfm firefox 2>/dev/null || true
     fi
   else
     log "ERROR: unsupported package manager"
@@ -453,7 +440,7 @@ session.screen0.toolbar.autoHide: false
 session.screen0.toolbar.placement: BottomCenter
 session.screen0.toolbar.widthPercent: 100
 session.screen0.toolbar.alpha: 200
-session.screen0.toolbar.tools: prevworkspace, workspacename, nextworkspace, iconbar, systemtray, clock
+session.screen0.toolbar.tools: prevworkspace, workspacename, nextworkspace, iconbar, systemtray
 session.screen0.strftimeFormat: %H:%M
 session.screen0.workspaces: 1
 session.screen0.focusModel: ClickToFocus
@@ -466,7 +453,6 @@ FBEOF
   cat > "${'$'}HOME/.fluxbox/menu" <<'FBMENU'
 [begin] (LiquidHub)
   [exec] (终端 Terminal) { xterm }
-  [exec] (文件 Files) { pcmanfm }
   [exec] (浏览器 Browser) { firefox }
   [separator]
   [restart] (重新加载)
@@ -577,6 +563,43 @@ start() {
   log "STARTED: VNC ready (mode=${'$'}(cat /workspace/.liquidhub/vnc_mode 2>/dev/null || echo unknown))"
 }
 
+# Firefox 的内容进程沙箱在 proot 下会崩，写 user.js 关闭沙箱 + 软件渲染
+setup_firefox_profile() {
+  FF_DIR="${'$'}HOME/.mozilla/firefox"
+  mkdir -p "${'$'}FF_DIR"
+  PROFILE=""
+  for d in "${'$'}FF_DIR"/*.default-release "${'$'}FF_DIR"/*.default "${'$'}FF_DIR"/*.default-esr; do
+    [ -d "${'$'}d" ] && { PROFILE="${'$'}d"; break; }
+  done
+  if [ -z "${'$'}PROFILE" ]; then
+    PROFILE="${'$'}FF_DIR/liquidhub.default-release"
+    mkdir -p "${'$'}PROFILE"
+    cat > "${'$'}FF_DIR/profiles.ini" <<'FFINI'
+[Profile0]
+Name=default-release
+IsRelative=1
+Path=liquidhub.default-release
+Default=1
+
+[General]
+StartWithLastProfile=1
+Version=2
+FFINI
+  fi
+  cat > "${'$'}PROFILE/user.js" <<'FFJS'
+user_pref("security.sandbox.content.level", 0);
+user_pref("security.sandbox.gpu.level", 0);
+user_pref("security.sandbox.socket.level", 0);
+user_pref("security.sandbox.rdd.level", 0);
+user_pref("security.sandbox.utility.level", 0);
+user_pref("dom.ipc.processCount", 1);
+user_pref("gfx.webrender.software", true);
+user_pref("layers.acceleration.disabled", true);
+user_pref("media.hardware-video-decoding.enabled", false);
+user_pref("toolkit.startup.max_resumed_crashes", -1);
+FFJS
+}
+
 browser() {
   PREF=""
   [ -f /workspace/.liquidhub/browser ] && PREF=$(cat /workspace/.liquidhub/browser 2>/dev/null)
@@ -588,12 +611,17 @@ browser() {
     done
   fi
   if [ -z "${'$'}BIN" ]; then log "ERROR: no browser installed"; return 3; fi
+  echo "${'$'}BIN" > /workspace/.liquidhub/browser
   if pgrep -f "${'$'}BIN" >/dev/null 2>&1; then
     "${'$'}BIN" "${'$'}{1:-about:blank}" >/dev/null 2>&1
     log "BROWSER_NAVIGATED"
     return 0
   fi
   case "${'$'}BIN" in
+    firefox*)
+      setup_firefox_profile
+      MOZ_DISABLE_CONTENT_SANDBOX=1 MOZ_DISABLE_GMP_SANDBOX=1 MOZ_WEBRENDER=0 \
+        "${'$'}BIN" -no-remote "${'$'}{1:-about:blank}" >"${'$'}RUNDIR/browser.log" 2>&1 & ;;
     chromium|chromium-browser)
       "${'$'}BIN" --no-sandbox --disable-dev-shm-usage --disable-gpu --no-first-run \
         --user-data-dir="${'$'}HOME/.chromium" --window-size=1280,720 --window-position=0,0 \

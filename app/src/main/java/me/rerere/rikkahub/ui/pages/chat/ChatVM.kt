@@ -34,15 +34,19 @@ import me.rerere.rikkahub.data.datastore.getCurrentChatModel
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Avatar
+import me.rerere.rikkahub.BuildConfig
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.model.MessageNode
 import me.rerere.rikkahub.data.model.NodeFavoriteTarget
+import me.rerere.rikkahub.data.phone.PhoneControlManager
 import me.rerere.rikkahub.data.repository.ConversationRepository
 import me.rerere.rikkahub.data.repository.FavoriteRepository
 import me.rerere.rikkahub.service.ChatError
 import me.rerere.rikkahub.service.ChatService
+import me.rerere.rikkahub.service.ChatTaskManager
 import me.rerere.rikkahub.ui.hooks.writeStringPreference
 import me.rerere.rikkahub.ui.hooks.ChatInputState
+import me.rerere.rikkahub.utils.ChatCommandSpecs
 import me.rerere.rikkahub.utils.UiState
 import me.rerere.rikkahub.utils.UpdateChecker
 import java.util.Locale
@@ -209,6 +213,55 @@ class ChatVM(
         analytics.logEvent("ai_send_message", null)
 
         chatService.sendMessage(_conversationId, content, answer, skill)
+    }
+
+    /** 执行输入框命令（以 // 开头）。返回给用户看的结果文本，不会发给 AI。 */
+    fun runCommand(raw: String): String {
+        val cmd = raw.removePrefix("//").trim()
+        val lower = cmd.lowercase()
+        return when {
+            lower.isEmpty() || lower == "help" -> ChatCommandSpecs.helpText()
+
+            lower == "tasks" -> {
+                val tasks = ChatTaskManager.activeTasks()
+                if (tasks.isEmpty()) {
+                    "当前没有进行中的任务"
+                } else {
+                    tasks.joinToString("\n") { "${it.id}  ·  会话 ${it.conversationId.toString().take(8)}" }
+                }
+            }
+
+            lower == "killall" -> "已请求停止 ${ChatTaskManager.killAll()} 个任务"
+
+            lower.startsWith("kill-") -> {
+                val id = cmd.substringAfter("kill-", "").trim()
+                if (ChatTaskManager.kill(id)) "已请求停止任务 $id" else "未找到进行中的任务：$id"
+            }
+
+            lower.startsWith("recover-") -> {
+                val id = cmd.substringAfter("recover-", "").trim()
+                val task = ChatTaskManager.find(id)
+                if (task == null) {
+                    "未找到任务：$id"
+                } else {
+                    chatService.recoverTask(task.conversationId)
+                    "已尝试恢复任务 $id"
+                }
+            }
+
+            lower == "stop" -> {
+                stopGeneration()
+                "已停止当前会话的生成"
+            }
+
+            lower == "status" -> buildString {
+                append("LiquidHub ${BuildConfig.APP_VERSION} (${BuildConfig.VERSION_NAME})\n")
+                append("进行中的任务：${ChatTaskManager.activeTasks().size}\n")
+                append("手机控制：${if (PhoneControlManager.active.value) "开启" else "关闭"}")
+            }
+
+            else -> "未知命令：$cmd\n（输入 //help 查看全部命令）"
+        }
     }
 
     fun handleMessageEdit(parts: List<UIMessagePart>, messageId: Uuid) {

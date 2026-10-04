@@ -99,6 +99,7 @@ import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
 @Composable
@@ -397,6 +398,13 @@ private fun ChatPageContent(
                         )
                     },
                     onSendClick = {
+                        val trimmed = inputState.textContent.text.toString().trim()
+                        if (trimmed.startsWith("//")) {
+                            val result = vm.runCommand(trimmed)
+                            inputState.clearInput()
+                            toaster.show(message = result, duration = 6.seconds, type = ToastType.Normal)
+                            return@ChatInput
+                        }
                         if (currentChatModel == null) {
                             toaster.show("请先选择模型", type = ToastType.Error)
                             return@ChatInput

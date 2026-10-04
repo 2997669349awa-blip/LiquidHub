@@ -52,6 +52,7 @@ import me.rerere.hugeicons.stroke.Bookshelf01
 import me.rerere.hugeicons.stroke.Brain02
 import me.rerere.hugeicons.stroke.Clapping01
 import me.rerere.hugeicons.stroke.ComputerPhoneSync
+import me.rerere.hugeicons.stroke.ComputerTerminal01
 import me.rerere.hugeicons.stroke.Database02
 import me.rerere.hugeicons.stroke.Download04
 import me.rerere.hugeicons.stroke.Folder01
@@ -294,6 +295,12 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                         leadingContent = { Icon(HugeIcons.ComputerPhoneSync, null) },
                         supportingContent = { Text("授权 Shizuku/无障碍/悬浮窗，让 AI 操作手机") },
                         headlineContent = { Text("手机控制") },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.DialogCommands) },
+                        leadingContent = { Icon(HugeIcons.ComputerTerminal01, null) },
+                        supportingContent = { Text("输入框里以 // 开头的本地命令，如 //tasks、//kill-<ID>") },
+                        headlineContent = { Text("对话框命令") },
                     )
                 }
             }
