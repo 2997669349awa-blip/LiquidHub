@@ -316,7 +316,7 @@ private fun ChatListNormal(
                 items = conversation.messageNodes,
                 key = { index, item -> item.id },
             ) { index, node ->
-                Column {
+                Column(modifier = Modifier.animateItem()) {
                     ListSelectableItem(
                         key = node.id,
                         onSelectChange = {

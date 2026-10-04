@@ -57,7 +57,8 @@ class UpdateChecker(
                             .build()
                     ).await()
                     if (response.isSuccessful) {
-                        json.decodeFromString<UpdateInfo>(response.body.string())
+                        val manifest = json.decodeFromString<UpdateManifest>(response.body.string())
+                        resolveChannel(manifest)
                     } else {
                         throw Exception("Failed to fetch update info")
                     }
@@ -69,6 +70,25 @@ class UpdateChecker(
     }.catch {
         emit(UiState.Error(it))
     }.flowOn(Dispatchers.IO)
+
+    private fun resolveChannel(manifest: UpdateManifest): UpdateInfo {
+        // 兼容旧的扁平格式：顶层 version 视为正式版
+        val stable = manifest.stable ?: manifest.version?.let { v ->
+            UpdateInfo(
+                version = v,
+                publishedAt = manifest.publishedAt.orEmpty(),
+                changelog = manifest.changelog.orEmpty(),
+                downloads = manifest.downloads,
+            )
+        }
+        val preview = manifest.preview
+        val current = Version(BuildConfig.VERSION_NAME.trimStart('V', 'v'))
+        val previewNewer = preview?.takeIf { runCatching { Version(it.version) > current }.getOrDefault(false) }
+        val stableNewer = stable?.takeIf { runCatching { Version(it.version) > current }.getOrDefault(false) }
+        // 正式版和预览版都检测；只要有更新的预览版，就优先推预览版。
+        return previewNewer ?: stableNewer ?: preview ?: stable
+            ?: throw Exception("No update info")
+    }
 
     fun downloadUpdate(context: Context, download: UpdateDownload) {
         runCatching {
@@ -109,6 +129,19 @@ data class UpdateInfo(
     val publishedAt: String,
     val changelog: String,
     val downloads: List<UpdateDownload>
+)
+
+/**
+ * 更新清单：同时提供正式版(stable)和预览版(preview)，并兼容旧的扁平字段(顶层 version 视为正式版)。
+ */
+@Serializable
+data class UpdateManifest(
+    val version: String? = null,
+    val publishedAt: String? = null,
+    val changelog: String? = null,
+    val downloads: List<UpdateDownload> = emptyList(),
+    val stable: UpdateInfo? = null,
+    val preview: UpdateInfo? = null,
 )
 
 /**

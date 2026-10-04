@@ -36,7 +36,7 @@ android {
         minSdk = 26
         targetSdk = 37
         versionCode = 189
-        versionName = "V0.1.0Data"
+        versionName = rootProject.file("version.txt").takeIf { it.exists() }?.readText()?.trim() ?: "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

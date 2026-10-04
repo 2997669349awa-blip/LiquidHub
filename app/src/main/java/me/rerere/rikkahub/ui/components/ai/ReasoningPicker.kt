@@ -1,6 +1,12 @@
 package me.rerere.rikkahub.ui.components.ai
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -132,33 +138,42 @@ fun ReasoningPicker(
                 )
             }
 
-            // 当前等级展示
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                val iconColor by animateColorAsState(
-                    if (reasoningLevel.isEnabled) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurface
-                )
-                Icon(
-                    imageVector = when (reasoningLevel) {
-                        ReasoningLevel.OFF -> HugeIcons.Idea
-                        ReasoningLevel.AUTO -> HugeIcons.Idea01
-                        ReasoningLevel.LOW -> ReasoningLow
-                        ReasoningLevel.MEDIUM -> ReasoningMedium
-                        ReasoningLevel.HIGH -> ReasoningHigh
-                        ReasoningLevel.XHIGH -> ReasoningHigh
-                        ReasoningLevel.MAX -> ReasoningHigh
-                    },
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp),
-                    tint = iconColor,
-                )
-                Text(
-                    text = reasoningLevel.label(),
-                    style = MaterialTheme.typography.titleMedium,
-                )
+            // 当前等级展示（切换等级时带过渡动画）
+            AnimatedContent(
+                targetState = reasoningLevel,
+                transitionSpec = {
+                    (fadeIn() + scaleIn(initialScale = 0.8f)) togetherWith
+                        (fadeOut() + scaleOut(targetScale = 0.8f))
+                },
+                label = "reasoningLevel",
+            ) { level ->
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val iconColor by animateColorAsState(
+                        if (level.isEnabled) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurface
+                    )
+                    Icon(
+                        imageVector = when (level) {
+                            ReasoningLevel.OFF -> HugeIcons.Idea
+                            ReasoningLevel.AUTO -> HugeIcons.Idea01
+                            ReasoningLevel.LOW -> ReasoningLow
+                            ReasoningLevel.MEDIUM -> ReasoningMedium
+                            ReasoningLevel.HIGH -> ReasoningHigh
+                            ReasoningLevel.XHIGH -> ReasoningHigh
+                            ReasoningLevel.MAX -> ReasoningHigh
+                        },
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = iconColor,
+                    )
+                    Text(
+                        text = level.label(),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
             }
 
             Slider(
