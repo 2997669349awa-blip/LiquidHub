@@ -1,12 +1,24 @@
 {
-  "version": "0.2.8Data",
-  "publishedAt": "2026-10-03T20:15:00Z",
-  "changelog": "LiquidHub V0.2.8Data\n\n- 网页版：输入框支持指定 skill，本条消息只允许该技能，AI 不再乱调；手机端界面更接近 App\n- 手机控制（新）：Shizuku + 无障碍，AI 可返回桌面、打开应用、点击、滑动、输入、截图、读屏；右上角悬浮球实时显示动作，单击即停止；支持自动刷短视频\n- 工作区：授予「所有文件访问」后，用户文件保存到 /sdcard/LiquidHub/workspaces，卸载重装不丢失；Linux 系统镜像仍在应用内\n- 桌面安装优化：镜像自动切换（清华/阿里/中科大）+ 失败重试 + 超时，减少下载失败；工作区详情页可手动安装/重装桌面",
+  "version": "1.0.0",
+  "publishedAt": "2026-10-04T05:00:00Z",
+  "changelog": "LiquidHub 1.0.0 正式版\n\n- 指定技能：App 与网页输入框都可为单条消息指定 skill，AI 不再乱调\n- 手机控制：设置 > 其他 > 手机控制，授权 Shizuku/无障碍/悬浮窗后可用；悬浮球实时显示动作、单击停止\n- 工作区：按工作区选择是否把文件保留在公共存储，卸载重装不丢\n- 桌面安装：通知栏显示安装进度；镜像自动切换 + 重试\n- 音乐：图标替换 emoji、四行歌词预览、播放器延伸到状态栏\n- 动画：消息列表入场动画、思考等级切换过渡\n- 更新：同时检测正式版与预览版，优先正式版，正式版无更新时再推预览版",
   "downloads": [
     {
-      "name": "liquidhub-release-1003-2015.apk",
-      "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1003-2015.apk",
+      "name": "liquidhub-release-1004-0500.apk",
+      "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1004-0500.apk",
       "size": "约 54 MB"
     }
-  ]
+  ],
+  "stable": {
+    "version": "1.0.0",
+    "publishedAt": "2026-10-04T05:00:00Z",
+    "changelog": "LiquidHub 1.0.0 正式版\n\n- 指定技能：App 与网页输入框都可为单条消息指定 skill，AI 不再乱调\n- 手机控制：设置 > 其他 > 手机控制，授权 Shizuku/无障碍/悬浮窗后可用；悬浮球实时显示动作、单击停止\n- 工作区：按工作区选择是否把文件保留在公共存储，卸载重装不丢\n- 桌面安装：通知栏显示安装进度；镜像自动切换 + 重试\n- 音乐：图标替换 emoji、四行歌词预览、播放器延伸到状态栏\n- 动画：消息列表入场动画、思考等级切换过渡\n- 更新：同时检测正式版与预览版，优先正式版，正式版无更新时再推预览版",
+    "downloads": [
+      {
+        "name": "liquidhub-release-1004-0500.apk",
+        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1004-0500.apk",
+        "size": "约 54 MB"
+      }
+    ]
+  }
 }
