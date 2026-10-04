@@ -1,0 +1,6 @@
+{
+  "name": "NeteaseCloudMusic",
+  "version": "1.0.0",
+  "type": "music",
+  "main": "index.js"
+}
