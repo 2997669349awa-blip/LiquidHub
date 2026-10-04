@@ -1421,6 +1421,10 @@
   <string name="music_source_status_enabled">音乐已启用</string>
   <string name="music_source_status_enabled_desc">现在可以打开内置音乐，和之前一样使用</string>
   <string name="music_source_open">打开音乐</string>
+  <string name="music_source_page_desc">音乐源是一个插件：添加后导入 manifest.json（type 必须为 music）和 index.js（定义 search(keyword)/songUrl(id)/lyrics(id)），测试通过即可启用。启用后音乐与 AI 搜歌都由该音乐源提供。内置网易云可用聊天命令 //NetEase Cloud Music 输入 32 位密码解锁。</string>
+  <string name="music_source_add">添加音乐源</string>
+  <string name="music_source_empty">还没有音乐源，点击上方按钮添加</string>
+  <string name="music_source_name_hint">名称（如 NetEaseCloudMusic）</string>
   <string name="permission_go_grant">去授权</string>
   <string name="phone_control_page_title">手机控制</string>
   <string name="phone_control_page_shizuku">Shizuku 授权</string>

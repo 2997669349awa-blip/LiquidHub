@@ -19,6 +19,7 @@ import me.rerere.ai.ui.UIMessagePart
 import me.rerere.rikkahub.data.music.MusicControllerHolder
 import me.rerere.rikkahub.data.music.MusicSession
 import me.rerere.rikkahub.data.music.MusicSong
+import me.rerere.rikkahub.data.music.MusicSources
 import me.rerere.rikkahub.data.music.NeteaseApi
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
@@ -189,7 +190,7 @@ private suspend fun searchSongs(vararg queries: String): List<MusicSong> {
     val tries = queries.map { it.trim() }.filter { it.isNotBlank() }.distinct()
     for (q in tries) {
         val list = withContext(Dispatchers.IO) {
-            runCatching { NeteaseApi.search(q) }.getOrDefault(emptyList())
+            runCatching { MusicSources.search(q) }.getOrDefault(emptyList())
         }
         if (list.isNotEmpty()) return list
     }

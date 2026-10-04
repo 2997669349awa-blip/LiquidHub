@@ -105,6 +105,7 @@ import me.rerere.rikkahub.data.music.MusicControllerHolder
 import me.rerere.rikkahub.data.music.MusicSession
 import me.rerere.rikkahub.data.music.MusicSong
 import me.rerere.rikkahub.data.music.MusicUser
+import me.rerere.rikkahub.data.music.MusicSources
 import me.rerere.rikkahub.data.music.NeteaseApi
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.theme.CustomColors
@@ -226,7 +227,7 @@ fun MusicPage() {
         loading = true
         error = null
         scope.launch {
-            val list = withContext(Dispatchers.IO) { runCatching { NeteaseApi.search(query) }.getOrNull() }
+            val list = withContext(Dispatchers.IO) { runCatching { MusicSources.search(query) }.getOrNull() }
             loading = false
             if (list == null) error = "搜索失败（网络或被限制）" else songs = list
         }
@@ -461,7 +462,7 @@ private fun NowPlayingScreen(
     LaunchedEffect(snap.mediaId) {
         val id = snap.mediaId ?: return@LaunchedEffect
         lyrics = null
-        val data = withContext(Dispatchers.IO) { runCatching { NeteaseApi.lyrics(id) }.getOrNull() }
+        val data = withContext(Dispatchers.IO) { runCatching { MusicSources.lyrics(id) }.getOrNull() }
         lyrics = data?.takeIf { it.lyric.isNotBlank() }
             ?.let { parseLrc(it.lyric, it.translation) }
             ?.takeIf { it.isNotEmpty() }

@@ -109,6 +109,8 @@ class RikkaHubApp : Application() {
 
         // 加载音乐源解锁状态（默认隐藏音乐功能）
         runCatching { MusicSourceManager.init(this) }
+        // 加载已启用的音乐源插件
+        runCatching { me.rerere.rikkahub.data.music.MusicSourceRegistry.init(this) }
 
         // 初始化手机控制管理器（悬浮球 / 无障碍 / Shizuku 工具依赖它的 context）
         runCatching { PhoneControlManager.init(this) }

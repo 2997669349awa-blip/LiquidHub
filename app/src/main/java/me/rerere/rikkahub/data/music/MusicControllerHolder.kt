@@ -94,7 +94,7 @@ object MusicControllerHolder {
         val uri = item.localConfiguration?.uri?.toString().orEmpty()
         if (!uri.contains("/song/media/outer/")) return
         scope.launch {
-            val resolved = runCatching { NeteaseApi.songUrl(id) }.getOrNull()
+            val resolved = runCatching { MusicSources.songUrl(id) }.getOrNull()
             if (resolved.isNullOrBlank()) return@launch
             withContext(Dispatchers.Main) {
                 runCatching { replaceItemWithResolved(c, id, resolved, item.mediaMetadata) }
@@ -114,7 +114,7 @@ object MusicControllerHolder {
             val c = ensure(context) ?: return@withContext null
             val clicked = songs.getOrNull(index)
             val resolvedUrl = clicked?.let {
-                withContext(Dispatchers.IO) { runCatching { NeteaseApi.songUrl(it.id) }.getOrNull() }
+                withContext(Dispatchers.IO) { runCatching { MusicSources.songUrl(it.id) }.getOrNull() }
             }
             val items = songs.mapIndexed { i, s ->
                 if (i == index && !resolvedUrl.isNullOrBlank()) resolvedItem(s, resolvedUrl) else toMediaItem(s)

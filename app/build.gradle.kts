@@ -191,6 +191,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
+    implementation(libs.quickjs)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.work.runtime.ktx)

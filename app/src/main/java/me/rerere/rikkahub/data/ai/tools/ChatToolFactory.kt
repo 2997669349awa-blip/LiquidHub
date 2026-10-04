@@ -63,7 +63,7 @@ class ChatToolFactory(
         if (shouldUseExternalWebSearch(assistant, model)) {
             addAll(createSearchTools(settings))
         }
-        if (MusicSourceManager.isUnlockedCached()) {
+        if (MusicSourceManager.isUnlockedCached() || me.rerere.rikkahub.data.music.MusicSourceRegistry.current() != null) {
             addAll(createMusicTools())
         }
         addAll(localTools.getTools(assistant.localTools))
