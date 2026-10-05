@@ -21,6 +21,7 @@ import {
   Plus,
   RefreshCw,
   LogOut,
+  Settings,
   Sun,
   Trash2,
 } from "lucide-react";
@@ -69,6 +70,7 @@ import {
 } from "~/components/theme-provider";
 import { ConversationSearchButton } from "~/components/conversation-search-button";
 import { CustomThemeDialog } from "~/components/custom-theme-dialog";
+import { SettingsDrawer } from "~/components/settings/settings-drawer";
 import { getAssistantDisplayName } from "~/lib/display";
 import { cn } from "~/lib/utils";
 import { clearWebAuthToken } from "~/services/api";
@@ -790,6 +792,7 @@ export const ConversationSidebar = React.memo(
     const [switchingAssistantId, setSwitchingAssistantId] = React.useState<string | null>(null);
     const [switchError, setSwitchError] = React.useState<string | null>(null);
     const [showBackToTop, setShowBackToTop] = React.useState(false);
+    const [settingsOpen, setSettingsOpen] = React.useState(false);
 
     const currentTheme = theme;
     const currentThemeOption =
@@ -1127,6 +1130,8 @@ export const ConversationSidebar = React.memo(
             onSave={handleCustomThemeSave}
           />
 
+          <SettingsDrawer open={settingsOpen} onOpenChange={setSettingsOpen} />
+
           <div className="flex items-center gap-2">
             {webAuthEnabled && (
               <Button
@@ -1143,6 +1148,18 @@ export const ConversationSidebar = React.memo(
             )}
 
             <LanguageSwitcher />
+
+            <Button
+              variant="outline"
+              size="icon-sm"
+              className="text-foreground"
+              type="button"
+              aria-label="设置"
+              title="设置"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <Settings className="size-4" />
+            </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

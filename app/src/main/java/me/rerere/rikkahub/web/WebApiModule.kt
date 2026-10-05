@@ -36,6 +36,7 @@ import me.rerere.rikkahub.web.routes.conversationRoutes
 import me.rerere.rikkahub.web.routes.eventsRoutes
 import me.rerere.rikkahub.web.routes.filesRoutes
 import me.rerere.rikkahub.web.routes.folderRoutes
+import me.rerere.rikkahub.web.routes.manageRoutes
 import me.rerere.rikkahub.web.routes.settingsRoutes
 import me.rerere.rikkahub.web.routes.skillRoutes
 import java.security.MessageDigest
@@ -179,6 +180,7 @@ fun Application.configureWebApi(
                     skillRoutes(skillManager, settingsStore)
                     filesRoutes(filesManager, context)
                     assetsRoutes(context)
+                    manageRoutes(settingsStore, skillManager, filesManager)
                 }
             } else {
                 conversationRoutes(chatService, conversationRepo, folderRepo, settingsStore)
@@ -188,6 +190,7 @@ fun Application.configureWebApi(
                 skillRoutes(skillManager, settingsStore)
                 filesRoutes(filesManager, context)
                 assetsRoutes(context)
+                manageRoutes(settingsStore, skillManager, filesManager)
             }
         }
     }

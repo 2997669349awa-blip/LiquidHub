@@ -27,6 +27,139 @@ data class SkillDto(
     val enabled: Boolean,
 )
 
+// ========== Management DTOs ==========
+
+@Serializable
+data class AssistantDto(
+    val id: String,
+    val name: String,
+    val systemPrompt: String,
+    val chatModelId: String?,
+    val temperature: Float?,
+    val topP: Float?,
+    val contextMessageLimit: Int,
+    val streamOutput: Boolean,
+    val enableMemory: Boolean,
+    val useGlobalMemory: Boolean,
+    val enableWebSearch: Boolean,
+    val enableRecentChatsReference: Boolean,
+    val maxTokens: Int?,
+    val reasoningLevel: String,
+    val useGradientBackground: Boolean,
+    val workspaceId: String?,
+)
+
+@Serializable
+data class CreateAssistantRequest(
+    val name: String,
+)
+
+@Serializable
+data class UpdateAssistantFieldsRequest(
+    val name: String? = null,
+    val systemPrompt: String? = null,
+    val chatModelId: String? = null,
+    val temperature: Float? = null,
+    val topP: Float? = null,
+    val contextMessageLimit: Int? = null,
+    val streamOutput: Boolean? = null,
+    val enableMemory: Boolean? = null,
+    val useGlobalMemory: Boolean? = null,
+    val enableWebSearch: Boolean? = null,
+    val enableRecentChatsReference: Boolean? = null,
+    val maxTokens: Int? = null,
+    val reasoningLevel: String? = null,
+    val useGradientBackground: Boolean? = null,
+    val workspaceId: String? = null,
+)
+
+@Serializable
+data class ModelDto(
+    val id: String,
+    val modelId: String,
+    val displayName: String,
+    val type: String,
+    val tools: List<String>,
+)
+
+@Serializable
+data class ProviderDto(
+    val id: String,
+    val name: String,
+    val enabled: Boolean,
+    val builtIn: Boolean,
+    val type: String,
+    val apiKey: String,
+    val baseUrl: String,
+    val models: List<ModelDto>,
+)
+
+@Serializable
+data class UpdateProviderRequest(
+    val name: String? = null,
+    val enabled: Boolean? = null,
+    val apiKey: String? = null,
+    val baseUrl: String? = null,
+)
+
+@Serializable
+data class GeneralSettingsDto(
+    val dynamicColor: Boolean,
+    val themeId: String,
+    val developerMode: Boolean,
+    val enableSuggestion: Boolean,
+    val chatModelId: String,
+    val fastModelId: String,
+    val imageGenerationModelId: String,
+    val translateModeId: String,
+    val ocrModelId: String,
+    val compressModelId: String,
+    val webServerEnabled: Boolean,
+    val webServerPort: Int,
+    val webServerJwtEnabled: Boolean,
+    val webServerLocalhostOnly: Boolean,
+)
+
+@Serializable
+data class UpdateGeneralSettingsRequest(
+    val dynamicColor: Boolean? = null,
+    val themeId: String? = null,
+    val developerMode: Boolean? = null,
+    val enableSuggestion: Boolean? = null,
+    val chatModelId: String? = null,
+    val fastModelId: String? = null,
+    val imageGenerationModelId: String? = null,
+    val translateModeId: String? = null,
+    val ocrModelId: String? = null,
+    val compressModelId: String? = null,
+)
+
+@Serializable
+data class SkillDetailDto(
+    val name: String,
+    val description: String,
+    val enabled: Boolean,
+    val content: String,
+)
+
+@Serializable
+data class SaveSkillRequest(
+    val name: String,
+    val content: String,
+)
+
+@Serializable
+data class FileItemDto(
+    val id: Long,
+    val folder: String,
+    val displayName: String,
+    val mimeType: String,
+    val sizeBytes: Long,
+    val relativePath: String,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
+
 @Serializable
 data class RegenerateRequest(
     val messageId: String

@@ -15,7 +15,9 @@ import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -40,6 +42,9 @@ class PhoneControlService : Service() {
         private const val CHANNEL_ID = "phone_control"
         private const val NOTIFICATION_ID = 0x9C12
 
+        @Volatile
+        private var instance: PhoneControlService? = null
+
         fun start(context: Context) {
             val intent = Intent(context, PhoneControlService::class.java).setAction(ACTION_START)
             ContextCompat.startForegroundService(context, intent)
@@ -47,6 +52,8 @@ class PhoneControlService : Service() {
 
         fun stop(context: Context) {
             PhoneControlManager.stopSession()
+            // 立即移除悬浮球，避免与随后的 stopService/onDestroy 形成竞态
+            instance?.removeBallNow()
             runCatching { context.stopService(Intent(context, PhoneControlService::class.java)) }
             bringAppToFront(context)
         }
@@ -61,13 +68,16 @@ class PhoneControlService : Service() {
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var windowManager: WindowManager? = null
     private var ballView: TextView? = null
+    private var observing = false
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         createChannel()
-        startForeground(NOTIFICATION_ID, buildNotification())
+        runCatching { startForeground(NOTIFICATION_ID, buildNotification()) }
         windowManager = getSystemService(WindowManager::class.java)
     }
 
@@ -75,6 +85,7 @@ class PhoneControlService : Service() {
         when (intent?.action) {
             ACTION_STOP -> {
                 PhoneControlManager.stopSession()
+                removeBallNow()
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -88,47 +99,63 @@ class PhoneControlService : Service() {
     }
 
     private fun showBall() {
-        if (ballView != null) return
-        val ctx = this
-        val view = TextView(ctx).apply {
-            setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            setPadding(dp(12), dp(8), dp(12), dp(8))
-            background = GradientDrawable().apply {
-                cornerRadius = dp(18).toFloat()
-                setColor(Color.parseColor("#CC2D6CDF"))
+        mainHandler.post {
+            // 复用 Service 实例时，先移除残留视图再重新添加，保证“停止后再启动”依然可见
+            ballView?.let { runCatching { windowManager?.removeView(it) } }
+            ballView = null
+
+            val ctx = this
+            val view = TextView(ctx).apply {
+                setTextColor(Color.WHITE)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                setPadding(dp(12), dp(8), dp(12), dp(8))
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(18).toFloat()
+                    setColor(Color.parseColor("#CC2D6CDF"))
+                }
+                text = renderText()
+                setOnClickListener {
+                    PhoneControlManager.stopSession()
+                    bringAppToFront(this@PhoneControlService)
+                    removeBallNow()
+                    stopSelf()
+                }
             }
-            text = renderText()
-            setOnClickListener {
-                PhoneControlManager.stopSession()
-                bringAppToFront(this@PhoneControlService)
-                stopSelf()
+            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
             }
-        }
-        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        } else {
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_PHONE
-        }
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            type,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-            PixelFormat.TRANSLUCENT,
-        ).apply {
-            gravity = Gravity.TOP or Gravity.END
-            x = dp(12)
-            y = dp(160)
-        }
-        val wm = windowManager ?: return
-        runCatching { wm.addView(view, params) }
-            .onSuccess {
-                ballView = view
-                observeStatus()
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                type,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                PixelFormat.TRANSLUCENT,
+            ).apply {
+                gravity = Gravity.TOP or Gravity.END
+                x = dp(12)
+                y = dp(160)
             }
+            val wm = windowManager ?: return@post
+            runCatching { wm.addView(view, params) }
+                .onSuccess {
+                    ballView = view
+                    if (!observing) {
+                        observing = true
+                        observeStatus()
+                    }
+                }
+        }
+    }
+
+    private fun removeBallNow() {
+        mainHandler.post {
+            ballView?.let { view -> runCatching { windowManager?.removeView(view) } }
+            ballView = null
+        }
     }
 
     private fun observeStatus() {
@@ -156,8 +183,11 @@ class PhoneControlService : Service() {
 
     override fun onDestroy() {
         scope.cancel()
+        observing = false
+        mainHandler.removeCallbacksAndMessages(null)
         ballView?.let { view -> runCatching { windowManager?.removeView(view) } }
         ballView = null
+        if (instance === this) instance = null
         super.onDestroy()
     }
 
