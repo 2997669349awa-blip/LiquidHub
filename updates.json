@@ -9,6 +9,18 @@
       "size": "约 54 MB"
     }
   ],
+  "preview": {
+    "version": "1.0.6",
+    "publishedAt": "2026-10-05T19:00:00Z",
+    "changelog": "LiquidHub 1.0.6（预览）\n\n- 工具显示：聊天只显示“被调用的工具名 + 助手说的话”，隐藏所有工具原始输出（点按仍可查看详情）\n- 新增「扮演」：自定义角色，角色设定注入系统提示词，每个角色独立对话，上下文窗口可自由调节（设置 > 其他 > 扮演）\n- 网页端管理：新增设置抽屉（通用 / 助手 / 技能 / 文件），侧边栏新增设置入口\n- 手机控制：修复悬浮球“停止后再次启动直接消失”的问题\n- 「指定技能」图标重绘并加入动画\n- 音乐插件：含个人 Cookie 的本地文件不再随仓库分发",
+    "downloads": [
+      {
+        "name": "liquidhub-release-1005-1900.apk",
+        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1005-1900.apk",
+        "size": "约 54 MB"
+      }
+    ]
+  },
   "stable": {
     "version": "1.0.5",
     "publishedAt": "2026-10-04T19:12:00Z",
