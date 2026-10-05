@@ -161,6 +161,19 @@ data class FileItemDto(
 )
 
 @Serializable
+data class WebPhoneActionRequest(
+    val action: String,
+    val label: String = "",
+    val args: Map<String, String> = emptyMap(),
+)
+
+@Serializable
+data class WebPhoneActionResult(
+    val ok: Boolean,
+    val result: String = "",
+)
+
+@Serializable
 data class RegenerateRequest(
     val messageId: String
 )

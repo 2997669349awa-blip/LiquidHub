@@ -14,13 +14,14 @@ import { ScrollArea } from "~/components/ui/scroll-area";
 import api from "~/services/api";
 import * as manage from "~/services/manage";
 
-type TabId = "general" | "assistants" | "skills" | "files";
+type TabId = "general" | "assistants" | "skills" | "files" | "phone";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "general", label: "通用" },
   { id: "assistants", label: "助手" },
   { id: "skills", label: "技能" },
   { id: "files", label: "文件" },
+  { id: "phone", label: "手机" },
 ];
 
 const REASONING_LEVELS = ["AUTO", "OFF", "LOW", "MEDIUM", "HIGH"];
@@ -105,6 +106,7 @@ export function SettingsDrawer({
             {tab === "assistants" && <AssistantsTab />}
             {tab === "skills" && <SkillsTab />}
             {tab === "files" && <FilesTab />}
+            {tab === "phone" && <PhoneTab />}
           </div>
         </div>
       </DialogContent>
@@ -738,6 +740,108 @@ function FilesTab() {
             ))}
           </div>
         )}
+      </div>
+    </ScrollArea>
+  );
+}
+
+function PhoneTab() {
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+  const [text, setText] = useState("");
+  const [clickText, setClickText] = useState("");
+  const [pkg, setPkg] = useState("");
+  const [shot, setShot] = useState<string | null>(null);
+
+  const run = useCallback(
+    async (action: string, args: Record<string, string> = {}, label?: string) => {
+      setBusy(true);
+      setStatus("等待手机端确认…");
+      try {
+        const res = await manage.phoneAction(action, args, label);
+        if (action === "screenshot") {
+          setShot(`data:image/png;base64,${res.result}`);
+          setStatus("截图成功");
+        } else {
+          setStatus(res.result || "成功");
+        }
+      } catch (error) {
+        setStatus(`失败：${(error as Error).message}`);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [],
+  );
+
+  return (
+    <ScrollArea className="h-full">
+      <div className="space-y-4 p-5">
+        <p className="text-sm text-muted-foreground">
+          操作会先推送到手机，需在手机上点「允许」后才会执行；30 秒内未确认即视为拒绝。
+        </p>
+
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" disabled={busy} onClick={() => void run("home")}>
+            返回桌面
+          </Button>
+          <Button size="sm" disabled={busy} onClick={() => void run("back")}>
+            后退
+          </Button>
+          <Button size="sm" disabled={busy} onClick={() => void run("recents")}>
+            最近任务
+          </Button>
+          <Button size="sm" disabled={busy} onClick={() => void run("notifications")}>
+            通知栏
+          </Button>
+          <Button size="sm" disabled={busy} onClick={() => void run("read_screen")}>
+            读取屏幕
+          </Button>
+          <Button size="sm" disabled={busy} onClick={() => void run("screenshot")}>
+            截屏
+          </Button>
+        </div>
+
+        <Field label="输入文本">
+          <div className="flex gap-2">
+            <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="要输入的文字" />
+            <Button size="sm" disabled={busy || !text} onClick={() => void run("text", { text })}>
+              发送
+            </Button>
+          </div>
+        </Field>
+
+        <Field label="点击文字">
+          <div className="flex gap-2">
+            <Input
+              value={clickText}
+              onChange={(e) => setClickText(e.target.value)}
+              placeholder="界面上的文字"
+            />
+            <Button
+              size="sm"
+              disabled={busy || !clickText}
+              onClick={() => void run("click_text", { text: clickText })}
+            >
+              点击
+            </Button>
+          </div>
+        </Field>
+
+        <Field label="打开应用（包名）">
+          <div className="flex gap-2">
+            <Input value={pkg} onChange={(e) => setPkg(e.target.value)} placeholder="com.example.app" />
+            <Button size="sm" disabled={busy || !pkg} onClick={() => void run("open_app", { package: pkg })}>
+              打开
+            </Button>
+          </div>
+        </Field>
+
+        {status ? <div className="text-sm text-muted-foreground">{status}</div> : null}
+
+        {shot ? (
+          <img src={shot} alt="screenshot" className="max-h-80 w-auto rounded-md border" />
+        ) : null}
       </div>
     </ScrollArea>
   );

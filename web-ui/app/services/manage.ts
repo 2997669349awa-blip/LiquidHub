@@ -148,3 +148,15 @@ export const deleteSkill = (name: string) =>
 // Files
 export const listFiles = (folder?: string) =>
   api.get<FileItemDto[]>(`manage/files${folder ? `?folder=${encodeURIComponent(folder)}` : ""}`);
+
+// Phone control (requires on-device confirmation)
+export interface PhoneActionResult {
+  ok: boolean;
+  result: string;
+}
+
+export const phoneAction = (
+  action: string,
+  args: Record<string, string> = {},
+  label?: string,
+) => api.post<PhoneActionResult>("manage/phone/action", { action, args, label: label ?? "" });

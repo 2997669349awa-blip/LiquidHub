@@ -1,5 +1,6 @@
 package me.rerere.rikkahub.web.routes
 
+import android.content.Context
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -20,7 +21,12 @@ import me.rerere.rikkahub.data.files.FileFolders
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.files.SkillManager
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.phone.PhoneControlManager
+import me.rerere.rikkahub.data.phone.WebPhoneExecutor
+import me.rerere.rikkahub.data.phone.WebPhoneRequest
+import me.rerere.rikkahub.service.PhoneControlService
 import me.rerere.rikkahub.web.BadRequestException
+import me.rerere.rikkahub.web.ForbiddenException
 import me.rerere.rikkahub.web.NotFoundException
 import me.rerere.rikkahub.web.dto.AssistantDto
 import me.rerere.rikkahub.web.dto.CreateAssistantRequest
@@ -33,6 +39,8 @@ import me.rerere.rikkahub.web.dto.SkillDetailDto
 import me.rerere.rikkahub.web.dto.UpdateAssistantFieldsRequest
 import me.rerere.rikkahub.web.dto.UpdateGeneralSettingsRequest
 import me.rerere.rikkahub.web.dto.UpdateProviderRequest
+import me.rerere.rikkahub.web.dto.WebPhoneActionRequest
+import me.rerere.rikkahub.web.dto.WebPhoneActionResult
 import kotlin.uuid.Uuid
 
 /**
@@ -40,6 +48,7 @@ import kotlin.uuid.Uuid
  * skills editor and the managed-files browser.
  */
 fun Route.manageRoutes(
+    context: Context,
     settingsStore: SettingsStore,
     skillManager: SkillManager,
     filesManager: FilesManager,
@@ -231,7 +240,45 @@ fun Route.manageRoutes(
                 ?: FileFolders.UPLOAD
             call.respond(filesManager.list(folder).map { it.toManageDto() })
         }
+
+        // ---------- 网页端控制手机（需手机端手动确认） ----------
+        post("/phone/action") {
+            val request = call.receive<WebPhoneActionRequest>()
+            if (!PhoneControlManager.hasOverlayPermission()) {
+                throw BadRequestException("手机端未授予悬浮窗权限，无法弹出确认")
+            }
+            val label = request.label.ifBlank { phoneActionLabel(request.action) }
+            PhoneControlService.start(context)
+            val approved = PhoneControlManager.awaitWebApproval(
+                WebPhoneRequest(
+                    id = Uuid.random().toString(),
+                    action = request.action,
+                    label = label,
+                    args = request.args,
+                )
+            )
+            if (!approved) throw ForbiddenException("手机端已拒绝，或超过 30 秒未确认")
+            val result = WebPhoneExecutor.execute(context, request.action, request.args)
+            call.respond(WebPhoneActionResult(ok = true, result = result))
+        }
     }
+}
+
+private fun phoneActionLabel(action: String): String = when (action) {
+    "home" -> "返回桌面"
+    "back" -> "后退"
+    "recents" -> "最近任务"
+    "notifications" -> "下拉通知栏"
+    "tap" -> "点击屏幕"
+    "swipe" -> "滑动"
+    "scroll" -> "滚动"
+    "text" -> "输入文本"
+    "click_text" -> "点击文字"
+    "key" -> "按键"
+    "open_app" -> "打开应用"
+    "read_screen" -> "读取屏幕"
+    "screenshot" -> "截取屏幕"
+    else -> action
 }
 
 private fun Assistant.toManageDto() = AssistantDto(

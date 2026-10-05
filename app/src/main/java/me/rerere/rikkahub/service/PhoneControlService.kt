@@ -1,7 +1,7 @@
 // Modified by AI Hello World on 2026-10-03.
 // This file is part of LiquidHub, a fork of RikkaHub.
 // Licensed under AGPL-3.0.
-// 手机控制悬浮球：右上角显示，实时展示 AI 的调用，单击关闭手机控制。
+// 手机控制悬浮球：右上角显示，实时展示 AI 的调用；网页发起的操作会在此弹出允许/拒绝。
 
 package me.rerere.rikkahub.service
 
@@ -22,6 +22,8 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -52,7 +54,7 @@ class PhoneControlService : Service() {
 
         fun stop(context: Context) {
             PhoneControlManager.stopSession()
-            // 立即移除悬浮球，避免与随后的 stopService/onDestroy 形成竞态
+            // 立即移除悬浮窗，避免与随后的 stopService/onDestroy 形成竞态
             instance?.removeBallNow()
             runCatching { context.stopService(Intent(context, PhoneControlService::class.java)) }
             bringAppToFront(context)
@@ -70,7 +72,9 @@ class PhoneControlService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val mainHandler = Handler(Looper.getMainLooper())
     private var windowManager: WindowManager? = null
-    private var ballView: TextView? = null
+    private var containerView: LinearLayout? = null
+    private var textView: TextView? = null
+    private var confirmRow: LinearLayout? = null
     private var observing = false
 
     override fun onCreate() {
@@ -101,26 +105,52 @@ class PhoneControlService : Service() {
     private fun showBall() {
         mainHandler.post {
             // 复用 Service 实例时，先移除残留视图再重新添加，保证“停止后再启动”依然可见
-            ballView?.let { runCatching { windowManager?.removeView(it) } }
-            ballView = null
+            containerView?.let { runCatching { windowManager?.removeView(it) } }
+            containerView = null
 
             val ctx = this
-            val view = TextView(ctx).apply {
+            val ballText = TextView(ctx).apply {
                 setTextColor(Color.WHITE)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            }
+            val confirm = LinearLayout(ctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                visibility = View.GONE
+                setPadding(0, dp(6), 0, 0)
+            }
+            val deny = Button(ctx).apply {
+                setText("拒绝")
+                setOnClickListener { PhoneControlManager.respondWebRequest(false) }
+            }
+            val allow = Button(ctx).apply {
+                setText("允许")
+                setOnClickListener { PhoneControlManager.respondWebRequest(true) }
+            }
+            confirm.addView(deny)
+            confirm.addView(allow)
+
+            val container = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
                 setPadding(dp(12), dp(8), dp(12), dp(8))
                 background = GradientDrawable().apply {
-                    cornerRadius = dp(18).toFloat()
-                    setColor(Color.parseColor("#CC2D6CDF"))
+                    cornerRadius = dp(16).toFloat()
+                    setColor(Color.parseColor("#E62D6CDF"))
                 }
-                text = renderText()
+                addView(ballText)
+                addView(confirm)
                 setOnClickListener {
-                    PhoneControlManager.stopSession()
-                    bringAppToFront(this@PhoneControlService)
-                    removeBallNow()
-                    stopSelf()
+                    if (PhoneControlManager.pendingWebRequest.value == null) {
+                        PhoneControlManager.stopSession()
+                        bringAppToFront(this@PhoneControlService)
+                        removeBallNow()
+                        stopSelf()
+                    }
                 }
             }
+
+            textView = ballText
+            confirmRow = confirm
+
             val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             } else {
@@ -140,9 +170,10 @@ class PhoneControlService : Service() {
                 y = dp(160)
             }
             val wm = windowManager ?: return@post
-            runCatching { wm.addView(view, params) }
+            runCatching { wm.addView(container, params) }
                 .onSuccess {
-                    ballView = view
+                    containerView = container
+                    applyText()
                     if (!observing) {
                         observing = true
                         observeStatus()
@@ -153,21 +184,33 @@ class PhoneControlService : Service() {
 
     private fun removeBallNow() {
         mainHandler.post {
-            ballView?.let { view -> runCatching { windowManager?.removeView(view) } }
-            ballView = null
+            containerView?.let { view -> runCatching { windowManager?.removeView(view) } }
+            containerView = null
+            textView = null
+            confirmRow = null
         }
     }
 
     private fun observeStatus() {
         scope.launch {
-            PhoneControlManager.status.collect {
-                ballView?.text = renderText()
-            }
+            PhoneControlManager.status.collect { applyText() }
         }
         scope.launch {
-            PhoneControlManager.liveText.collect {
-                ballView?.text = renderText()
-            }
+            PhoneControlManager.liveText.collect { applyText() }
+        }
+        scope.launch {
+            PhoneControlManager.pendingWebRequest.collect { applyText() }
+        }
+    }
+
+    private fun applyText() {
+        val pending = PhoneControlManager.pendingWebRequest.value
+        if (pending != null) {
+            textView?.text = "网页请求：${pending.label}\n请在手机上确认"
+            confirmRow?.visibility = View.VISIBLE
+        } else {
+            confirmRow?.visibility = View.GONE
+            textView?.text = renderText()
         }
     }
 
@@ -185,8 +228,10 @@ class PhoneControlService : Service() {
         scope.cancel()
         observing = false
         mainHandler.removeCallbacksAndMessages(null)
-        ballView?.let { view -> runCatching { windowManager?.removeView(view) } }
-        ballView = null
+        containerView?.let { view -> runCatching { windowManager?.removeView(view) } }
+        containerView = null
+        textView = null
+        confirmRow = null
         if (instance === this) instance = null
         super.onDestroy()
     }

@@ -1159,6 +1159,8 @@
   <string name="update_card_close">Close</string>
   <string name="update_card_downloading">Downloading, please check status bar for progress</string>
   <string name="update_card_new_version_found">New version found %s</string>
+  <string name="update_card_new_stable_found">New official version %s available</string>
+  <string name="update_card_new_preview_found">New preview version %s available</string>
   <string name="update_card_unknown_error">Unknown error</string>
   <string name="upload_file">Upload File</string>
   <string name="use_web_search">Web Search</string>

@@ -7,10 +7,20 @@ package me.rerere.rikkahub.data.phone
 
 import android.content.Context
 import android.provider.Settings
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withTimeoutOrNull
 import me.rerere.rikkahub.service.PhoneAccessibilityService
+
+/** 网页端发起、需要手机端手动确认的手机控制请求。 */
+data class WebPhoneRequest(
+    val id: String,
+    val action: String,
+    val label: String,
+    val args: Map<String, String> = emptyMap(),
+)
 
 object PhoneControlManager {
     @Volatile
@@ -25,6 +35,12 @@ object PhoneControlManager {
     // 悬浮球上实时显示的 AI 思考/回复文本
     private val _liveText = MutableStateFlow("")
     val liveText: StateFlow<String> = _liveText.asStateFlow()
+
+    // 需要手机端手动确认的网页请求
+    private val _pendingWebRequest = MutableStateFlow<WebPhoneRequest?>(null)
+    val pendingWebRequest: StateFlow<WebPhoneRequest?> = _pendingWebRequest.asStateFlow()
+
+    private var pendingDeferred: CompletableDeferred<Boolean>? = null
 
     @Volatile
     var stopRequested: Boolean = false
@@ -57,6 +73,25 @@ object PhoneControlManager {
         _active.value = false
         _liveText.value = ""
         setStatus("手机控制已停止")
+        respondWebRequest(false)
+    }
+
+    /** 等待手机端对网页请求做出确认；超时视为拒绝。 */
+    suspend fun awaitWebApproval(request: WebPhoneRequest, timeoutMs: Long = 30_000L): Boolean {
+        val deferred = CompletableDeferred<Boolean>()
+        pendingDeferred = deferred
+        _pendingWebRequest.value = request
+        return try {
+            withTimeoutOrNull(timeoutMs) { deferred.await() } ?: false
+        } finally {
+            _pendingWebRequest.value = null
+            pendingDeferred = null
+        }
+    }
+
+    /** 手机端点击允许/拒绝。 */
+    fun respondWebRequest(approved: Boolean) {
+        pendingDeferred?.complete(approved)
     }
 
     fun setStatus(text: String) {

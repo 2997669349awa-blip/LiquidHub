@@ -85,9 +85,14 @@ class UpdateChecker(
         val current = Version(BuildConfig.VERSION_NAME.trimStart('V', 'v'))
         val previewNewer = preview?.takeIf { runCatching { Version(it.version) > current }.getOrDefault(false) }
         val stableNewer = stable?.takeIf { runCatching { Version(it.version) > current }.getOrDefault(false) }
-        // 优先正式版；正式版没有更新时，再看预览版是否有更新。
-        return stableNewer ?: previewNewer ?: stable ?: preview
-            ?: throw Exception("No update info")
+        // 通道策略：主看正式通道；正式通道没有更新时，再看预览通道，若预览有更新则走预览通道。
+        return when {
+            stableNewer != null -> stableNewer.copy(channel = "stable")
+            previewNewer != null -> previewNewer.copy(channel = "preview")
+            stable != null -> stable.copy(channel = "stable")
+            preview != null -> preview.copy(channel = "preview")
+            else -> throw Exception("No update info")
+        }
     }
 
     fun downloadUpdate(context: Context, download: UpdateDownload) {
@@ -128,7 +133,9 @@ data class UpdateInfo(
     val version: String,
     val publishedAt: String,
     val changelog: String,
-    val downloads: List<UpdateDownload>
+    val downloads: List<UpdateDownload>,
+    // 解析后标注来源通道：stable（正式版）或 preview（预览版）
+    val channel: String? = null,
 )
 
 /**

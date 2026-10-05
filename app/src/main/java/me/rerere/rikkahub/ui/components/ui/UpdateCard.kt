@@ -100,7 +100,14 @@ fun UpdateCard(vm: ChatVM) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = stringResource(R.string.update_card_new_version_found, info.version),
+                            text = stringResource(
+                                if (info.channel == "preview") {
+                                    R.string.update_card_new_preview_found
+                                } else {
+                                    R.string.update_card_new_stable_found
+                                },
+                                info.version,
+                            ),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.weight(1f)

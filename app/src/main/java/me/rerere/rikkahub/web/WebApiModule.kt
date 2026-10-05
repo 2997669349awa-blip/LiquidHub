@@ -180,7 +180,7 @@ fun Application.configureWebApi(
                     skillRoutes(skillManager, settingsStore)
                     filesRoutes(filesManager, context)
                     assetsRoutes(context)
-                    manageRoutes(settingsStore, skillManager, filesManager)
+                    manageRoutes(context, settingsStore, skillManager, filesManager)
                 }
             } else {
                 conversationRoutes(chatService, conversationRepo, folderRepo, settingsStore)
@@ -190,7 +190,7 @@ fun Application.configureWebApi(
                 skillRoutes(skillManager, settingsStore)
                 filesRoutes(filesManager, context)
                 assetsRoutes(context)
-                manageRoutes(settingsStore, skillManager, filesManager)
+                manageRoutes(context, settingsStore, skillManager, filesManager)
             }
         }
     }
