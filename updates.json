@@ -10,13 +10,13 @@
     }
   ],
   "preview": {
-    "version": "1.0.6-Preview2",
+    "version": "1.0.6-Preview3",
     "publishedAt": "2026-10-05T21:03:00Z",
     "changelog": "LiquidHub 1.0.6 Preview2（预览通道）\n\n- 联网搜索：结果新增来源类型(official/wiki/news/other/forum)与发布距今天数，按权威度与新鲜度排序；强化官方来源优先、区分检索时间与发布时间、无日期需说明的规则\n- 侧边栏新增「扮演」快捷入口\n- 液态玻璃：降低折射位移、提高模糊，减少透过玻璃的文字偏移并增强质感\n- 清除字符串资源内的 emoji（语言旗帜、问候手势、警告符号等）\n- 音乐源插件改为明文接口优先、weapi 兜底（插件文件需重新导入）\n- 沿用上一预览：网页端控制手机(需手机确认)、更新通道文案、工具只显示工具名、扮演、手机控制悬浮球修复",
     "downloads": [
       {
-        "name": "liquidhub-release-1005-2103.apk",
-        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1005-2103.apk",
+        "name": "liquidhub-release-1005-2203.apk",
+        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1005-2203.apk",
         "size": "约 54 MB"
       }
     ]
