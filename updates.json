@@ -1,7 +1,7 @@
 {
   "version": "1.0.5",
   "publishedAt": "2026-10-04T19:12:00Z",
-  "changelog": "LiquidHub 1.0.5\n\n- 音乐源支持「喜欢」\n- 音乐源验证改为真实搜索\n- 网易云插件修复 csrf",
+  "changelog": "LiquidHub 1.0.5",
   "downloads": [
     {
       "name": "liquidhub-release-1004-1912.apk",
@@ -10,13 +10,13 @@
     }
   ],
   "preview": {
-    "version": "1.0.6-Preview",
-    "publishedAt": "2026-10-05T19:49:00Z",
-    "changelog": "LiquidHub 1.0.6 Preview（预览通道）\n\n- 工具显示：聊天只显示“被调用的工具名 + 助手说的话”，隐藏所有工具原始输出（点按可看详情）\n- 新增「扮演」：自定义角色，设定词注入系统提示词，每个角色独立对话，上下文窗口可自由调节（设置 > 其他 > 扮演）\n- 网页端管理：设置抽屉（通用 / 助手 / 技能 / 文件 / 手机）\n- 网页端控制手机：网页发起操作，需在手机悬浮球上点“允许/拒绝”，30 秒未确认即拒绝\n- 手机控制：修复悬浮球“停止后再次启动直接消失”的问题\n- 更新提示区分通道：正式版显示“发现正式版”，预览版显示“发现预览版”；正式通道优先，正式无更新再看预览\n- 「指定技能」图标重绘并加入动画\n- 音乐插件：含个人 Cookie 的本地文件不再随仓库分发",
+    "version": "1.0.6-Preview2",
+    "publishedAt": "2026-10-05T21:03:00Z",
+    "changelog": "LiquidHub 1.0.6 Preview2（预览通道）\n\n- 联网搜索：结果新增来源类型(official/wiki/news/other/forum)与发布距今天数，按权威度与新鲜度排序；强化官方来源优先、区分检索时间与发布时间、无日期需说明的规则\n- 侧边栏新增「扮演」快捷入口\n- 液态玻璃：降低折射位移、提高模糊，减少透过玻璃的文字偏移并增强质感\n- 清除字符串资源内的 emoji（语言旗帜、问候手势、警告符号等）\n- 音乐源插件改为明文接口优先、weapi 兜底（插件文件需重新导入）\n- 沿用上一预览：网页端控制手机(需手机确认)、更新通道文案、工具只显示工具名、扮演、手机控制悬浮球修复",
     "downloads": [
       {
-        "name": "liquidhub-release-1005-1949.apk",
-        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1005-1949.apk",
+        "name": "liquidhub-release-1005-2103.apk",
+        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1005-2103.apk",
         "size": "约 54 MB"
       }
     ]
@@ -24,7 +24,7 @@
   "stable": {
     "version": "1.0.5",
     "publishedAt": "2026-10-04T19:12:00Z",
-    "changelog": "LiquidHub 1.0.5\n\n- 音乐源支持「喜欢」\n- 音乐源验证改为真实搜索\n- 网易云插件修复 csrf",
+    "changelog": "LiquidHub 1.0.5",
     "downloads": [
       {
         "name": "liquidhub-release-1004-1912.apk",
