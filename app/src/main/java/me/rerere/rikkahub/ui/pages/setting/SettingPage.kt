@@ -62,6 +62,7 @@ import me.rerere.hugeicons.stroke.InLove
 import me.rerere.hugeicons.stroke.LookTop
 import me.rerere.hugeicons.stroke.McpServer
 import me.rerere.hugeicons.stroke.Megaphone01
+import me.rerere.hugeicons.stroke.MagicWand01
 import me.rerere.hugeicons.stroke.MusicNote01
 import me.rerere.hugeicons.stroke.Package
 import me.rerere.hugeicons.stroke.ServerStack01
@@ -286,6 +287,12 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                     modifier = Modifier.padding(horizontal = 8.dp),
                     title = { Text("其他") },
                 ) {
+                    item(
+                        onClick = { navController.navigate(Screen.Cosplay) },
+                        leadingContent = { Icon(HugeIcons.MagicWand01, null) },
+                        supportingContent = { Text("自定义角色，让 AI 以该角色身份对话（每个角色独立对话）") },
+                        headlineContent = { Text("扮演") },
+                    )
                     if (!jsMusicSource.isNullOrBlank()) {
                         item(
                             onClick = { navController.navigate(Screen.Music) },

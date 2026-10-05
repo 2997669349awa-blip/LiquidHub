@@ -124,6 +124,7 @@ import me.rerere.rikkahub.ui.pages.setting.SettingPage
 import me.rerere.rikkahub.ui.pages.setting.SettingProviderDetailPage
 import me.rerere.rikkahub.ui.pages.setting.LocalModelsPage
 import me.rerere.rikkahub.ui.pages.setting.MusicPage
+import me.rerere.rikkahub.ui.pages.setting.SettingCosplayPage
 import me.rerere.rikkahub.ui.pages.setting.SettingPhoneControlPage
 import me.rerere.rikkahub.ui.pages.setting.SettingDialogCommandsPage
 import me.rerere.rikkahub.ui.pages.setting.SettingMusicSourcePage
@@ -510,6 +511,10 @@ class RouteActivity : ComponentActivity() {
                                 SettingPhoneControlPage()
                             }
 
+                            entry<Screen.Cosplay> {
+                                SettingCosplayPage()
+                            }
+
                             entry<Screen.DialogCommands> {
                                 SettingDialogCommandsPage()
                             }
@@ -745,6 +750,9 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data object PhoneControl : Screen
+
+    @Serializable
+    data object Cosplay : Screen
 
     @Serializable
     data object DialogCommands : Screen

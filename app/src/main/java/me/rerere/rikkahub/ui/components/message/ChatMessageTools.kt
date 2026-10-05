@@ -128,8 +128,8 @@ fun ChainOfThoughtScope.ChatMessageToolStep(
     val isDenied = tool.approvalState is ToolApprovalState.Denied
     val images = tool.output.filterIsInstance<UIMessagePart.Image>()
 
-    // 摘要由注册的渲染器决定; 图片输出与拒绝原因为所有工具通用
-    val hasExtraContent = renderer.hasSummary(context) || isDenied || images.isNotEmpty()
+    // 只显示“被调用的工具名”，所有工具输出（摘要/图片/文本）默认都不展示，点按可查看详情
+    val hasExtraContent = isDenied
 
     ControlledChainOfThoughtStep(
         expanded = expanded,
@@ -192,23 +192,6 @@ fun ChainOfThoughtScope.ChatMessageToolStep(
         content = if (hasExtraContent) {
             {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    renderer.Summary(context)
-                    if (images.isNotEmpty()) {
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.wrapContentWidth(),
-                        ) {
-                            items(images) { image ->
-                                ZoomableAsyncImage(
-                                    model = image.url,
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .height(64.dp)
-                                        .wrapContentWidth(),
-                                )
-                            }
-                        }
-                    }
                     if (isDenied) {
                         val reason = (tool.approvalState as ToolApprovalState.Denied).reason
                         Text(
