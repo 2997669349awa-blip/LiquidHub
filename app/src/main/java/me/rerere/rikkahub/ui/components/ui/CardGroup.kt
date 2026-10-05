@@ -1,6 +1,9 @@
 package me.rerere.rikkahub.ui.components.ui
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -24,10 +27,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEachIndexed
@@ -105,6 +112,19 @@ private fun CardGroupListItem(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
+    // 进入动画：错峰淡入并轻微上移，避免列表“生硬出现”
+    var appeared by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { appeared = true }
+    val enterProgress by animateFloatAsState(
+        targetValue = if (appeared) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = 260,
+            delayMillis = (index * 36).coerceAtMost(216),
+            easing = FastOutSlowInEasing,
+        ),
+        label = "cardGroupItemEnter",
+    )
+
     val topCorner by animateDpAsState(
         targetValue = if (isPressed || count == 1 || isFirst) CardGroupCorner else CardGroupInnerCorner,
         animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
@@ -118,6 +138,10 @@ private fun CardGroupListItem(
         headlineContent = item.headlineContent,
         modifier = item.modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                alpha = enterProgress
+                translationY = (1f - enterProgress) * 24.dp.toPx()
+            }
             .clip(
                 RoundedCornerShape(
                     topStart = topCorner,
