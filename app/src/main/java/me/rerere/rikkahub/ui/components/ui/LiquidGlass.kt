@@ -48,8 +48,10 @@ object LiquidGlassDefaults {
     const val HighlightAlpha: Float = 0.18f
 
     /** 玻璃折射/模糊强度，数值越大越明显。 */
-    val BlurRadius: Dp = 26.dp
-    const val GlassDepth: Float = 0.55f
+    val BlurRadius: Dp = 32.dp
+
+    /** 折射位移深度：过大时透过玻璃的文字会明显偏移，调低更自然。 */
+    const val GlassDepth: Float = 0.3f
 
     @Composable
     @ReadOnlyComposable

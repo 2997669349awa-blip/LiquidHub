@@ -3,9 +3,11 @@ package me.rerere.rikkahub.data.ai.tools
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import me.rerere.ai.core.Tool
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.rikkahub.data.datastore.Settings
@@ -35,8 +37,15 @@ fun createSearchTools(settings: Settings): Set<Tool> {
 
                     Response format:
                     - retrievedAt is the local retrieval time, never a publication date
-                    - items[].id (short id), index, title, url, publishedDate (if supplied), highlights (if supplied), text
+                    - items[].id (short id), index, title, url, sourceType, publishedDate (if supplied), ageDays (days since publication; null if unknown), highlights (if supplied), text
+                    - sourceType is one of: official (official site, .gov/.edu or official domains), wiki, news, other, forum
+                    - items are pre-sorted: official first, then wiki/news, then other, then forum; within a group newer items first
                     - images[]: image urls related to the query (may be empty)
+
+                    Authority & recency:
+                    - For products, games, software, policy, sports and other authoritative topics, rely on official sources (sourceType=official) first; treat wiki/news/forum/other as auxiliary, and never use them as the final authority when an official source exists.
+                    - Distinguish retrievedAt (when you fetched it) from publishedDate/ageDays (when it was published). When you state a time, say which one and include the date/age (e.g. "published 2026-10-01, about 4 days ago").
+                    - If a time-sensitive claim has no publishedDate (ageDays=null), explicitly say the date is unknown instead of guessing.
 
                     Citations:
                     - After using results, add `[citation,domain](id)` after the sentence.
@@ -72,11 +81,25 @@ fun createSearchTools(settings: Settings): Set<Tool> {
                     val results =
                         JsonInstantPretty.encodeToJsonElement(result).jsonObject.let { json ->
                             val map = json.toMutableMap()
+                            val enriched = map["items"]!!.jsonArray.map { item ->
+                                val obj = item.jsonObject
+                                val url = obj["url"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                                val published = obj["publishedDate"]?.jsonPrimitive?.contentOrNull
+                                EnrichedSearchItem(
+                                    obj = obj,
+                                    sourceType = classifySource(url),
+                                    ageDays = parsePublishedAgeDays(published),
+                                )
+                            }.sortedWith(
+                                compareBy({ sourceRank(it.sourceType) }, { it.ageDays ?: Int.MAX_VALUE })
+                            )
                             map["items"] =
-                                JsonArray(map["items"]!!.jsonArray.mapIndexed { index, item ->
-                                    JsonObject(item.jsonObject.toMutableMap().apply {
+                                JsonArray(enriched.mapIndexed { index, item ->
+                                    JsonObject(item.obj.toMutableMap().apply {
                                         put("id", JsonPrimitive(Uuid.random().toString().take(6)))
                                         put("index", JsonPrimitive(index + 1))
+                                        put("sourceType", JsonPrimitive(item.sourceType))
+                                        item.ageDays?.let { put("ageDays", JsonPrimitive(it)) }
                                     })
                                 })
                             JsonObject(map)
@@ -123,4 +146,57 @@ fun createSearchTools(settings: Settings): Set<Tool> {
                 ))
         }
     }
+}
+
+private data class EnrichedSearchItem(
+    val obj: JsonObject,
+    val sourceType: String,
+    val ageDays: Int?,
+)
+
+private fun sourceRank(sourceType: String): Int = when (sourceType) {
+    "official" -> 0
+    "wiki" -> 1
+    "news" -> 2
+    "other" -> 3
+    "forum" -> 4
+    else -> 3
+}
+
+private fun classifySource(url: String): String {
+    val host = runCatching { java.net.URI(url).host ?: "" }.getOrDefault("").lowercase()
+    if (host.isBlank()) return "other"
+    return when {
+        host.endsWith(".gov") || host.endsWith(".gov.cn") ||
+            host.endsWith(".edu") || host.endsWith(".edu.cn") ||
+            host.contains("official") -> "official"
+
+        host.contains("wikipedia") || host.contains("wiki") ||
+            host.contains("fandom") || host.contains("baike") -> "wiki"
+
+        host.contains("news") || host.endsWith("ithome.com") ||
+            host.contains("36kr") || host.contains("cnbeta") ||
+            host.contains("gamersky") || host.contains("ign.com") -> "news"
+
+        host.contains("reddit") || host.contains("tieba") ||
+            host.contains("zhihu") || host.contains("bbs") ||
+            host.contains("forum") || host.contains("stackoverflow") ||
+            host.contains("quora") || host.contains("discord") -> "forum"
+
+        else -> "other"
+    }
+}
+
+/** 解析发布时间的“距今天数”，解析失败返回 null（避免模型臆测时间）。 */
+private fun parsePublishedAgeDays(published: String?): Int? {
+    if (published.isNullOrBlank()) return null
+    val instant = runCatching { java.time.OffsetDateTime.parse(published).toInstant() }
+        .recoverCatching { java.time.Instant.parse(published) }
+        .recoverCatching {
+            java.time.LocalDate.parse(published)
+                .atStartOfDay(java.time.ZoneId.systemDefault()).toInstant()
+        }
+        .getOrNull() ?: return null
+    val days = java.time.Duration.between(instant, java.time.Instant.now()).toDays().toInt()
+    return days.coerceAtLeast(0)
 }
