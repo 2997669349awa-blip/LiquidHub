@@ -577,6 +577,8 @@ data class Settings(
     val init: Boolean = false,
     val dynamicColor: Boolean = false,
     val themeId: String = "liquid_glass",
+    // 玻璃风格：glass=液态玻璃(模糊+质感), blur=毛玻璃(仅模糊), original=原版(纯色)
+    val liquidGlassStyle: String = "glass",
     val customThemes: List<CustomTheme> = emptyList(),
     val developerMode: Boolean = false,
     val displaySetting: DisplaySetting = DisplaySetting(),

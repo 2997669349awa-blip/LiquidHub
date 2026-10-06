@@ -167,6 +167,41 @@ fun SettingThemePage(vm: SettingVM = koinViewModel()) {
                     }
                 }
 
+                item("liquidGlassStyle") {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    ) {
+                        Text(
+                            text = "玻璃风格",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 8.dp),
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(
+                                "glass" to "液态玻璃",
+                                "blur" to "毛玻璃",
+                                "original" to "原版",
+                            ).forEach { (value, label) ->
+                                val selected = settings.liquidGlassStyle == value
+                                Button(
+                                    onClick = { vm.updateSettings(settings.copy(liquidGlassStyle = value)) },
+                                ) {
+                                    if (selected) {
+                                        Icon(
+                                            imageVector = HugeIcons.Tick01,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                        Spacer(Modifier.size(4.dp))
+                                    }
+                                    Text(label)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 item("customThemesHeader") {
                     Row(
                         modifier = Modifier

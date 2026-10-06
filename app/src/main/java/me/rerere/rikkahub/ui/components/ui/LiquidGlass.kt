@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -20,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.blur.HazeBlurStyle
 import dev.chrisbanes.haze.blur.hazeBlur
@@ -29,7 +31,9 @@ import dev.chrisbanes.haze.glass.GlassStyle
 import dev.chrisbanes.haze.glass.OpticalSizeValue
 import dev.chrisbanes.haze.glass.hazeGlass
 import dev.chrisbanes.haze.glass.material3.Material3
+import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.ui.theme.LocalDarkMode
+import org.koin.compose.koinInject
 
 /**
  * 液态玻璃视觉参数。
@@ -47,11 +51,11 @@ object LiquidGlassDefaults {
     const val BorderAlpha: Float = 0.42f
     const val HighlightAlpha: Float = 0.18f
 
-    /** 玻璃折射/模糊强度，数值越大越明显。 */
-    val BlurRadius: Dp = 32.dp
+    /** 玻璃模糊强度，数值越大越明显。 */
+    val BlurRadius: Dp = 42.dp
 
-    /** 折射位移深度：过大时透过玻璃的文字会明显偏移，调低更自然。 */
-    const val GlassDepth: Float = 0.3f
+    /** 折射位移深度：设为 0，只保留模糊与质感，不做像素位移（避免文字错位）。 */
+    const val GlassDepth: Float = 0f
 
     @Composable
     @ReadOnlyComposable
@@ -95,14 +99,27 @@ fun Modifier.liquidGlassHost(
     borderAlpha: Float = LiquidGlassDefaults.BorderAlpha,
     mode: LiquidGlassMode = LiquidGlassMode.GLASS,
 ): Modifier {
-    val hazeInput = input?.takeIf { Build.VERSION.SDK_INT >= Build.VERSION_CODES.S }
+    val settingsStore = koinInject<SettingsStore>()
+    val glassSettings by settingsStore.settingsFlow.collectAsStateWithLifecycle()
+    // 设置里的全局风格优先：glass=液态玻璃, blur=毛玻璃, original=原版纯色
+    val effectiveMode: LiquidGlassMode? = when (glassSettings.liquidGlassStyle) {
+        "original" -> null
+        "blur" -> LiquidGlassMode.BLUR
+        else -> mode
+    }
+    val hazeInput = input?.takeIf { Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && effectiveMode != null }
     val containerColor = tint.copy(alpha = if (hazeInput != null) tintAlpha else LiquidGlassDefaults.FallbackAlpha)
     return this
         .clip(shape)
         .then(
             if (hazeInput != null) {
-                when (mode) {
-                    LiquidGlassMode.GLASS -> Modifier.hazeGlass(
+                when (effectiveMode) {
+                    LiquidGlassMode.BLUR -> Modifier.hazeBlur(
+                        input = hazeInput,
+                        style = HazeBlurStyle.Material3 { blurRadius(LiquidGlassDefaults.BlurRadius) },
+                    )
+
+                    else -> Modifier.hazeGlass(
                         input = hazeInput,
                         style = GlassStyle.Material3(
                             containerColor = tint,
@@ -116,11 +133,6 @@ fun Modifier.liquidGlassHost(
                             )
                             shape(shape)
                         },
-                    )
-
-                    LiquidGlassMode.BLUR -> Modifier.hazeBlur(
-                        input = hazeInput,
-                        style = HazeBlurStyle.Material3 { blurRadius(LiquidGlassDefaults.BlurRadius) },
                     )
                 }
             } else {
