@@ -10,13 +10,13 @@
     }
   ],
   "preview": {
-    "version": "1.0.6-Preview5",
-    "publishedAt": "2026-10-06T05:41:00Z",
-    "changelog": "LiquidHub 1.0.6 Preview5（预览通道）\n\n- 动画：思考深度选择器补齐动画。输入框上的思考按钮图标切换带淡入缩放过渡；弹层切换等级时图标与文字做弹跳缩放过渡；滑块位移放慢到 450ms\n- 沿用：设置类列表入场动画(700ms/错峰90ms)、联网搜索结果增强、侧边栏扮演入口、液态玻璃调参、清除字符串 emoji、音乐源插件明文接口优先、网页端控制手机、工具只显示工具名、手机控制悬浮球修复",
+    "version": "1.0.6-Preview6",
+    "publishedAt": "2026-10-06T11:06:00Z",
+    "changelog": "LiquidHub 1.0.6 Preview6（预览通道）\n\n- 液态玻璃：折射位移归零（不再有文字错位），模糊提高到 42dp，专注模糊与玻璃质感\n- 新增玻璃风格切换：设置，主题，玻璃风格，可选 液态玻璃 / 毛玻璃 / 原版\n- 沿用：思考深度选择动画、设置类列表入场动画、联网搜索增强、侧边栏扮演、音乐源插件明文接口、网页端控制手机、工具只显示工具名",
     "downloads": [
       {
-        "name": "liquidhub-release-1006-0541.apk",
-        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1006-0541.apk",
+        "name": "liquidhub-release-1006-1106.apk",
+        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1006-1106.apk",
         "size": "约 54 MB"
       }
     ]
