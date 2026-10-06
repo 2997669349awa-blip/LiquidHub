@@ -64,6 +64,7 @@ import me.rerere.hugeicons.stroke.McpServer
 import me.rerere.hugeicons.stroke.Megaphone01
 import me.rerere.hugeicons.stroke.MagicWand01
 import me.rerere.hugeicons.stroke.MusicNote01
+import me.rerere.hugeicons.stroke.Puzzle
 import me.rerere.hugeicons.stroke.Package
 import me.rerere.hugeicons.stroke.ServerStack01
 import me.rerere.hugeicons.stroke.Settings03
@@ -292,6 +293,18 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                         leadingContent = { Icon(HugeIcons.MagicWand01, null) },
                         supportingContent = { Text("自定义角色，让 AI 以该角色身份对话（每个角色独立对话）") },
                         headlineContent = { Text("扮演") },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.Pro) },
+                        leadingContent = { Icon(HugeIcons.MagicWand01, null) },
+                        supportingContent = { Text("下载 LikkaHub Pro：操控Pro / 思考Pro / 沙盒Pro / 定时Pro / 歌词Pro") },
+                        headlineContent = { Text("LikkaHub Pro") },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.More) },
+                        leadingContent = { Icon(HugeIcons.Puzzle, null) },
+                        supportingContent = { Text("DSH 服务与插件市场") },
+                        headlineContent = { Text("更多功能") },
                     )
                     if (!jsMusicSource.isNullOrBlank()) {
                         item(

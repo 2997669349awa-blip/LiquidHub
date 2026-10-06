@@ -234,8 +234,10 @@ class ChatVM(
             lower == "killall" -> "已请求停止 ${ChatTaskManager.killAll()} 个任务"
 
             lower == "kill" -> {
+                ChatTaskManager.killByArg(_conversationId.toString())
                 stopGeneration()
-                "已停止当前会话的生成"
+                PhoneControlManager.stopAll()
+                "已彻底终止当前会话：生成、后台任务与手机控制均已切断"
             }
 
             lower.startsWith("kill-") || lower.startsWith("kill ") -> {

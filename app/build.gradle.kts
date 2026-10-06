@@ -35,7 +35,7 @@ android {
         applicationId = "LiquidHub.teto.x"
         minSdk = 26
         targetSdk = 37
-        versionCode = 195
+        versionCode = 196
         versionName = rootProject.file("version.txt").takeIf { it.exists() }?.readText()?.trim() ?: "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

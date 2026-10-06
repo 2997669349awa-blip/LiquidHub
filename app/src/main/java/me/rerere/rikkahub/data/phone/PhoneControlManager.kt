@@ -76,6 +76,14 @@ object PhoneControlManager {
         respondWebRequest(false)
     }
 
+    /** 彻底终止手机控制：结束会话并停掉前台服务与悬浮窗。 */
+    fun stopAll() {
+        stopSession()
+        appContext?.let { ctx ->
+            runCatching { me.rerere.rikkahub.service.PhoneControlService.stop(ctx) }
+        }
+    }
+
     /** 等待手机端对网页请求做出确认；超时视为拒绝。 */
     suspend fun awaitWebApproval(request: WebPhoneRequest, timeoutMs: Long = 30_000L): Boolean {
         val deferred = CompletableDeferred<Boolean>()
