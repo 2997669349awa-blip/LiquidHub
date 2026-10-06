@@ -3,6 +3,7 @@ package me.rerere.rikkahub.ui.components.ai
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -85,7 +86,16 @@ fun ReasoningButton(
                 modifier = Modifier.size(24.dp),
                 contentAlignment = Alignment.Center
             ) {
-                ReasoningIcon(reasoningLevel)
+                AnimatedContent(
+                    targetState = reasoningLevel,
+                    transitionSpec = {
+                        (fadeIn(tween(320)) + scaleIn(initialScale = 0.5f)) togetherWith
+                            (fadeOut(tween(200)) + scaleOut(targetScale = 0.5f))
+                    },
+                    label = "reasoningButtonIcon",
+                ) { level ->
+                    ReasoningIcon(level)
+                }
             }
             if (!onlyIcon) Text(stringResource(R.string.setting_provider_page_reasoning))
         }
@@ -109,7 +119,7 @@ fun ReasoningPicker(
 
     val animatedIndex by animateFloatAsState(
         targetValue = currentIndex.toFloat(),
-        animationSpec = tween(300),
+        animationSpec = tween(450),
         label = "reasoningIndex",
     )
     LaunchedEffect(animatedIndex) {
@@ -149,8 +159,11 @@ fun ReasoningPicker(
             AnimatedContent(
                 targetState = reasoningLevel,
                 transitionSpec = {
-                    (fadeIn() + scaleIn(initialScale = 0.8f)) togetherWith
-                        (fadeOut() + scaleOut(targetScale = 0.8f))
+                    (fadeIn(tween(350)) + scaleIn(
+                        initialScale = 0.6f,
+                        animationSpec = spring(dampingRatio = 0.5f, stiffness = 400f),
+                    )) togetherWith
+                        (fadeOut(tween(200)) + scaleOut(targetScale = 0.6f))
                 },
                 label = "reasoningLevel",
             ) { level ->
