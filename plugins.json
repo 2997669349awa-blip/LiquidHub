@@ -1,0 +1,1 @@
+{"plugins":[{"name":"DSH 服务","type":"service","description":"设备安全托管服务，随应用自动启动"},{"name":"AI 工具增强","type":"ai","description":"为模型提供更多工具与自动化能力"}]}
