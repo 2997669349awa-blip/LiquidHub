@@ -118,8 +118,8 @@ private fun CardGroupListItem(
     val enterProgress by animateFloatAsState(
         targetValue = if (appeared) 1f else 0f,
         animationSpec = tween(
-            durationMillis = 260,
-            delayMillis = (index * 36).coerceAtMost(216),
+            durationMillis = 700,
+            delayMillis = (index * 90).coerceAtMost(540),
             easing = FastOutSlowInEasing,
         ),
         label = "cardGroupItemEnter",
@@ -140,7 +140,7 @@ private fun CardGroupListItem(
             .fillMaxWidth()
             .graphicsLayer {
                 alpha = enterProgress
-                translationY = (1f - enterProgress) * 24.dp.toPx()
+                translationY = (1f - enterProgress) * 28.dp.toPx()
             }
             .clip(
                 RoundedCornerShape(
