@@ -762,12 +762,14 @@ class ChatService(
             // 兜底取消 Live Update 通知（生成开始前失败时 onCompletion 不会执行）
             appEventBus.tryEmit(AppEvent.ChatGenerationEnded(conversationId, senderName, null))
             if (it is CancellationException) {
-                // 被 //kill 等强行切断：写入固定错误，供 AI 在后续回合感知
-                addError(
-                    IllegalStateException("The conversation was cut off"),
-                    conversationId,
-                    title = context.getString(R.string.error_title_generation),
-                )
+                // 仅被 //kill 强制切断时才写入固定错误，普通停止/重生成不写
+                if (ChatTaskManager.consumeCutOff(conversationId.toString())) {
+                    addError(
+                        IllegalStateException("The conversation was cut off"),
+                        conversationId,
+                        title = context.getString(R.string.error_title_generation),
+                    )
+                }
                 throw it
             }
             sessionManager.get(conversationId)?.messageQueue?.pause()

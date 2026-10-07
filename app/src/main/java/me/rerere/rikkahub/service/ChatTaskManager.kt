@@ -66,6 +66,15 @@ object ChatTaskManager {
         return true
     }
 
+    // 被 //kill 强制切断的会话：仅这些会话在取消时写入 "The conversation was cut off"
+    private val cutOff = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+    fun markCutOff(conversationId: String) {
+        cutOff.add(conversationId)
+    }
+
+    fun consumeCutOff(conversationId: String): Boolean = cutOff.remove(conversationId)
+
     /** 按任务 ID 或会话 ID（前缀即可）查找任务（含最近完成的）。 */
     @Synchronized
     fun findByArg(arg: String): Task? {
