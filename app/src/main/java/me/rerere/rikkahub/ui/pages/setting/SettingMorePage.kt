@@ -120,6 +120,13 @@ fun SettingMorePage() {
                 }
             }
 
+            CardGroup(title = { Text("已安装插件") }) {
+                item(
+                    headlineContent = { Text("dsh-web-mobile") },
+                    supportingContent = { Text("必装：DSH Web UI 移动端适配") },
+                )
+            }
+
             Text(
                 text = "插件市场中的 DSH 及 AI 插件会在此列出，后续可一键安装。",
                 style = MaterialTheme.typography.bodySmall,

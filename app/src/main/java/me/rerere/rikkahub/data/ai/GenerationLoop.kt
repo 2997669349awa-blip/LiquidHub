@@ -18,6 +18,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import me.rerere.ai.core.MessageRole
+import me.rerere.ai.core.ReasoningLevel
 import me.rerere.ai.core.Tool
 import me.rerere.ai.provider.Model
 import me.rerere.ai.provider.Provider
@@ -389,7 +390,7 @@ class GenerationLoop(
             topP = assistant.topP,
             maxTokens = assistant.maxTokens,
             tools = tools,
-            reasoningLevel = assistant.reasoningLevel,
+            reasoningLevel = if (settings.proThinking) ReasoningLevel.MAX else assistant.reasoningLevel,
             customHeaders = buildList {
                 addAll(assistant.customHeaders)
                 addAll(model.customHeaders)
