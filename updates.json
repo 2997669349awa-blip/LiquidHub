@@ -10,13 +10,13 @@
     }
   ],
   "preview": {
-    "version": "1.0.6-Preview9",
-    "publishedAt": "2026-10-07T03:24:00Z",
-    "changelog": "LiquidHub 1.0.6 Preview9（预览通道）\n\n- 新增 DSH 服务页：设置，其他，更多功能，DSH 服务。在工作区安装并启动 DeepSeek Harness，自动装移动端适配插件 dsh-web-mobile，并内嵌打开其 Web UI\n- 已安装插件区标注必装 dsh-web-mobile\n- 沿用：思考Pro(强制最高思考)、//kill 彻底终止、LikkaHub Pro、插件市场、玻璃风格、动画、联网搜索增强",
+    "version": "1.0.6-Preview10",
+    "publishedAt": "2026-10-07T06:08:00Z",
+    "changelog": "LiquidHub 1.0.6 Preview10（预览通道）\n\n- 修复：只有 //kill 强制切断时才写入 The conversation was cut off，普通停止/重生成不再误报\n- DSH 服务：安装/启动改为应用级常驻，切到其他页面也会继续；日志实时流式显示；改用国内 npm 镜像加速\n- 沿用：思考Pro、LikkaHub Pro、插件市场、玻璃风格、动画、联网搜索增强",
     "downloads": [
       {
-        "name": "liquidhub-release-1007-0324.apk",
-        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1007-0324.apk",
+        "name": "liquidhub-release-1007-0608.apk",
+        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1007-0608.apk",
         "size": "约 54 MB"
       }
     ]
