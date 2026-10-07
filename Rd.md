@@ -66,3 +66,35 @@ LiquidHub 是基于 RikkaHub 的 Android LLM 聊天客户端分叉，支持多�
 ## 发布
 - 站点与产物：`master` 分支源码，`gh-pages` 分支为官网与发布产物（index.html、updates.json、APK）。
 - 仓库：https://github.com/2997669349awa-blip/LiquidHub
+
+## DSH 服务（DeepSeek Harness）
+
+DSH = DeepSeek Harness，DeepSeek AI 开源的 Agent 运行时框架，MIT，Node.js，仓库 https://github.com/deepseek-ai/deepseek-harness。默认 Web UI 监听 127.0.0.1:3080。
+
+需求
+- 让手机端运行 DSH 服务，App 内打开其 Web UI。
+- 必装插件：dsh-web-mobile（https://github.com/mexiaosqwq/dsh-web-mobile），移动端适配，安装命令 `dsh plugin --profile web add dsh-web-mobile`。
+- 插件市场正常显示；新增「已安装插件」列表。
+- DSH 状态页展示：未安装 / 安装中 / 运行中 / 已停止。
+
+性能要求（借鉴 DSHA 但必须更快）
+- 优先使用 arm64 原生 Node，减少 proot 开销；Node 与服务常驻预热，避免冷启动。
+- DSH 与 dsh-web-mobile 预打包随 App 分发，首次使用零下载。
+- 端口走 loopback 直连，启用 gzip/brotli，减少中间代理层。
+- WebView 预创建、资源本地缓存、按需懒加载，保证滑动与输入流畅。
+
+实现步骤
+1. 检测/安装 Node，安装 DSH 与 dsh-web-mobile。
+2. 后台启动 `dsh web` 并保活。
+3. 工作区端口映射到 App 可访问地址。
+4. 内嵌 WebView 打开，状态页联动。
+5. 插件市场 + 已安装插件列表。
+
+## 待完成清单
+
+- DSH 服务与插件市场（见上）。
+- Pro 行为层：定时Pro（到点自动跑任务）、歌词Pro（桌面悬浮歌词）、沙盒Pro（工作区开放外网）、思考Pro（强制最高思考）。
+- 更多功能：DSH 服务开关改为真实状态；插件市场与已安装列表。
+- 全应用动画逐屏补齐。
+- 音乐源插件需在真机验证搜索/播放。
+- 液态玻璃风格与模糊度需真机复核。
