@@ -31,9 +31,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.components.ui.CardGroup
+import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.ui.theme.CustomColors
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -46,6 +48,7 @@ private const val PLUGINS_URL = "https://2997669349awa-blip.github.io/LiquidHub/
 fun SettingMorePage() {
     val settingsStore = koinInject<SettingsStore>()
     val scope = rememberCoroutineScope()
+    val navController = LocalNavController.current
     val settings by settingsStore.settingsFlow.collectAsStateWithLifecycle()
     var plugins by remember { mutableStateOf<List<Triple<String, String, String>>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -90,16 +93,9 @@ fun SettingMorePage() {
         ) {
             CardGroup(title = { Text("服务") }) {
                 item(
+                    onClick = { navController.navigate(Screen.Dsh) },
                     headlineContent = { Text("DSH 服务") },
-                    supportingContent = { Text("随应用自动启动") },
-                    trailingContent = {
-                        Switch(
-                            checked = settings.dshAutoStart,
-                            onCheckedChange = { value ->
-                                scope.launch { settingsStore.update { it.copy(dshAutoStart = value) } }
-                            },
-                        )
-                    },
+                    supportingContent = { Text("在工作区安装并启动 DeepSeek Harness，内嵌打开") },
                 )
             }
 

@@ -125,6 +125,7 @@ import me.rerere.rikkahub.ui.pages.setting.SettingProviderDetailPage
 import me.rerere.rikkahub.ui.pages.setting.LocalModelsPage
 import me.rerere.rikkahub.ui.pages.setting.MusicPage
 import me.rerere.rikkahub.ui.pages.setting.SettingCosplayPage
+import me.rerere.rikkahub.ui.pages.setting.SettingDshPage
 import me.rerere.rikkahub.ui.pages.setting.SettingMorePage
 import me.rerere.rikkahub.ui.pages.setting.SettingPhoneControlPage
 import me.rerere.rikkahub.ui.pages.setting.SettingProPage
@@ -525,6 +526,10 @@ class RouteActivity : ComponentActivity() {
                                 SettingMorePage()
                             }
 
+                            entry<Screen.Dsh> {
+                                SettingDshPage()
+                            }
+
                             entry<Screen.DialogCommands> {
                                 SettingDialogCommandsPage()
                             }
@@ -769,6 +774,9 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data object More : Screen
+
+    @Serializable
+    data object Dsh : Screen
 
     @Serializable
     data object DialogCommands : Screen
