@@ -10,13 +10,13 @@
     }
   ],
   "preview": {
-    "version": "1.0.6-Preview7",
-    "publishedAt": "2026-10-06T13:49:00Z",
-    "changelog": "LiquidHub 1.0.6 Preview7（预览通道）\n\n- 命令 //kill 增强：彻底终止当前会话，切断生成、后台任务与手机控制；被切断的生成会写入错误 \"The conversation was cut off\"\n- 新增 LikkaHub Pro：设置，其他，LikkaHub Pro。下载插件后解锁 操控Pro / 思考Pro / 沙盒Pro / 定时Pro / 歌词Pro\n- 新增 更多功能：设置，其他，更多功能。含 DSH 服务（自动启动）与插件市场（展示 DSH / AI 插件）\n- 沿用：液态玻璃偏移归零+模糊42dp与风格切换、思考深度动画、列表入场动画、联网搜索增强、侧边栏扮演、音乐源插件、网页端控制手机、工具只显示工具名",
+    "version": "1.0.6-Preview8",
+    "publishedAt": "2026-10-07T02:04:00Z",
+    "changelog": "LiquidHub 1.0.6 Preview8（预览通道）\n\n- 思考 Pro 实装：开启后强制模型以最高思考程度生成\n- 更多功能：新增「已安装插件」区（必装 dsh-web-mobile）\n- 文档 Rd.md：写入 DSH 定义、性能要求与待完成清单\n- 沿用：//kill 彻底终止、LikkaHub Pro、插件市场、玻璃风格、动画、联网搜索增强等",
     "downloads": [
       {
-        "name": "liquidhub-release-1006-1349.apk",
-        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1006-1349.apk",
+        "name": "liquidhub-release-1007-0204.apk",
+        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1007-0204.apk",
         "size": "约 54 MB"
       }
     ]
