@@ -10,13 +10,13 @@
     }
   ],
   "preview": {
-    "version": "1.0.6-Preview8",
-    "publishedAt": "2026-10-07T02:04:00Z",
-    "changelog": "LiquidHub 1.0.6 Preview8（预览通道）\n\n- 思考 Pro 实装：开启后强制模型以最高思考程度生成\n- 更多功能：新增「已安装插件」区（必装 dsh-web-mobile）\n- 文档 Rd.md：写入 DSH 定义、性能要求与待完成清单\n- 沿用：//kill 彻底终止、LikkaHub Pro、插件市场、玻璃风格、动画、联网搜索增强等",
+    "version": "1.0.6-Preview9",
+    "publishedAt": "2026-10-07T03:24:00Z",
+    "changelog": "LiquidHub 1.0.6 Preview9（预览通道）\n\n- 新增 DSH 服务页：设置，其他，更多功能，DSH 服务。在工作区安装并启动 DeepSeek Harness，自动装移动端适配插件 dsh-web-mobile，并内嵌打开其 Web UI\n- 已安装插件区标注必装 dsh-web-mobile\n- 沿用：思考Pro(强制最高思考)、//kill 彻底终止、LikkaHub Pro、插件市场、玻璃风格、动画、联网搜索增强",
     "downloads": [
       {
-        "name": "liquidhub-release-1007-0204.apk",
-        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1007-0204.apk",
+        "name": "liquidhub-release-1007-0324.apk",
+        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1007-0324.apk",
         "size": "约 54 MB"
       }
     ]
