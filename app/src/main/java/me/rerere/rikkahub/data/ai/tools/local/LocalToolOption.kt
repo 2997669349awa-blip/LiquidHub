@@ -36,4 +36,7 @@ sealed class LocalToolOption {
     @Serializable
     @SerialName("phone_control")
     data object PhoneControl : LocalToolOption()
+
+    @SerialName("chart_display")
+    data object ChartDisplay : LocalToolOption()
 }

@@ -1,16 +1,12 @@
-// Modified by AI Hello World on 2026-09-25.
-// This file is part of LiquidHub, a fork of RikkaHub.
-// Licensed under AGPL-3.0.
-// Falls back to /bin/sh when the rootfs has no bash (e.g. Alpine).
-
 package me.rerere.workspace
 
 import java.io.File
-import java.nio.file.Files
 
 data class WorkspaceBindMount(
     val source: File,
     val target: String,
+    /** AI 写入该目录时免强制审批 */
+    val writable: Boolean = false,
 ) {
     init {
         require(target.startsWith("/")) { "Bind mount target must be absolute: $target" }
@@ -22,7 +18,7 @@ class ProotShellRunner(
     private val patcher: RootfsPatcher = RootfsPatcher(),
 ) : WorkspaceShellRunner {
     override fun execute(context: WorkspaceShellContext): WorkspaceCommandResult {
-        if (!context.linuxDir.hasUsableRootfs()) {
+        if (!WorkspaceManager.isUsableRootfs(context.linuxDir)) {
             return WorkspaceCommandResult(
                 exitCode = 127,
                 stdout = "",
@@ -67,64 +63,90 @@ class ProotShellRunner(
         return process.readResult(context.timeoutMillis, context.stdin)
     }
 
+    override fun terminalLaunch(context: WorkspaceTerminalContext): WorkspaceTerminalLaunch {
+        val shell = WorkspaceManager.rootfsShell(context.linuxDir)
+        val args = prootArgs(context.linuxDir, context.filesDir, WORKSPACE_DIR, context.bindMounts)
+        args += ROOTFS_ENV
+        args += listOf(
+            "USER=root",
+            "SHELL=$shell",
+            shell,
+        )
+
+        val env = mutableListOf(
+            "PROOT_LOADER=${File(nativeLibraryDir, PROOT_LOADER).absolutePath}",
+            "PROOT_TMP_DIR=${context.tempDir.absolutePath}",
+            "TMPDIR=${context.tempDir.absolutePath}",
+        )
+        if (context.shellCompatibilityMode) {
+            env += "PROOT_NO_SECCOMP=1"
+        }
+
+        return WorkspaceTerminalLaunch(
+            executable = File(nativeLibraryDir, PROOT_EXEC).absolutePath,
+            cwd = context.filesDir.absolutePath,
+            args = args,
+            env = env,
+        )
+    }
+
     private fun buildCommand(
         context: WorkspaceShellContext,
         proot: File,
     ): List<String> {
-        val command = mutableListOf(
-            proot.absolutePath,
+        val command = mutableListOf(proot.absolutePath)
+        command += prootArgs(context.linuxDir, context.filesDir, context.prootCwd(), context.bindMounts)
+        command += ROOTFS_ENV
+        command += listOf(
+            // 非交互执行约定, 抑制各类 CLI 的交互行为 (确认提示/分页器/颜色转义)
+            "CI=true",
+            "NO_COLOR=1",
+            "PAGER=cat",
+            WorkspaceManager.rootfsShell(context.linuxDir),
+            "-l",
+            "-c",
+            // 命令通过位置参数传入, 避免任何转义; eval "$2" 对命令文本只求值一次, 等价于 bash -c "$cmd"
+            "cd -- \"\$1\" && eval \"\$2\"",
+            "rikkahub",
+            context.prootCwd(),
+            context.command,
+        )
+        return command
+    }
+
+    /** PRoot 自身的参数: Rootfs、工作目录与挂载表, 命令执行和交互式终端共用 */
+    private fun prootArgs(
+        linuxDir: File,
+        filesDir: File,
+        cwd: String,
+        bindMounts: List<WorkspaceBindMount>,
+    ): MutableList<String> {
+        val args = mutableListOf(
             "--root-id",
             "--link2symlink",
             "--kill-on-exit",
             "-r",
-            context.linuxDir.absolutePath,
+            linuxDir.absolutePath,
             "-w",
-            context.prootCwd(),
+            cwd,
             "-b",
-            "${context.filesDir.absolutePath}:$WORKSPACE_DIR",
+            "${filesDir.absolutePath}:$WORKSPACE_DIR",
         )
 
-        context.bindMounts.forEach { mount ->
+        bindMounts.forEach { mount ->
             if (mount.source.exists()) {
-                command += "-b"
-                command += "${mount.source.absolutePath}:${mount.target.trimEnd('/')}"
+                args += "-b"
+                args += "${mount.source.absolutePath}:${mount.target.trimEnd('/')}"
             }
         }
 
         WorkspaceManager.KERNEL_FS_MOUNTS.forEach { path ->
             if (File(path).exists()) {
-                command += "-b"
-                command += path
+                args += "-b"
+                args += path
             }
         }
-
-        // 部分发行版（如 Alpine）不预装 bash，回退到 /bin/sh 以保证可用。
-        val hasBash = File(context.linuxDir, "bin/bash").isFile
-        val shell = if (hasBash) "/bin/bash" else "/bin/sh"
-        val shellArgs = if (hasBash) {
-            listOf("-l", "-c", SHELL_SCRIPT)
-        } else {
-            listOf("-c", SHELL_SCRIPT)
-        }
-
-        command += listOf(
-            "/usr/bin/env",
-            "-i",
-            "HOME=/root",
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-            "TERM=xterm-256color",
-            "LANG=C.UTF-8",
-            "LC_ALL=C.UTF-8",
-            // 非交互执行约定, 抑制各类 CLI 的交互行为 (确认提示/分页器/颜色转义)
-            "CI=true",
-            "NO_COLOR=1",
-            "PAGER=cat",
-            shell,
-        )
-        command += shellArgs
-        // 命令通过位置参数传入, 避免任何转义; eval "$2" 对命令文本只求值一次
-        command += listOf("rikkahub", context.prootCwd(), context.command)
-        return command
+        return args
     }
 
     private fun WorkspaceShellContext.prootCwd(): String {
@@ -136,17 +158,20 @@ class ProotShellRunner(
         }
     }
 
-    private fun File.hasUsableRootfs(): Boolean {
-        if (!isDirectory) return false
-        // Alpine 的 /bin/sh 是绝对符号链接，isFile 在宿主机解析会失败
-        val sh = File(this, "bin/sh")
-        return sh.isFile || Files.isSymbolicLink(sh.toPath())
-    }
-
     private companion object {
         private const val PROOT_EXEC = "libproot_exec.so"
         private const val PROOT_LOADER = "libproot_loader.so"
-        private const val SHELL_SCRIPT = "cd -- \"\$1\" && eval \"\$2\""
         private val WORKSPACE_DIR = WorkspaceManager.ROOTFS_WORKSPACE_DIR
+
+        /** 清空宿主机环境变量后 Rootfs 内的基础环境 */
+        private val ROOTFS_ENV = listOf(
+            "/usr/bin/env",
+            "-i",
+            "HOME=${WorkspaceManager.ROOTFS_HOME_DIR}",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "TERM=xterm-256color",
+            "LANG=C.UTF-8",
+            "LC_ALL=C.UTF-8",
+        )
     }
 }

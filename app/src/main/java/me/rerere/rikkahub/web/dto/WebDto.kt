@@ -3,10 +3,12 @@ package me.rerere.rikkahub.web.dto
 import kotlinx.serialization.Serializable
 import me.rerere.ai.core.ReasoningLevel
 import me.rerere.ai.core.TokenUsage
+import me.rerere.ai.ui.ModelSnapshot
 import me.rerere.ai.ui.UIMessageAnnotation
 import me.rerere.ai.ui.UIMessage
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.rikkahub.data.model.Conversation
+import me.rerere.rikkahub.data.model.ConversationConfig
 import me.rerere.rikkahub.data.model.MessageNode
 
 // ========== Request DTOs ==========
@@ -14,163 +16,8 @@ import me.rerere.rikkahub.data.model.MessageNode
 @Serializable
 data class SendMessageRequest(
     val parts: List<UIMessagePart>,
-    val modeInjectionIds: List<String>? = null,
-    val lorebookIds: List<String>? = null,
-    // 用户为本条消息显式指定的 skill；非空时本次生成只暴露该 skill。
-    val skill: String? = null,
-)
-
-@Serializable
-data class SkillDto(
-    val name: String,
-    val description: String,
-    val enabled: Boolean,
-)
-
-// ========== Management DTOs ==========
-
-@Serializable
-data class AssistantDto(
-    val id: String,
-    val name: String,
-    val systemPrompt: String,
-    val chatModelId: String?,
-    val temperature: Float?,
-    val topP: Float?,
-    val contextMessageLimit: Int,
-    val streamOutput: Boolean,
-    val enableMemory: Boolean,
-    val useGlobalMemory: Boolean,
-    val enableWebSearch: Boolean,
-    val enableRecentChatsReference: Boolean,
-    val maxTokens: Int?,
-    val reasoningLevel: String,
-    val useGradientBackground: Boolean,
-    val workspaceId: String?,
-)
-
-@Serializable
-data class CreateAssistantRequest(
-    val name: String,
-)
-
-@Serializable
-data class UpdateAssistantFieldsRequest(
-    val name: String? = null,
-    val systemPrompt: String? = null,
-    val chatModelId: String? = null,
-    val temperature: Float? = null,
-    val topP: Float? = null,
-    val contextMessageLimit: Int? = null,
-    val streamOutput: Boolean? = null,
-    val enableMemory: Boolean? = null,
-    val useGlobalMemory: Boolean? = null,
-    val enableWebSearch: Boolean? = null,
-    val enableRecentChatsReference: Boolean? = null,
-    val maxTokens: Int? = null,
-    val reasoningLevel: String? = null,
-    val useGradientBackground: Boolean? = null,
-    val workspaceId: String? = null,
-)
-
-@Serializable
-data class ModelDto(
-    val id: String,
-    val modelId: String,
-    val displayName: String,
-    val type: String,
-    val tools: List<String>,
-)
-
-@Serializable
-data class ProviderDto(
-    val id: String,
-    val name: String,
-    val enabled: Boolean,
-    val builtIn: Boolean,
-    val type: String,
-    val apiKey: String,
-    val baseUrl: String,
-    val models: List<ModelDto>,
-)
-
-@Serializable
-data class UpdateProviderRequest(
-    val name: String? = null,
-    val enabled: Boolean? = null,
-    val apiKey: String? = null,
-    val baseUrl: String? = null,
-)
-
-@Serializable
-data class GeneralSettingsDto(
-    val dynamicColor: Boolean,
-    val themeId: String,
-    val developerMode: Boolean,
-    val enableSuggestion: Boolean,
-    val chatModelId: String,
-    val fastModelId: String,
-    val imageGenerationModelId: String,
-    val translateModeId: String,
-    val ocrModelId: String,
-    val compressModelId: String,
-    val webServerEnabled: Boolean,
-    val webServerPort: Int,
-    val webServerJwtEnabled: Boolean,
-    val webServerLocalhostOnly: Boolean,
-)
-
-@Serializable
-data class UpdateGeneralSettingsRequest(
-    val dynamicColor: Boolean? = null,
-    val themeId: String? = null,
-    val developerMode: Boolean? = null,
-    val enableSuggestion: Boolean? = null,
-    val chatModelId: String? = null,
-    val fastModelId: String? = null,
-    val imageGenerationModelId: String? = null,
-    val translateModeId: String? = null,
-    val ocrModelId: String? = null,
-    val compressModelId: String? = null,
-)
-
-@Serializable
-data class SkillDetailDto(
-    val name: String,
-    val description: String,
-    val enabled: Boolean,
-    val content: String,
-)
-
-@Serializable
-data class SaveSkillRequest(
-    val name: String,
-    val content: String,
-)
-
-@Serializable
-data class FileItemDto(
-    val id: Long,
-    val folder: String,
-    val displayName: String,
-    val mimeType: String,
-    val sizeBytes: Long,
-    val relativePath: String,
-    val createdAt: Long,
-    val updatedAt: Long,
-)
-
-@Serializable
-data class WebPhoneActionRequest(
-    val action: String,
-    val label: String = "",
-    val args: Map<String, String> = emptyMap(),
-)
-
-@Serializable
-data class WebPhoneActionResult(
-    val ok: Boolean,
-    val result: String = "",
+    // 新会话首条消息归入的文件夹；已存在的会话忽略
+    val folderId: String? = null,
 )
 
 @Serializable
@@ -215,6 +62,16 @@ data class UpdateConversationTitleRequest(
 data class UpdateConversationInjectionsRequest(
     val modeInjectionIds: List<String>,
     val lorebookIds: List<String>,
+)
+
+// 只更新传了值的字段；会话开始前这些修改落在助手上
+@Serializable
+data class UpdateConversationConfigRequest(
+    val chatModelId: String? = null,
+    val reasoningLevel: ReasoningLevel? = null,
+    val mcpServerIds: List<String>? = null,
+    val enableWebSearch: Boolean? = null,
+    val builtInSearch: Boolean? = null,
 )
 
 @Serializable
@@ -347,6 +204,7 @@ data class ConversationDto(
     val customSystemPrompt: String? = null,
     val modeInjectionIds: List<String> = emptyList(),
     val lorebookIds: List<String> = emptyList(),
+    val config: ConversationConfig? = null,
     val workspaceCwd: String? = null,
     val folderId: String? = null,
     val createAt: Long,
@@ -370,8 +228,11 @@ data class MessageDto(
     val createdAt: String,
     val finishedAt: String? = null,
     val modelId: String? = null,
+    val modelSnapshot: ModelSnapshot? = null,
     val usage: TokenUsage? = null,
-    val translation: String? = null
+    val generationTimeMs: Long? = null,
+    val translation: String? = null,
+    val isContextCheckpoint: Boolean = false,
 )
 
 @Serializable
@@ -488,6 +349,7 @@ fun Conversation.toDto(isGenerating: Boolean = false) = ConversationDto(
     customSystemPrompt = customSystemPrompt,
     modeInjectionIds = modeInjectionIds.map { it.toString() },
     lorebookIds = lorebookIds.map { it.toString() },
+    config = config,
     workspaceCwd = workspaceCwd,
     folderId = folderId?.toString(),
     createAt = createAt.toEpochMilli(),
@@ -509,6 +371,162 @@ fun UIMessage.toDto() = MessageDto(
     createdAt = createdAt.toString(),
     finishedAt = finishedAt?.toString(),
     modelId = modelId?.toString(),
+    modelSnapshot = modelSnapshot,
     usage = usage,
-    translation = translation
+    generationTimeMs = generationTimeMs,
+    translation = translation,
+    isContextCheckpoint = isContextCheckpoint,
+)
+
+@Serializable
+data class SkillDto(
+    val name: String,
+    val description: String,
+    val enabled: Boolean,
+)
+
+// ========== Management DTOs ==========
+
+@Serializable
+data class AssistantDto(
+    val id: String,
+    val name: String,
+    val systemPrompt: String,
+    val chatModelId: String?,
+    val temperature: Float?,
+    val topP: Float?,
+    val contextMessageLimit: Int,
+    val streamOutput: Boolean,
+    val enableMemory: Boolean,
+    val useGlobalMemory: Boolean,
+    val enableWebSearch: Boolean,
+    val enableRecentChatsReference: Boolean,
+    val maxTokens: Int?,
+    val reasoningLevel: String,
+    val useGradientBackground: Boolean,
+    val workspaceId: String?,
+)
+
+@Serializable
+data class CreateAssistantRequest(
+    val name: String,
+)
+
+@Serializable
+data class UpdateAssistantFieldsRequest(
+    val name: String? = null,
+    val systemPrompt: String? = null,
+    val chatModelId: String? = null,
+    val temperature: Float? = null,
+    val topP: Float? = null,
+    val contextMessageLimit: Int? = null,
+    val streamOutput: Boolean? = null,
+    val enableMemory: Boolean? = null,
+    val useGlobalMemory: Boolean? = null,
+    val enableWebSearch: Boolean? = null,
+    val enableRecentChatsReference: Boolean? = null,
+    val maxTokens: Int? = null,
+    val reasoningLevel: String? = null,
+    val useGradientBackground: Boolean? = null,
+    val workspaceId: String? = null,
+)
+
+@Serializable
+data class ModelDto(
+    val id: String,
+    val modelId: String,
+    val displayName: String,
+    val type: String,
+    val tools: List<String>,
+)
+
+@Serializable
+data class ProviderDto(
+    val id: String,
+    val name: String,
+    val enabled: Boolean,
+    val builtIn: Boolean,
+    val type: String,
+    val apiKey: String,
+    val baseUrl: String,
+    val models: List<ModelDto>,
+)
+
+@Serializable
+data class UpdateProviderRequest(
+    val name: String? = null,
+    val enabled: Boolean? = null,
+    val apiKey: String? = null,
+    val baseUrl: String? = null,
+)
+
+@Serializable
+data class GeneralSettingsDto(
+    val dynamicColor: Boolean,
+    val themeId: String,
+    val developerMode: Boolean,
+    val enableSuggestion: Boolean,
+    val chatModelId: String,
+    val fastModelId: String,
+    val imageGenerationModelId: String,
+    val translateModeId: String,
+    val ocrModelId: String,
+    val compressModelId: String? = null,
+    val webServerEnabled: Boolean,
+    val webServerPort: Int,
+    val webServerJwtEnabled: Boolean,
+    val webServerLocalhostOnly: Boolean,
+)
+
+@Serializable
+data class UpdateGeneralSettingsRequest(
+    val dynamicColor: Boolean? = null,
+    val themeId: String? = null,
+    val developerMode: Boolean? = null,
+    val enableSuggestion: Boolean? = null,
+    val chatModelId: String? = null,
+    val fastModelId: String? = null,
+    val imageGenerationModelId: String? = null,
+    val translateModeId: String? = null,
+    val ocrModelId: String? = null,
+    val compressModelId: String? = null,
+)
+
+@Serializable
+data class SkillDetailDto(
+    val name: String,
+    val description: String,
+    val enabled: Boolean,
+    val content: String,
+)
+
+@Serializable
+data class SaveSkillRequest(
+    val name: String,
+    val content: String,
+)
+
+@Serializable
+data class FileItemDto(
+    val id: Long,
+    val folder: String,
+    val displayName: String,
+    val mimeType: String,
+    val sizeBytes: Long,
+    val relativePath: String,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
+
+@Serializable
+data class WebPhoneActionRequest(
+    val action: String,
+    val label: String = "",
+    val args: Map<String, String> = emptyMap(),
+)
+
+@Serializable
+data class WebPhoneActionResult(
+    val ok: Boolean,
+    val result: String = "",
 )

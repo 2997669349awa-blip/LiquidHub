@@ -3,10 +3,6 @@ import type { Settings, UIMessagePart } from "~/types";
 export interface Draft {
   text: string;
   parts: UIMessagePart[];
-  modeInjectionIds?: string[];
-  lorebookIds?: string[];
-  // 本条消息显式指定的 skill；null/undefined 表示不限制。
-  skill?: string | null;
 }
 
 export interface SettingsSlice {
@@ -19,16 +15,6 @@ export interface ChatInputSlice {
   setText: (conversationId: string, text: string) => void;
   addParts: (conversationId: string, parts: UIMessagePart[]) => void;
   removePartAt: (conversationId: string, index: number) => void;
-  setPromptInjectionIds: (
-    conversationId: string,
-    ids: { modeInjectionIds: string[]; lorebookIds: string[] },
-  ) => void;
-  getPromptInjectionIds: (conversationId: string) => {
-    modeInjectionIds: string[];
-    lorebookIds: string[];
-  };
-  setSkill: (conversationId: string, skill: string | null) => void;
-  getSkill: (conversationId: string) => string | null;
   clearDraft: (conversationId: string) => void;
   isEmpty: (conversationId: string) => boolean;
   getSubmitParts: (conversationId: string) => UIMessagePart[];

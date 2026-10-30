@@ -1,19 +1,23 @@
-// Modified by AI Hello World on 2026-09-26.
-// This file is part of LiquidHub, a fork of RikkaHub.
-// Licensed under AGPL-3.0.
-// Adds the built-in "likkahub本地AI" provider that points at the local Ollama
-// instance exposed by the terminal likkahub CLI on 127.0.0.1:11434.
-
 package me.rerere.rikkahub.data.datastore
 
-import me.rerere.ai.provider.BalanceOption
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
 import me.rerere.ai.provider.ProviderSetting
+import me.rerere.ai.provider.QuotaQuery
+import me.rerere.rikkahub.R
+import me.rerere.rikkahub.ui.components.richtext.MarkdownBlock
 import kotlin.uuid.Uuid
-
-val DEFAULT_AUTO_MODEL_ID = Uuid.parse("b7055fb4-39f9-4042-a88a-0d80ed76cf08")
 
 /** 终端本地AI 提供商的固定 id，扫描到本机模型时把模型写进这一项。 */
 val LOCAL_AI_PROVIDER_ID = Uuid.parse("c71d3a52-8f4b-4e0a-9c6d-2b5e8f1a7c40")
+
+val DEFAULT_AUTO_MODEL_ID = Uuid.parse("b7055fb4-39f9-4042-a88a-0d80ed76cf08")
 
 val DEFAULT_PROVIDERS = listOf(
     ProviderSetting.OpenAI(
@@ -37,6 +41,32 @@ val DEFAULT_PROVIDERS = listOf(
         apiKey = "",
         enabled = true,
         builtIn = true,
+        description = {
+            Text(
+                text = buildAnnotatedString {
+                    append("提供 OpenAI、Claude、Google Gemini 等主流模型的高并发和稳定服务")
+                    appendLine()
+                    append("官网：")
+                    withLink(LinkAnnotation.Url("https://aihubmix.com?aff=pG7r")) {
+                        withStyle(SpanStyle(MaterialTheme.colorScheme.primary)) {
+                            append("https://aihubmix.com")
+                        }
+                    }
+                    appendLine()
+                    append("充值: ")
+                    withLink(LinkAnnotation.Url("https://console.aihubmix.com/topup")) {
+                        withStyle(SpanStyle(MaterialTheme.colorScheme.primary)) {
+                            append("https://console.aihubmix.com/topup")
+                        }
+                    }
+                }
+            )
+        },
+        shortDescription = {
+            Text(
+                text = "支持gpt, claude, gemini等200+模型"
+            )
+        },
     ),
     ProviderSetting.OpenAI(
         id = Uuid.parse("2a05506f-3a59-450a-a493-33a82bc85a81"),
@@ -45,6 +75,22 @@ val DEFAULT_PROVIDERS = listOf(
         apiKey = "",
         enabled = false,
         builtIn = true,
+        description = {
+            Text(
+                text = buildAnnotatedString {
+                    append("APIMart 是专注 AI 图片/视频生成的低价 API 平台，GPT-Image-2 低至 $0.006/张，1 美元可出图 160+ 张。图片、视频一套异步 API 通吃，提交任务拿 ID、回调取结果，跑批万张不超时、换模型不改代码。按量付费、无月费。")
+                    appendLine()
+                    withLink(LinkAnnotation.Url("https://go.apimart.ai/gh-rikkahub")) {
+                        withStyle(SpanStyle(MaterialTheme.colorScheme.primary)) {
+                            append("通过此注册链接注册即可开用")
+                        }
+                    }
+                }
+            )
+        },
+        shortDescription = {
+            Text("AI 图片/视频生成，GPT-Image-2 低至 $0.006/张")
+        },
     ),
     ProviderSetting.OpenAI(
         id = Uuid.parse("56a94d29-c88b-41c5-8e09-38a7612d6cf8"),
@@ -52,6 +98,14 @@ val DEFAULT_PROVIDERS = listOf(
         baseUrl = "https://api.siliconflow.cn/v1",
         apiKey = "",
         builtIn = true,
+        description = {
+            MarkdownBlock(
+                content = """
+                    ${stringResource(R.string.silicon_flow_description)}
+                    ${stringResource(R.string.silicon_flow_website)}
+                """.trimIndent()
+            )
+        },
     ),
     ProviderSetting.OpenAI(
         id = Uuid.parse("f099ad5b-ef03-446d-8e78-7e36787f780b"),
@@ -59,9 +113,9 @@ val DEFAULT_PROVIDERS = listOf(
         baseUrl = "https://api.deepseek.com/v1",
         apiKey = "",
         builtIn = true,
-        balanceOption = BalanceOption(
+        quotaQuery = QuotaQuery(
             enabled = true,
-            apiPath = "/user/balance",
+            url = "{{baseUrl}}/user/balance",
             resultPath = "balance_infos[0].total_balance"
         )
     ),
@@ -72,9 +126,9 @@ val DEFAULT_PROVIDERS = listOf(
         apiKey = "",
         enabled = true,
         builtIn = true,
-        balanceOption = BalanceOption(
+        quotaQuery = QuotaQuery(
             enabled = true,
-            apiPath = "/users/me/balance",
+            url = "{{baseUrl}}/users/me/balance",
             resultPath = "data.available_balance"
         )
     ),
@@ -84,9 +138,9 @@ val DEFAULT_PROVIDERS = listOf(
         baseUrl = "https://openrouter.ai/api/v1",
         apiKey = "",
         builtIn = true,
-        balanceOption = BalanceOption(
+        quotaQuery = QuotaQuery(
             enabled = true,
-            apiPath = "/credits",
+            url = "{{baseUrl}}/credits",
             resultPath = "data.total_credits - data.total_usage",
         )
     ),
@@ -97,9 +151,9 @@ val DEFAULT_PROVIDERS = listOf(
         apiKey = "",
         enabled = false,
         builtIn = true,
-        balanceOption = BalanceOption(
+        quotaQuery = QuotaQuery(
             enabled = true,
-            apiPath = "/credits",
+            url = "{{baseUrl}}/credits",
             resultPath = "balance",
         )
     ),
@@ -142,6 +196,18 @@ val DEFAULT_PROVIDERS = listOf(
         apiKey = "",
         enabled = false,
         builtIn = true,
+        description = {
+            Text(
+                text = buildAnnotatedString {
+                    append("企业级AI服务, 官网：")
+                    withLink(LinkAnnotation.Url("https://302.ai/")) {
+                        withStyle(SpanStyle(MaterialTheme.colorScheme.primary)) {
+                            append("https://302.ai/")
+                        }
+                    }
+                }
+            )
+        }
     ),
     ProviderSetting.OpenAI(
         id = Uuid.parse("ef5d149b-8e34-404b-818c-6ec242e5c3c5"),
@@ -167,6 +233,24 @@ val DEFAULT_PROVIDERS = listOf(
         apiKey = "",
         enabled = false,
         builtIn = true,
+        description = {
+            Text(
+                text = buildAnnotatedString {
+                    append("可靠高效的 API 中继服务，提供 Claude、Codex、Gemini 等中继服务。注重隐私·无数据倒卖·无模型掺水，充值额度 1:1，按量付费。多线路冗余、跨区域容灾、自动故障切换，长链路 SSE 不中断。\n")
+                    append("官网：")
+                    withLink(LinkAnnotation.Url("https://sui-xiang.com")) {
+                        withStyle(SpanStyle(MaterialTheme.colorScheme.primary)) {
+                            append("https://sui-xiang.com")
+                        }
+                    }
+                }
+            )
+        },
+        shortDescription = {
+            Text(
+                text = "Claude、Codex、Gemini 等中继服务，1:1 充值"
+            )
+        },
     ),
     ProviderSetting.OpenAI(
         id = Uuid.parse("afbc54ad-807e-4455-9594-7d7a546356ad"),
@@ -175,6 +259,25 @@ val DEFAULT_PROVIDERS = listOf(
         apiKey = "",
         enabled = false,
         builtIn = true,
+        description = {
+            Text(
+                text = buildAnnotatedString {
+                    append("MaruCode 是一家偶尔做做慈善的小破站 API，自营号池，主要提供 Codex、Claude Code、GPT Image 等主流模型，支持 Websocket 协议，明码标价(Codex 0.25x, CC 1.5x)，透明汇率(1:1)。")
+                    appendLine()
+                    withLink(LinkAnnotation.Url("https://api.muteki.site/register?aff=Rikkahub&promo=Rikkahub")) {
+                        withStyle(SpanStyle(MaterialTheme.colorScheme.primary)) {
+                            append("新用户注册送 2 刀")
+                        }
+                    }
+                    appendLine()
+                    withLink(LinkAnnotation.Url("https://images-2.muteki.site")) {
+                        withStyle(SpanStyle(MaterialTheme.colorScheme.primary)) {
+                            append("生图工作台🖼️")
+                        }
+                    }
+                }
+            )
+        },
         useResponseApi = true,
     ),
     ProviderSetting.Claude(

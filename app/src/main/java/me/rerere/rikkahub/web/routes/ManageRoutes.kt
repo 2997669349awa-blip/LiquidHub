@@ -19,7 +19,7 @@ import me.rerere.rikkahub.data.datastore.findModelById
 import me.rerere.rikkahub.data.db.entity.ManagedFileEntity
 import me.rerere.rikkahub.data.files.FileFolders
 import me.rerere.rikkahub.data.files.FilesManager
-import me.rerere.rikkahub.data.files.SkillManager
+import me.rerere.rikkahub.data.skills.SkillManager
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.phone.PhoneControlManager
 import me.rerere.rikkahub.data.phone.WebPhoneExecutor
@@ -159,6 +159,8 @@ fun Route.manageRoutes(
                         baseUrl = request.baseUrl ?: existing.baseUrl,
                     )
 
+                    is ProviderSetting.ChatGPT, is ProviderSetting.Grok -> existing
+
                     is ProviderSetting.Google -> existing.copy(
                         name = request.name ?: existing.name,
                         enabled = request.enabled ?: existing.enabled,
@@ -197,7 +199,6 @@ fun Route.manageRoutes(
                         ?: settings.imageGenerationModelId,
                     translateModeId = request.translateModeId?.toUuid("translateModeId") ?: settings.translateModeId,
                     ocrModelId = request.ocrModelId?.toUuid("ocrModelId") ?: settings.ocrModelId,
-                    compressModelId = request.compressModelId?.toUuid("compressModelId") ?: settings.compressModelId,
                 )
             }
             call.respond(HttpStatusCode.OK, settingsStore.settingsFlow.value.toManageDto())
@@ -206,7 +207,9 @@ fun Route.manageRoutes(
         // ---------- Skills ----------
         get("/skills/{name}") {
             val name = call.parameters["name"] ?: throw BadRequestException("Missing name")
-            val content = skillManager.readSkillContent(name) ?: throw NotFoundException("Skill not found")
+            val skillMeta = skillManager.findSkill(name) ?: throw NotFoundException("Skill not found")
+            val content = skillMeta.skillFile.takeIf { it.isFile }?.readText()
+                ?: throw NotFoundException("Skill not found")
             val meta = skillManager.listSkills().firstOrNull { it.name == name }
             val assistant = settingsStore.settingsFlow.value.assistants
                 .firstOrNull { it.id == settingsStore.settingsFlow.value.assistantId }
@@ -230,7 +233,8 @@ fun Route.manageRoutes(
 
         delete("/skills/{name}") {
             val name = call.parameters["name"] ?: throw BadRequestException("Missing name")
-            if (!skillManager.deleteSkill(name)) throw NotFoundException("Skill not found")
+            val skill = skillManager.findSkill(name) ?: throw NotFoundException("Skill not found")
+            if (!skillManager.deleteSkill(skill)) throw NotFoundException("Skill not found")
             call.respond(HttpStatusCode.OK, mapOf("status" to "ok"))
         }
 
@@ -319,16 +323,22 @@ private fun ProviderSetting.toManageDto(): ProviderDto {
         is ProviderSetting.OpenAI -> "openai"
         is ProviderSetting.Google -> "google"
         is ProviderSetting.Claude -> "claude"
+        is ProviderSetting.ChatGPT -> "chatgpt"
+        is ProviderSetting.Grok -> "grok"
     }
     val key = when (this) {
         is ProviderSetting.OpenAI -> apiKey
         is ProviderSetting.Google -> apiKey
         is ProviderSetting.Claude -> apiKey
+        is ProviderSetting.ChatGPT -> ""
+        is ProviderSetting.Grok -> ""
     }
     val url = when (this) {
         is ProviderSetting.OpenAI -> baseUrl
         is ProviderSetting.Google -> baseUrl
         is ProviderSetting.Claude -> baseUrl
+        is ProviderSetting.ChatGPT -> ""
+        is ProviderSetting.Grok -> ""
     }
     return ProviderDto(
         id = id.toString(),
@@ -352,7 +362,6 @@ private fun Settings.toManageDto() = GeneralSettingsDto(
     imageGenerationModelId = imageGenerationModelId.toString(),
     translateModeId = translateModeId.toString(),
     ocrModelId = ocrModelId.toString(),
-    compressModelId = compressModelId.toString(),
     webServerEnabled = webServerEnabled,
     webServerPort = webServerPort,
     webServerJwtEnabled = webServerJwtEnabled,

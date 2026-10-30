@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.input.TextFieldLineLimits
-import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalTextStyle
@@ -28,15 +28,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.dokar.sonner.ToastType
+import me.rerere.ui.toast.ToastType
 import kotlinx.coroutines.launch
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
 import me.rerere.rikkahub.ui.components.nav.BackButton
-import me.rerere.rikkahub.ui.components.webview.WebView
-import me.rerere.rikkahub.ui.components.webview.rememberWebViewState
 import me.rerere.rikkahub.ui.context.LocalToaster
 import me.rerere.rikkahub.ui.theme.CustomColors
 import me.rerere.rikkahub.ui.theme.JetbrainsMono
+import me.rerere.ui.webview.WebView
+import me.rerere.ui.webview.rememberWebViewState
 import me.rerere.workspace.WorkspaceStorageArea
 import org.koin.compose.koinInject
 
@@ -60,7 +60,9 @@ fun WorkspaceFileEditorPage(
     val supportsPreview = extension in setOf("html", "htm", "svg")
     var showPreview by rememberSaveable(id, area, path) { mutableStateOf(supportsPreview) }
 
-    val textState = rememberTextFieldState()
+    // 不能用 rememberTextFieldState: 它会把全文存进 saved state Bundle, 大文件切后台时触发 TransactionTooLargeException (#1953).
+    // 内容本就由下方 LaunchedEffect 从磁盘加载, 无需 saveable.
+    val textState = remember(id, area, path) { TextFieldState() }
     var loading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }

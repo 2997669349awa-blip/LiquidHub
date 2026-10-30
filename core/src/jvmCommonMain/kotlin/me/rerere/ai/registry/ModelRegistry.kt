@@ -167,6 +167,12 @@ object ModelRegistry {
         toolReasoningAbility()
     }
 
+    val GEMINI_4 = defineModel {
+        tokens("gemini", "4")
+        visionInput()
+        toolReasoningAbility()
+    }
+
     val GEMINI_FLASH_LATEST = defineModel {
         exact("gemini-flash-latest")
         visionInput()
@@ -188,19 +194,7 @@ object ModelRegistry {
     }
 
     val GEMINI_SERIES = defineGroup {
-        add(GEMINI_20_FLASH, GEMINI_2_5_FLASH, GEMINI_2_5_PRO, GEMINI_3_SERIES, GEMINI_LATEST)
-    }
-
-    private val CLAUDE_SONNET_3_5 = defineModel {
-        tokens("claude", "3", "5", "sonnet")
-        visionInput()
-        toolReasoningAbility()
-    }
-
-    private val CLAUDE_SONNET_3_7 = defineModel {
-        tokens("claude", "3", "7", "sonnet")
-        visionInput()
-        toolReasoningAbility()
+        add(GEMINI_20_FLASH, GEMINI_2_5_FLASH, GEMINI_2_5_PRO, GEMINI_3_SERIES, GEMINI_4, GEMINI_LATEST)
     }
 
     private val CLAUDE_4 = defineModel {
@@ -255,10 +249,24 @@ object ModelRegistry {
         contextLength(1.m)
     }
 
+    private val CLAUDE_SONNET_5_5 = defineModel {
+        tokens("claude", "sonnet", "5", "5")
+        notTokens("claude", "sonnet", "4")
+        visionInput()
+        toolReasoningAbility()
+        contextLength(1.m)
+    }
+
+    private val CLAUDE_OPUS_5_5 = defineModel {
+        tokens("claude", "opus", "5", "5")
+        notTokens("claude", "opus", "4")
+        visionInput()
+        toolReasoningAbility()
+        contextLength(1.m)
+    }
+
     val CLAUDE_SERIES = defineGroup {
         add(
-            CLAUDE_SONNET_3_5,
-            CLAUDE_SONNET_3_7,
             CLAUDE_4,
             CLAUDE_4_5,
             CLAUDE_SONNET_4_6,
@@ -266,7 +274,9 @@ object ModelRegistry {
             CLAUDE_OPUS_4_7,
             CLAUDE_OPUS_4_8,
             CLAUDE_SONNET_5,
-            CLAUDE_OPUS_5
+            CLAUDE_OPUS_5,
+            CLAUDE_SONNET_5_5,
+            CLAUDE_OPUS_5_5
         )
     }
 
@@ -342,6 +352,12 @@ object ModelRegistry {
 
     private val QWEN_3 = defineModel {
         tokens("qwen", "3")
+        toolReasoningAbility()
+    }
+
+    private val QWEN_3_VL = defineModel {
+        tokens("qwen", "3", "vl")
+        visionInput()
         toolReasoningAbility()
     }
 
@@ -632,10 +648,9 @@ object ModelRegistry {
         GEMINI_3_1_PRO_PREVIEW_CUSTOMTOOLS,
         GEMINI_3_1_FLASH_IMAGE,
         GEMINI_3_5,
+        GEMINI_4,
         GEMINI_FLASH_LATEST,
         GEMINI_PRO_LATEST,
-        CLAUDE_SONNET_3_5,
-        CLAUDE_SONNET_3_7,
         CLAUDE_4,
         CLAUDE_4_5,
         CLAUDE_SONNET_4_6,
@@ -644,6 +659,8 @@ object ModelRegistry {
         CLAUDE_OPUS_4_8,
         CLAUDE_SONNET_5,
         CLAUDE_OPUS_5,
+        CLAUDE_SONNET_5_5,
+        CLAUDE_OPUS_5_5,
         DEEPSEEK_V3_MODEL,
         DEEPSEEK_CHAT,
         DEEPSEEK_R1_MODEL,
@@ -656,6 +673,7 @@ object ModelRegistry {
         DEEPSEEK_V3_1,
         DEEPSEEK_V3_2,
         QWEN_3,
+        QWEN_3_VL,
         QWEN_3_5,
         QWEN_3_6,
         QWEN_3_7,
@@ -705,18 +723,37 @@ object ModelRegistry {
         QWEN_MT
     )
 
+    @Volatile
+    private var catalog: ModelsDevCatalog? = null
+
+    /** 安装 models.dev 数据：查得到的模型以它为准，查不到的再走上面的 token 规则 */
+    fun installCatalog(catalog: ModelsDevCatalog?) {
+        this.catalog = catalog
+    }
+
     val MODEL_INPUT_MODALITIES = ModelData { modelId ->
-        resolveModalities(modelId) { it.inputModalities }
+        val info = catalog?.find(modelId)
+        if (info != null) {
+            sortModalities(info.inputModalities)
+        } else {
+            resolveModalities(modelId) { it.inputModalities }
+        }
     }
 
     val MODEL_OUTPUT_MODALITIES = ModelData { modelId ->
-        resolveModalities(modelId) { it.outputModalities }
+        val info = catalog?.find(modelId)
+        if (info != null) {
+            sortModalities(info.outputModalities)
+        } else {
+            resolveModalities(modelId) { it.outputModalities }
+        }
     }
 
     val MODEL_ABILITIES = ModelData { modelId ->
-        val abilities = resolveModels(modelId)
-            .flatMap { it.abilities }
-            .toSet()
+        val abilities = catalog?.find(modelId)?.abilities
+            ?: resolveModels(modelId)
+                .flatMap { it.abilities }
+                .toSet()
         buildList {
             if (ModelAbility.TOOL in abilities) add(ModelAbility.TOOL)
             if (ModelAbility.REASONING in abilities) add(ModelAbility.REASONING)
@@ -724,14 +761,16 @@ object ModelRegistry {
     }
 
     val MODEL_CONTEXT_LENGTH = ModelData { modelId ->
-        resolveModels(modelId).firstNotNullOfOrNull { it.contextLength }
+        catalog?.find(modelId)?.contextLength
+            ?: resolveModels(modelId).firstNotNullOfOrNull { it.contextLength }
     }
 
     private fun resolveModels(modelId: String): List<ModelDefinition> {
+        val tokens = tokenize(modelId)
         var bestScore: Int? = null
         val matches = mutableListOf<ModelDefinition>()
         for (model in ALL_MODELS) {
-            val score = model.matchScore(modelId) ?: continue
+            val score = model.matchScore(modelId, tokens) ?: continue
             when {
                 bestScore == null || score > bestScore -> {
                     bestScore = score
@@ -752,6 +791,10 @@ object ModelRegistry {
         val modalities = resolveModels(modelId)
             .flatMap { selector(it) }
             .toSet()
+        return sortModalities(modalities)
+    }
+
+    private fun sortModalities(modalities: Set<Modality>): List<Modality> {
         return if (modalities.isEmpty()) {
             listOf(Modality.TEXT)
         } else {

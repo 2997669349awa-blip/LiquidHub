@@ -11,14 +11,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
@@ -34,7 +31,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -46,7 +45,6 @@ import me.rerere.hugeicons.stroke.Share08
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
-import me.rerere.workspace.WorkspaceStorageArea
 import org.koin.compose.koinInject
 import java.io.File
 
@@ -84,12 +82,12 @@ internal fun EditedFilesList(
     ) { uri ->
         val path = selectedPath.also { selectedPath = null } ?: return@rememberLauncherForActivityResult
         if (uri == null) return@rememberLauncherForActivityResult
-        val outputStream = context.contentResolver.openOutputStream(uri) ?: return@rememberLauncherForActivityResult
         scope.launch {
             runCatching {
-                val (area, relativePath) = resolveWorkspacePath(path)
+                val outputStream = withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri) }
+                    ?: return@runCatching
                 outputStream.use { output ->
-                    workspaceRepository.exportFile(workspaceId, area, relativePath, output)
+                    workspaceRepository.exportAbsoluteFile(workspaceId, path, output)
                 }
             }
         }
@@ -101,43 +99,24 @@ internal fun EditedFilesList(
     ) {
         visibleFiles.forEach { path ->
             val fileName = remember(path) { path.substringAfterLast('/') }
-            Surface(
+            ChatMessageFileChip(
+                text = fileName,
                 onClick = { selectedPath = path },
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.tertiaryContainer,
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
+                icon = {
                     Icon(
                         imageVector = HugeIcons.File02,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
                     )
-                    Text(
-                        text = fileName,
-                        style = MaterialTheme.typography.labelSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = 200.dp),
-                    )
-                }
-            }
+                },
+            )
         }
         if (hasMore && !expanded) {
-            Surface(
+            ChatMessageFileChip(
+                text = "+${editedFiles.size - DEFAULT_VISIBLE_COUNT}",
                 onClick = { expanded = true },
-                shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ) {
-                Text(
-                    text = "+${editedFiles.size - DEFAULT_VISIBLE_COUNT}",
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                )
-            }
+            )
         }
     }
 
@@ -194,11 +173,10 @@ internal fun EditedFilesList(
                         selectedPath = null
                         scope.launch {
                             runCatching {
-                                val (area, relativePath) = resolveWorkspacePath(p)
                                 val dir = File(context.cacheDir, "workspace_share").apply { mkdirs() }
                                 val file = File(dir, p.substringAfterLast('/'))
                                 file.outputStream().use { output ->
-                                    workspaceRepository.exportFile(workspaceId, area, relativePath, output)
+                                    workspaceRepository.exportAbsoluteFile(workspaceId, p, output)
                                 }
                                 val uri = FileProvider.getUriForFile(
                                     context,
@@ -236,14 +214,5 @@ internal fun EditedFilesList(
                 }
             }
         }
-    }
-}
-
-private fun resolveWorkspacePath(path: String): Pair<WorkspaceStorageArea, String> {
-    val trimmed = path.trimEnd('/')
-    return if (trimmed == "/workspace" || trimmed.startsWith("/workspace/")) {
-        WorkspaceStorageArea.FILES to trimmed.removePrefix("/workspace").trimStart('/')
-    } else {
-        WorkspaceStorageArea.LINUX to trimmed.trimStart('/')
     }
 }

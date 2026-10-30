@@ -7,7 +7,26 @@ import java.util.concurrent.TimeUnit
 
 interface WorkspaceShellRunner {
     fun execute(context: WorkspaceShellContext): WorkspaceCommandResult
+
+    /** 交互式终端的启动参数, 不支持交互式终端时返回 null */
+    fun terminalLaunch(context: WorkspaceTerminalContext): WorkspaceTerminalLaunch? = null
 }
+
+data class WorkspaceTerminalContext(
+    val filesDir: File,
+    val linuxDir: File,
+    val tempDir: File,
+    val bindMounts: List<WorkspaceBindMount> = emptyList(),
+    val shellCompatibilityMode: Boolean = false,
+)
+
+/** 交给终端模拟器拉起的本地进程 */
+data class WorkspaceTerminalLaunch(
+    val executable: String,
+    val cwd: String,
+    val args: List<String>,
+    val env: List<String>,
+)
 
 data class WorkspaceShellContext(
     val root: String,
@@ -84,7 +103,7 @@ fun Process.readResult(
     }
 }
 
-private class StreamWriter(
+internal class StreamWriter(
     private val stream: java.io.OutputStream,
     private val bytes: ByteArray,
 ) {
@@ -105,7 +124,7 @@ private class StreamWriter(
     fun join(millis: Long) = thread.join(millis)
 }
 
-private class StreamCollector(
+internal class StreamCollector(
     stream: InputStream,
     private val maxChars: Int = MAX_OUTPUT_CHARS,
     private val onOutput: ((String) -> Unit)? = null,
@@ -153,3 +172,7 @@ private class StreamCollector(
 
     fun text(): String = synchronized(builder) { builder.toString() }
 }
+
+/** POSIX shell 单引号转义 */
+internal fun String.shellQuote(): String =
+    "'" + replace("'", "'\"'\"'") + "'"

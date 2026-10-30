@@ -1,0 +1,14 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /workspace/highlight/src/main/AndroidManifest.xml:2:1-4:12
+INJECTED from /workspace/highlight/src/main/AndroidManifest.xml:2:1-4:12
+	package
+		INJECTED from /workspace/highlight/src/main/AndroidManifest.xml
+uses-sdk
+INJECTED from /workspace/highlight/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /workspace/highlight/src/main/AndroidManifest.xml
+INJECTED from /workspace/highlight/src/main/AndroidManifest.xml
+	android:targetSdkVersion
+		INJECTED from /workspace/highlight/src/main/AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from /workspace/highlight/src/main/AndroidManifest.xml

@@ -1,34 +1,28 @@
 package me.rerere.rikkahub.ui.pages.extensions.workspace
 
-import android.os.Build
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,29 +31,29 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Add01
+import me.rerere.hugeicons.stroke.CloudServer
 import me.rerere.hugeicons.stroke.Delete01
-import me.rerere.hugeicons.stroke.Edit01
-import me.rerere.hugeicons.stroke.File02
-import me.rerere.hugeicons.stroke.MoreVertical
+import me.rerere.hugeicons.stroke.FolderCode
+import me.rerere.hugeicons.stroke.PencilEdit01
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.data.db.entity.WorkspaceEntity
-import me.rerere.rikkahub.data.workspace.WorkspaceStorage
 import androidx.compose.ui.res.stringResource
 import me.rerere.rikkahub.R
+import me.rerere.rikkahub.ui.components.ai.ExtensionEmptyState
 import me.rerere.rikkahub.ui.components.nav.BackButton
-import me.rerere.rikkahub.ui.components.ui.RikkaConfirmDialog
+import me.rerere.rikkahub.ui.components.ui.CardGroup
+import me.rerere.rikkahub.ui.components.ui.CardGroupIcon
+import me.rerere.rikkahub.ui.components.ui.ItemAction
+import me.rerere.rikkahub.ui.components.ui.ItemActionMenu
 import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.ui.theme.CustomColors
 import me.rerere.rikkahub.utils.plus
+import me.rerere.ui.components.RikkaConfirmDialog
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
@@ -67,22 +61,10 @@ fun WorkspacePage(vm: WorkspaceVM = koinViewModel()) {
     val navController = LocalNavController.current
     val workspaces by vm.workspaces.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    var showTypeSheet by rememberSaveable { mutableStateOf(false) }
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<WorkspaceEntity?>(null) }
     var deleteTarget by remember { mutableStateOf<WorkspaceEntity?>(null) }
-
-    val context = LocalContext.current
-    var publicStorageGranted by remember { mutableStateOf(WorkspaceStorage.isPublicStorageEnabled()) }
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                publicStorageGranted = WorkspaceStorage.isPublicStorageEnabled()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
 
     Scaffold(
         topBar = {
@@ -94,7 +76,7 @@ fun WorkspacePage(vm: WorkspaceVM = koinViewModel()) {
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
+            FloatingActionButton(onClick = { showTypeSheet = true }) {
                 Icon(HugeIcons.Add01, contentDescription = null)
             }
         },
@@ -106,26 +88,52 @@ fun WorkspacePage(vm: WorkspaceVM = koinViewModel()) {
             contentPadding = innerPadding + PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !publicStorageGranted) {
+            if (workspaces.isEmpty()) {
                 item {
-                    PublicStorageBanner(
-                        onGrant = { WorkspaceStorage.requestAllFilesAccess(context) },
+                    ExtensionEmptyState(
+                        message = stringResource(R.string.workspace_page_empty),
+                        description = stringResource(R.string.workspace_page_empty_desc),
+                        icon = HugeIcons.FolderCode,
                     )
                 }
             }
 
-            if (workspaces.isEmpty()) {
-                item {
-                    EmptyWorkspaceState()
-                }
-            }
-
             items(workspaces, key = { it.id }) { workspace ->
-                WorkspaceCard(
+                WorkspaceItem(
                     workspace = workspace,
                     onRename = { editTarget = workspace },
                     onDelete = { deleteTarget = workspace },
                     onOpen = { navController.navigate(Screen.WorkspaceDetail(workspace.id)) },
+                )
+            }
+        }
+    }
+
+    if (showTypeSheet) {
+        ModalBottomSheet(onDismissRequest = { showTypeSheet = false }) {
+            CardGroup(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 24.dp),
+                title = { Text(stringResource(R.string.workspace_page_create)) },
+            ) {
+                item(
+                    onClick = {
+                        showTypeSheet = false
+                        showAddDialog = true
+                    },
+                    leadingContent = { CardGroupIcon(HugeIcons.FolderCode) },
+                    supportingContent = { Text(stringResource(R.string.workspace_page_type_local_desc)) },
+                    headlineContent = { Text(stringResource(R.string.workspace_page_type_local)) },
+                )
+                item(
+                    onClick = {
+                        showTypeSheet = false
+                        navController.navigate(Screen.WorkspaceSshEditor())
+                    },
+                    leadingContent = { CardGroupIcon(HugeIcons.CloudServer) },
+                    supportingContent = { Text(stringResource(R.string.workspace_page_type_ssh_desc)) },
+                    headlineContent = { Text(stringResource(R.string.workspace_page_type_ssh)) },
                 )
             }
         }
@@ -173,144 +181,60 @@ fun WorkspacePage(vm: WorkspaceVM = koinViewModel()) {
 }
 
 @Composable
-private fun PublicStorageBanner(onGrant: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CustomColors.cardColorsOnSurfaceContainer,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.workspace_page_public_storage_title),
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Text(
-                text = stringResource(R.string.workspace_page_public_storage_desc),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            TextButton(onClick = onGrant) {
-                Text(stringResource(R.string.workspace_page_public_storage_action))
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmptyWorkspaceState() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Icon(
-            imageVector = HugeIcons.File02,
-            contentDescription = null,
-            modifier = Modifier.size(48.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = stringResource(R.string.workspace_page_empty),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = stringResource(R.string.workspace_page_empty_desc),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun WorkspaceCard(
+private fun WorkspaceItem(
     workspace: WorkspaceEntity,
     onRename: () -> Unit,
     onDelete: () -> Unit,
     onOpen: () -> Unit,
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onOpen),
-        colors = CustomColors.cardColorsOnSurfaceContainer,
+    Surface(
+        onClick = onOpen,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = CustomColors.listItemColors.containerColor,
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
+            CardGroupIcon(if (workspace.isSsh()) HugeIcons.CloudServer else HugeIcons.FolderCode)
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .weight(1f)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                Icon(
-                    imageVector = HugeIcons.File02,
-                    contentDescription = null,
-                    modifier = Modifier.size(22.dp),
-                    tint = MaterialTheme.colorScheme.primary,
+                Text(
+                    text = workspace.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text(
-                        text = workspace.name,
-                        style = MaterialTheme.typography.titleSmallEmphasized,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = workspace.shellStatus.toShellStatusLabel(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Box {
-                    IconButton(onClick = { menuExpanded = true }) {
-                        Icon(HugeIcons.MoreVertical, contentDescription = null)
-                    }
-                    DropdownMenu(
-                        expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.common_rename)) },
-                            leadingIcon = { Icon(HugeIcons.Edit01, contentDescription = null) },
-                            onClick = {
-                                menuExpanded = false
-                                onRename()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = HugeIcons.Delete01,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error,
-                                )
-                            },
-                            onClick = {
-                                menuExpanded = false
-                                onDelete()
-                            },
-                        )
-                    }
-                }
+                Text(
+                    text = workspace.statusLabel(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
+            ItemActionMenu(
+                actions = listOf(
+                    ItemAction(
+                        text = stringResource(R.string.common_rename),
+                        icon = HugeIcons.PencilEdit01,
+                        onClick = onRename,
+                    ),
+                    ItemAction(
+                        text = stringResource(R.string.common_delete),
+                        icon = HugeIcons.Delete01,
+                        destructive = true,
+                        onClick = onDelete,
+                    ),
+                )
+            )
         }
     }
 }

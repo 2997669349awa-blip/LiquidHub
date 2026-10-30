@@ -32,7 +32,7 @@ class RootfsInstaller(
         try {
             stagingDir.deleteRecursively()
             stagingDir.mkdirs()
-            download(candidateUrls(url), archive, onProgress)
+            download(url, archive, onProgress)
             extractTar(archive, stagingDir, format, onProgress)
             linuxDir.deleteRecursively()
             require(stagingDir.renameTo(linuxDir)) {
@@ -46,58 +46,7 @@ class RootfsInstaller(
         }
     }
 
-    /**
-     * 主镜像失败时依次回退到等价镜像（仅限已知互为镜像的路径）。
-     */
-    private fun candidateUrls(url: String): List<String> {
-        val mirror = when {
-            url.contains("mirrors.tuna.tsinghua.edu.cn/archlinuxarm/") ->
-                url.replace(
-                    "mirrors.tuna.tsinghua.edu.cn/archlinuxarm/",
-                    "mirror.iscas.ac.cn/archlinuxarm/",
-                )
-
-            url.contains("mirrors.tuna.tsinghua.edu.cn/") ->
-                url.replace("mirrors.tuna.tsinghua.edu.cn/", "mirrors.aliyun.com/")
-
-            url.contains("mirrors.aliyun.com/") ->
-                url.replace("mirrors.aliyun.com/", "mirrors.tuna.tsinghua.edu.cn/")
-
-            else -> null
-        }
-        return if (mirror != null && mirror != url) listOf(url, mirror) else listOf(url)
-    }
-
     private fun download(
-        urls: List<String>,
-        target: File,
-        onProgress: (RootfsInstallProgress) -> Unit,
-    ) {
-        var lastError: Throwable? = null
-        urls.forEachIndexed { index, url ->
-            try {
-                downloadOnce(url, target, onProgress)
-                return
-            } catch (error: InterruptedException) {
-                throw error
-            } catch (error: Throwable) {
-                lastError = error
-                target.delete()
-                if (index < urls.lastIndex) {
-                    onProgress(
-                        RootfsInstallProgress(
-                            stage = RootfsInstallStage.DOWNLOADING,
-                            bytesRead = 0,
-                            totalBytes = null,
-                        )
-                    )
-                }
-            }
-        }
-        throw IOException("Rootfs download failed: ${lastError?.message}", lastError)
-    }
-
-    private fun downloadOnce(
         url: String,
         target: File,
         onProgress: (RootfsInstallProgress) -> Unit,
@@ -106,10 +55,6 @@ class RootfsInstaller(
         connection.connectTimeout = CONNECT_TIMEOUT_MS
         connection.readTimeout = READ_TIMEOUT_MS
         connection.instanceFollowRedirects = true
-        // 清华 / 阿里云等镜像的 WAF 会拦截 Android 默认的 Dalvik UA 并返回 403，
-        // 必须显式指定一个被放行的 UA。
-        connection.setRequestProperty("User-Agent", DOWNLOAD_USER_AGENT)
-        connection.setRequestProperty("Accept", "*/*")
         try {
             val code = connection.responseCode
             require(code in 200..299) { "Rootfs download failed: HTTP $code" }
@@ -172,7 +117,7 @@ class RootfsInstaller(
                 )
                 pendingName = null
                 pendingLinkName = null
-                if (header.name.isBlank() || header.name == ROOT_ENTRY) {
+                if (header.name.isBlank()) {
                     input.skipFully(header.size.paddedTarSize())
                     continue
                 }
@@ -387,18 +332,16 @@ class RootfsInstaller(
         setExecutable(mode and 0b001_000_000 != 0, false)
     }
 
+    // 根目录条目 (如 Alpine minirootfs 开头的 "./") 规范化后为空串, 由调用方跳过
     private fun normalizeTarPath(path: String): String {
-        val normalized = path
+        require(!path.contains('\u0000')) { "Rootfs entry path contains invalid character" }
+        val segments = path
             .replace('\\', '/')
             .trim()
-            .trimStart('/')
-            .removePrefix("./")
-        // Alpine 等 minirootfs 的首条是 "./" 根目录项，规范化后会变成空串。
-        // 统一映射成 "." 由 extractTar 跳过，而不是当成非法路径报错。
-        if (normalized.isBlank() || normalized == ".") return ROOT_ENTRY
-        require(!normalized.contains('\u0000')) { "Rootfs entry path contains invalid character" }
-        require(normalized.split('/').none { it == ".." }) { "Rootfs entry escapes target directory: $path" }
-        return normalized
+            .split('/')
+            .filter { it.isNotEmpty() && it != "." }
+        require(segments.none { it == ".." }) { "Rootfs entry escapes target directory: $path" }
+        return segments.joinToString("/")
     }
 
     private fun ByteArray.string(offset: Int, length: Int): String {
@@ -471,8 +414,5 @@ class RootfsInstaller(
         private const val PROGRESS_STEP_BYTES = 512 * 1024
         private const val CONNECT_TIMEOUT_MS = 30_000
         private const val READ_TIMEOUT_MS = 60_000
-        private const val DOWNLOAD_USER_AGENT = "LiquidHub/0.1"
-        // "./" 根目录项规范化后的占位名，extractTar 会跳过
-        private const val ROOT_ENTRY = "."
     }
 }

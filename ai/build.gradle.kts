@@ -1,15 +1,28 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
-// AI 核心逻辑已移到 `:core`（KMP，Android + 桌面共享）。本模块保留为薄壳以兼容既有依赖，
-// 并继续承载 ai 的单元测试（测试仍位于 ai/src/test，通过 :core 访问被测类）。
 plugins {
-    id("rikkahub.android.library")
+    id("rikkahub.android.library.compose")
     alias(libs.plugins.kotlin.serialization)
 }
 
 android {
     namespace = "me.rerere.ai"
 
+    defaultConfig {
+//        externalNativeBuild {
+//            cmake {
+//                cppFlags += listOf("-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
+//                abiFilters += listOf("arm64-v8a", "x86_64")
+//            }
+//        }
+    }
+
+//    externalNativeBuild {
+//        cmake {
+//            path = file("src/main/cpp/CMakeLists.txt")
+//            version = "3.22.1"
+//        }
+//    }
     tasks.withType<KotlinCompile>().configureEach {
         compilerOptions.optIn.add("kotlin.uuid.ExperimentalUuidApi")
         compilerOptions.optIn.add("kotlin.time.ExperimentalTime")
@@ -17,9 +30,26 @@ android {
 }
 
 dependencies {
-    api(project(":core"))
+    implementation(project(":common"))
 
+    // Compose
+    implementation(libs.androidx.core.ktx)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.material3)
+
+    // okhttp
+    api(libs.okhttp)
+    api(libs.okhttp.sse)
+    api(libs.okhttp.logging)
+
+    // kotlinx
+    api(libs.kotlinx.serialization.json)
+    api(libs.kotlinx.coroutines.core)
+    api(libs.kotlinx.datetime)
+
+    // tests
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

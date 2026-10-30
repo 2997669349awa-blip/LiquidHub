@@ -8,30 +8,29 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.io.File
-import java.io.InputStream
-import java.io.OutputStream
+import kotlinx.coroutines.withContext
 import me.rerere.rikkahub.data.db.entity.WorkspaceEntity
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
 import me.rerere.workspace.RootfsInstallProgress
 import me.rerere.workspace.RootfsInstallStage
-import me.rerere.workspace.WorkspaceFileEntry
 import me.rerere.workspace.WorkspaceCommandResult
+import me.rerere.workspace.WorkspaceFileEntry
+import me.rerere.workspace.WorkspaceLayout
 import me.rerere.workspace.WorkspaceStorageArea
+import java.io.File
+import java.io.InputStream
 
 class WorkspaceDetailVM(
     private val id: String,
     private val repository: WorkspaceRepository,
     private val terminalSessionManager: WorkspaceTerminalSessionManager,
-    private val desktopManager: me.rerere.rikkahub.data.workspace.WorkspaceDesktopManager,
-    private val workspaceManager: me.rerere.workspace.WorkspaceManager,
 ) : ViewModel() {
     private val _state = MutableStateFlow(WorkspaceDetailState())
     val state = _state.asStateFlow()
@@ -52,14 +51,22 @@ class WorkspaceDetailVM(
     fun exportFilesToDirectory(treeUri: Uri?, resolver: ContentResolver) {
         val (area, entries) = pendingExport.also { pendingExport = null } ?: return
         if (treeUri == null) return
-        _state.update { it.copy(exporting = true, exportCompleted = 0, exportTotal = entries.size, exportResult = null) }
+        _state.update {
+            it.copy(
+                exporting = true,
+                exportCompleted = 0,
+                exportTotal = entries.size,
+                exportResult = null
+            )
+        }
         viewModelScope.launch {
             var succeeded = 0
             val failures = mutableListOf<String>()
             try {
                 withContext(Dispatchers.IO) {
                     val parent = DocumentsContract.buildDocumentUriUsingTree(
-                        treeUri, DocumentsContract.getTreeDocumentId(treeUri)
+                        treeUri,
+                        DocumentsContract.getTreeDocumentId(treeUri)
                     )
                     entries.forEachIndexed { index, entry ->
                         ensureActive()
@@ -114,50 +121,6 @@ class WorkspaceDetailVM(
     private val _settingsError = MutableStateFlow<String?>(null)
     val settingsError = _settingsError.asStateFlow()
 
-    private val _desktopMessage = MutableStateFlow<String?>(null)
-    val desktopMessage = _desktopMessage.asStateFlow()
-
-    private val _persistFiles = MutableStateFlow(false)
-    val persistFiles = _persistFiles.asStateFlow()
-
-    /** 切换该工作区是否把用户文件保留到公共存储（需已授予「所有文件访问」）。 */
-    fun setPersistFiles(enabled: Boolean) {
-        val workspace = state.value.workspace ?: return
-        viewModelScope.launch {
-            val ok = withContext(Dispatchers.IO) {
-                runCatching { workspaceManager.setPersistFiles(workspace.root, enabled) }.getOrDefault(false)
-            }
-            _persistFiles.value = workspaceManager.isPersistFiles(workspace.root)
-            _desktopMessage.value = when {
-                ok && enabled -> "已开启：工作区文件保存到公共存储，卸载重装不丢失"
-                ok -> "已关闭：工作区文件改回应用私有目录"
-                else -> "开启失败：请先授予「所有文件访问」"
-            }
-        }
-    }
-
-    fun consumeDesktopMessage() {
-        _desktopMessage.value = null
-    }
-
-    /**
-     * 用户手动安装/重装工作区桌面。桌面本身只给 AI 使用（应用内没有观看入口），
-     * 这里只是提供一个手动触发安装的入口，避免完全依赖 AI 首次调用。
-     */
-    fun installDesktop(reinstall: Boolean = false) {
-        if (state.value.workspace == null) return
-        viewModelScope.launch {
-            try {
-                desktopManager.runAction(id, if (reinstall) "reinstall" else "install")
-                _desktopMessage.value = "桌面安装已在后台开始，进度见工作区日志"
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                _desktopMessage.value = "桌面安装失败：${error.message}"
-            }
-        }
-    }
-
     fun dismissSettingsError() {
         _settingsError.value = null
     }
@@ -198,18 +161,23 @@ class WorkspaceDetailVM(
         refresh()
     }
 
+    private var refreshJob: Job? = null
+
     fun refresh() {
-        viewModelScope.launch {
+        // 远程工作区列目录要走网络, 快速切换目录时旧请求可能晚到, 只保留最新一次
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
-            runCatching {
-                repository.listFiles(
+            try {
+                val entries = repository.listFiles(
                     id = id,
                     area = state.value.area,
                     path = state.value.path,
                 )
-            }.onSuccess { entries ->
                 _state.update { it.copy(entries = entries, loading = false) }
-            }.onFailure { error ->
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
                 _state.update {
                     it.copy(
                         entries = emptyList(),
@@ -256,9 +224,12 @@ class WorkspaceDetailVM(
         }
     }
 
-    fun exportFile(entry: WorkspaceFileEntry, outputStream: OutputStream) {
+    fun exportFile(entry: WorkspaceFileEntry, uri: Uri, resolver: ContentResolver) {
         viewModelScope.launch {
             runCatching {
+                // 部分 ROM 的 SAF 返回的 Uri 并没有真正创建文件, 打开时会抛 FileNotFoundException
+                val outputStream = withContext(Dispatchers.IO) { resolver.openOutputStream(uri) }
+                    ?: error("无法打开目标文件")
                 repository.exportFile(
                     id = id,
                     area = state.value.area,
@@ -274,7 +245,7 @@ class WorkspaceDetailVM(
     suspend fun resolveImageFile(
         entry: WorkspaceFileEntry,
         area: WorkspaceStorageArea,
-    ): File = repository.resolveFile(id, area, entry.path)
+    ): File? = repository.resolveFile(id, area, entry.path)
 
     /**
      * 把当前区域下的文件导出到 cacheDir 的临时文件, 完成后回调 [onReady].
@@ -317,28 +288,8 @@ class WorkspaceDetailVM(
     fun setToolApproval(toolName: String, needsApproval: Boolean) {
         viewModelScope.launch {
             val workspace = state.value.workspace ?: return@launch
-            try {
-                repository.setToolApproval(workspace.id, toolName, needsApproval)
-                loadWorkspace()
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                _settingsError.value = error.message.orEmpty()
-            }
-        }
-    }
-
-    fun setAllToolApprovals(needsApproval: Boolean) {
-        viewModelScope.launch {
-            val workspace = state.value.workspace ?: return@launch
-            try {
-                repository.setAllToolApprovals(workspace.id, needsApproval)
-                loadWorkspace()
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                _settingsError.value = error.message.orEmpty()
-            }
+            repository.setToolApproval(workspace.id, toolName, needsApproval)
+            loadWorkspace()
         }
     }
 
@@ -349,7 +300,6 @@ class WorkspaceDetailVM(
             _installProgress.value = RootfsInstallProgress(stage = RootfsInstallStage.DOWNLOADING)
             try {
                 terminalSessionManager.closeWorkspace(workspace.root)
-                desktopManager.closeWorkspace(workspace.root)
                 repository.installRootfs(workspace.id, url) { progress ->
                     _installProgress.value = progress
                 }
@@ -416,21 +366,16 @@ class WorkspaceDetailVM(
 
     private fun loadWorkspace() {
         viewModelScope.launch {
-            try {
-                val workspace = repository.getById(id)
-                _state.update { it.copy(workspace = workspace) }
-                _persistFiles.value = workspace?.let { workspaceManager.isPersistFiles(it.root) } ?: false
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                _settingsError.value = error.message.orEmpty()
-            }
+            val workspace = repository.getById(id)
+            val layout = repository.layout(id)
+            _state.update { it.copy(workspace = workspace, layout = layout) }
         }
     }
 }
 
 data class WorkspaceDetailState(
     val workspace: WorkspaceEntity? = null,
+    val layout: WorkspaceLayout? = null,
     val area: WorkspaceStorageArea = WorkspaceStorageArea.FILES,
     val path: String = "",
     val entries: List<WorkspaceFileEntry> = emptyList(),

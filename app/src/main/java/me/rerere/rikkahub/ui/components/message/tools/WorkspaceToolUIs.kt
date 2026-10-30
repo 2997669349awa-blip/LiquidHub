@@ -29,7 +29,7 @@ import kotlinx.serialization.json.longOrNull
 import me.rerere.ai.ui.DiffMetadata
 import me.rerere.ai.ui.metadataAs
 import me.rerere.common.http.jsonObjectOrNull
-import me.rerere.highlight.CodeHighlightText
+import me.rerere.rikkahub.ui.components.richtext.CodeHighlightText
 import androidx.compose.ui.res.stringResource
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.ComputerTerminal01
@@ -37,14 +37,14 @@ import me.rerere.hugeicons.stroke.FileAdd
 import me.rerere.hugeicons.stroke.FileEdit
 import me.rerere.hugeicons.stroke.FileView
 import me.rerere.rikkahub.R
-import me.rerere.rikkahub.ui.components.richtext.DiffAddedColor
-import me.rerere.rikkahub.ui.components.richtext.DiffRemovedColor
-import me.rerere.rikkahub.ui.components.richtext.DiffView
 import me.rerere.rikkahub.ui.components.richtext.HighlightCodeBlock
-import me.rerere.rikkahub.ui.components.richtext.parseDiffStats
 import me.rerere.rikkahub.ui.modifier.shimmer
 import me.rerere.rikkahub.utils.generateUnifiedDiff
 import me.rerere.rikkahub.utils.jsonPrimitiveOrNull
+import me.rerere.ui.richtext.DiffAddedColor
+import me.rerere.ui.richtext.DiffRemovedColor
+import me.rerere.ui.richtext.DiffView
+import me.rerere.ui.richtext.parseDiffStats
 
 /**
  * 工作空间编辑文件: 摘要显示增删统计与精简 diff, 详情为完整 diff view

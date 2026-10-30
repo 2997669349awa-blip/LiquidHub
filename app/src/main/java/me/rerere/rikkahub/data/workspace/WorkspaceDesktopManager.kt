@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
 import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceTerminalSessionClient
 import me.rerere.rikkahub.ui.pages.extensions.workspace.createWorkspaceTerminalSession
+import me.rerere.rikkahub.ui.pages.extensions.workspace.toTransport
 
 /**
  * Owns the long-lived terminal session that keeps the workspace desktop (Xvfb / Fluxbox /
@@ -31,6 +32,7 @@ import me.rerere.rikkahub.ui.pages.extensions.workspace.createWorkspaceTerminalS
 class WorkspaceDesktopManager internal constructor(
     context: Context,
     private val workspaceRepository: WorkspaceRepository,
+    private val workspaceManager: me.rerere.workspace.WorkspaceManager,
 ) {
     private val appContext = context.applicationContext
     private val sessions = mutableMapOf<String, TerminalSession>()
@@ -135,11 +137,12 @@ class WorkspaceDesktopManager internal constructor(
             if (existing != null && existing.emulator != null) {
                 runCatching { existing.finishIfRunning() }
             }
+            val transport = workspaceManager.terminalLaunch(root, shellCompatibilityMode)?.toTransport()
+                ?: error("Interactive terminal is not supported")
             val session = createWorkspaceTerminalSession(
-                context = appContext,
+                transport = transport,
                 root = root,
                 client = WorkspaceTerminalSessionClient(appContext, onTitleUpdated = {}, onFinished = {}),
-                shellCompatibilityMode = shellCompatibilityMode,
             )
             // 该 session 不绑定 TerminalView，必须显式初始化：否则不会 fork 出 proot 进程，
             // write() 因 mShellPid <= 0 而被静默丢弃，桌面 start/stop/browser 全部失效

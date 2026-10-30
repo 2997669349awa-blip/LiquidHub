@@ -3,17 +3,19 @@ package me.rerere.rikkahub.ui.components.ui
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -38,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import java.security.MessageDigest
 import kotlin.math.abs
 import androidx.compose.ui.layout.ContentScale
@@ -48,9 +51,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import androidx.core.net.toUri
 import coil3.compose.AsyncImage
-import me.rerere.common.android.appTempFolder
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Edit03
 import me.rerere.rikkahub.R
@@ -59,7 +60,6 @@ import me.rerere.rikkahub.data.model.Avatar
 import me.rerere.rikkahub.ui.components.ai.useCropLauncher
 import me.rerere.rikkahub.ui.hooks.rememberAvatarShape
 import org.koin.compose.koinInject
-import java.io.File
 
 @Composable
 fun TextAvatar(
@@ -96,16 +96,15 @@ fun UIAvatar(
     value: Avatar,
     modifier: Modifier = Modifier,
     loading: Boolean = false,
+    shape: Shape = rememberAvatarShape(loading),
     onUpdate: ((Avatar) -> Unit)? = null,
     onClick: (() -> Unit)? = null
 ) {
     val filesManager: FilesManager = koinInject()
-    val context = LocalContext.current
     var showPickOption by remember { mutableStateOf(false) }
     var showEmojiPicker by remember { mutableStateOf(false) }
     var showUrlInput by remember { mutableStateOf(false) }
     var urlInput by remember { mutableStateOf("") }
-    var preCropTempFile by remember { mutableStateOf<File?>(null) }
 
     fun saveAvatarImage(uri: Uri) {
         val localUris = filesManager.createChatFilesByContents(listOf(uri))
@@ -114,40 +113,22 @@ fun UIAvatar(
         }
     }
 
-    val (_, launchImageCrop) = useCropLauncher(
+    val launchImageCrop = useCropLauncher(
         onCroppedImageReady = { croppedUri ->
             saveAvatarImage(croppedUri)
         },
-        onCleanup = {
-            preCropTempFile?.delete()
-            preCropTempFile = null
-        },
-        aspectRatio = 1f to 1f,
-        freeStyleCropEnabled = false
+        aspectRatio = 1f,
     )
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let { selectedUri ->
-            val tempFile = File(context.appTempFolder, "avatar_pick_${System.currentTimeMillis()}.jpg")
-            runCatching {
-                context.contentResolver.openInputStream(selectedUri)?.use { input ->
-                    tempFile.outputStream().use { output -> input.copyTo(output) }
-                } ?: error("Failed to open input stream for $selectedUri")
-                preCropTempFile?.delete()
-                preCropTempFile = tempFile
-                launchImageCrop(tempFile.toUri())
-            }.onFailure {
-                tempFile.delete()
-                launchImageCrop(selectedUri)
-            }
-        }
+        uri?.let(launchImageCrop)
     }
 
     Box(modifier = modifier.then(Modifier.size(32.dp))) {
         Surface(
-            shape = rememberAvatarShape(loading),
+            shape = shape,
             modifier = Modifier.fillMaxSize(),
             onClick = {
                 onClick?.invoke()
@@ -156,7 +137,7 @@ fun UIAvatar(
             tonalElevation = 4.dp,
             color = MaterialTheme.colorScheme.secondaryContainer,
         ) {
-            Box(
+            BoxWithConstraints(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.fillMaxSize()
             ) {
@@ -175,7 +156,8 @@ fun UIAvatar(
                             text = value.content,
                             autoSize = TextAutoSize.StepBased(
                                 minFontSize = 15.sp,
-                                maxFontSize = 30.sp,
+                                // 大头像里表情跟着放大，小头像保持原来的 30sp 上限
+                                maxFontSize = maxOf(30f, maxWidth.value * 0.45f).sp,
                             ),
                             lineHeight = 0.8.em,
                             textAlign = TextAlign.Center,
@@ -198,17 +180,17 @@ fun UIAvatar(
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .size(14.dp)
-                    .clip(MaterialTheme.shapes.small)
+                    // 角标跟着头像一起变大，小头像保底 14dp
+                    .sizeIn(minWidth = 14.dp, minHeight = 14.dp)
+                    .fillMaxSize(0.3f)
+                    .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.tertiaryContainer),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = HugeIcons.Edit03,
                     contentDescription = "Edit",
-                    modifier = Modifier
-                        .size(10.dp)
-                        .padding(1.dp),
+                    modifier = Modifier.fillMaxSize(0.6f),
                     tint = MaterialTheme.colorScheme.onTertiaryContainer
                 )
             }

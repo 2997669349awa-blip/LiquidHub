@@ -171,7 +171,7 @@ private fun createDesktopScreenshotTool(
             command = command,
             timeoutMillis = DESKTOP_TIMEOUT_MS,
         )
-        val size = runCatching { workspaceRepository.rootfsFileSize(workspaceId, DESKTOP_SHOT_PATH) }
+        val size = runCatching { workspaceRepository.absoluteFileSize(workspaceId, DESKTOP_SHOT_PATH) }
             .getOrDefault(0L)
         if (result.exitCode != 0 || size <= 0L || !result.stdout.contains("SHOT_OK")) {
             return@Tool listOf(
@@ -203,10 +203,10 @@ private suspend fun persistScreenshot(
     workspaceId: String,
     workspaceRepository: WorkspaceRepository,
 ): String {
-    val size = workspaceRepository.rootfsFileSize(workspaceId, DESKTOP_SHOT_PATH)
+    val size = workspaceRepository.absoluteFileSize(workspaceId, DESKTOP_SHOT_PATH)
     require(size in 1..SCREENSHOT_MAX_BYTES) { "Invalid screenshot size: $size" }
     val buffer = ByteArrayOutputStream(size.toInt())
-    workspaceRepository.exportRootfsFile(workspaceId, DESKTOP_SHOT_PATH, buffer)
+    workspaceRepository.exportAbsoluteFile(workspaceId, DESKTOP_SHOT_PATH, buffer)
     val filesManager = getKoin().get<FilesManager>()
     val uris = filesManager.createChatFilesByByteArrays(listOf(buffer.toByteArray()))
     return uris.first().toString()

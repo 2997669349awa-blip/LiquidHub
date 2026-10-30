@@ -5,11 +5,15 @@ import com.google.firebase.analytics.analytics
 import com.google.firebase.crashlytics.crashlytics
 import kotlinx.serialization.json.Json
 import me.rerere.rikkahub.AppScope
-import me.rerere.rikkahub.data.ai.tools.local.LocalTools
+import me.rerere.rikkahub.data.ai.ChatRequestFactory
 import me.rerere.rikkahub.data.ai.tools.ChatToolFactory
+import me.rerere.rikkahub.data.ai.tools.local.LocalTools
 import me.rerere.rikkahub.data.event.AppEventBus
+import me.rerere.rikkahub.service.ChatFloatingTracker
 import me.rerere.rikkahub.service.ChatNotificationManager
 import me.rerere.rikkahub.service.ChatService
+import me.rerere.rikkahub.service.MediaCreationService
+import me.rerere.rikkahub.ui.floating.ChatFloatingWindows
 import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceTerminalSessionManager
 import me.rerere.rikkahub.utils.EmojiData
 import me.rerere.rikkahub.utils.EmojiUtils
@@ -63,11 +67,11 @@ val appModule = module {
     }
 
     single {
-        WorkspaceTerminalSessionManager(get(), get())
+        WorkspaceTerminalSessionManager(get(), get(), get(), get())
     }
 
     single {
-        me.rerere.rikkahub.data.workspace.WorkspaceDesktopManager(get(), get())
+        me.rerere.rikkahub.data.workspace.WorkspaceDesktopManager(get(), get(), get())
     }
 
     // 生成通知与业务解耦：ChatService 只发事件，通知由这里消费；
@@ -81,9 +85,28 @@ val appModule = module {
         )
     }
 
+    // ChatService 只在后台才用到，延迟创建
+    single {
+        ChatFloatingTracker(
+            appScope = get(),
+            lazyChatService = lazy { get() },
+            settingsStore = get(),
+        )
+    }
+
+    // 同上，进程启动即开始监听前后台切换
+    single(createdAtStart = true) {
+        ChatFloatingWindows(
+            context = get(),
+            appScope = get(),
+            tracker = get(),
+            lazyChatService = lazy { get() },
+        )
+    }
+
     single {
         ChatToolFactory(
-            json = get(),
+            context = get(),
             memoryRepository = get(),
             conversationRepository = get(),
             localTools = get(),
@@ -95,22 +118,43 @@ val appModule = module {
     }
 
     single {
+        ChatRequestFactory(
+            context = get(),
+            providerManager = get(),
+            usageRecorder = get(),
+            chatToolFactory = get(),
+            memoryRepository = get(),
+            templateTransformer = get(),
+            workspaceRepository = get(),
+        )
+    }
+
+    single {
         ChatService(
             context = get(),
             appScope = get(),
             appEventBus = get(),
             settingsStore = get(),
             conversationRepo = get(),
-            memoryRepository = get(),
-            generationLoop = get(),
+            requestFactory = get(),
+            memoryConsolidationScheduler = get(),
             translationHandler = get(),
-            templateTransformer = get(),
-            providerManager = get(),
-            chatToolFactory = get(),
+            metaGenerator = get(),
             mcpManager = get(),
             filesManager = get(),
-            workspaceRepository = get(),
             folderRepository = get()
+        )
+    }
+
+    single {
+        MediaCreationService(
+            context = get(),
+            appScope = get(),
+            settingsStore = get(),
+            repository = get(),
+            manager = get(),
+            remoteFileStore = get(),
+            okHttpClient = get(),
         )
     }
 

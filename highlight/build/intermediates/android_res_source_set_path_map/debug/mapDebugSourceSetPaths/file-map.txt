@@ -1,0 +1,9 @@
+me.rerere.highlight-pngs-0 /workspace/highlight/build/generated/res/pngs/debug
+me.rerere.highlight-updated_navigation_xml-1 /workspace/highlight/build/generated/updated_navigation_xml/debug
+me.rerere.highlight-mergeDebugResources-2 /workspace/highlight/build/intermediates/incremental/debug/mergeDebugResources/merged.dir
+me.rerere.highlight-mergeDebugResources-3 /workspace/highlight/build/intermediates/incremental/debug/mergeDebugResources/stripped.dir
+me.rerere.highlight-debug-4 /workspace/highlight/build/intermediates/merged_res/debug/mergeDebugResources
+me.rerere.highlight-debug-5 /workspace/highlight/build/intermediates/packaged_res/debug/packageDebugResources
+me.rerere.highlight-debug-6 /workspace/highlight/src/debug/res
+me.rerere.highlight-main-7 /workspace/highlight/src/main/res
+gradleHome-0 /root/.gradle

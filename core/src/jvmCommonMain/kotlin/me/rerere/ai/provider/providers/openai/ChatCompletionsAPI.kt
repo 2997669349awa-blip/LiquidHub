@@ -54,13 +54,14 @@ import me.rerere.ai.util.configureSessionHeaders
 import me.rerere.ai.util.encodeBase64
 import me.rerere.ai.util.json
 import me.rerere.ai.util.mergeCustomBody
+import me.rerere.ai.util.mergeCustomHeaders
 import me.rerere.ai.util.parseErrorDetail
 import me.rerere.ai.util.stringSafe
-import me.rerere.ai.util.toHeaders
 import me.rerere.common.http.await
 import me.rerere.common.http.jsonArrayOrNull
 import me.rerere.common.http.jsonObjectOrNull
 import me.rerere.common.http.jsonPrimitiveOrNull
+import me.rerere.common.http.sse.newEventSource
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -69,7 +70,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.sse.EventSource
 import okhttp3.sse.EventSourceListener
-import okhttp3.sse.EventSources
 import kotlin.time.Clock
 
 private const val TAG = "ChatCompletionsAPI"
@@ -92,7 +92,7 @@ class ChatCompletionsAPI(
 
         val request = Request.Builder()
             .url("${providerSetting.baseUrl}${providerSetting.chatCompletionsPath}")
-            .headers(params.customHeaders.toHeaders())
+            .headers(providerSetting.mergeCustomHeaders(params.customHeaders))
             .post(json.encodeToString(requestBody).toRequestBody("application/json".toMediaType()))
             .addHeader("Authorization", "Bearer ${keyRoulette.next(providerSetting.apiKey, providerSetting.id.toString())}")
             .configureReferHeaders(providerSetting.baseUrl)
@@ -144,7 +144,7 @@ class ChatCompletionsAPI(
 
         val request = Request.Builder()
             .url("${providerSetting.baseUrl}${providerSetting.chatCompletionsPath}")
-            .headers(params.customHeaders.toHeaders())
+            .headers(providerSetting.mergeCustomHeaders(params.customHeaders))
             .post(json.encodeToString(requestBody).toRequestBody("application/json".toMediaType()))
             .addHeader("Authorization", "Bearer ${keyRoulette.next(providerSetting.apiKey, providerSetting.id.toString())}")
             .addHeader("Content-Type", "application/json")
@@ -213,7 +213,7 @@ class ChatCompletionsAPI(
             }
         }
 
-        val eventSource = EventSources.createFactory(client).newEventSource(request, listener)
+        val eventSource = client.newEventSource(request, listener)
 
         awaitClose {
             println("[awaitClose] 关闭eventSource ")
@@ -712,9 +712,8 @@ class ChatCompletionsAPI(
     }
 
     private fun parseMessage(jsonObject: JsonObject): UIMessage {
-        val role = MessageRole.valueOf(
-            jsonObject["role"]?.jsonPrimitive?.contentOrNull?.uppercase() ?: "ASSISTANT"
-        )
+        val role = MessageRole.fromValueOrNull(jsonObject["role"]?.jsonPrimitiveOrNull?.contentOrNull)
+            ?: MessageRole.ASSISTANT
 
         // 也许支持其他模态的输出content?
         val content = jsonObject["content"]?.jsonPrimitiveOrNull?.contentOrNull ?: ""

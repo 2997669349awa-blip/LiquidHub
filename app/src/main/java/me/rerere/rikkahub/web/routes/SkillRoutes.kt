@@ -5,7 +5,7 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.datastore.getCurrentAssistant
-import me.rerere.rikkahub.data.files.SkillManager
+import me.rerere.rikkahub.data.skills.SkillManager
 import me.rerere.rikkahub.web.dto.SkillDto
 
 /**
