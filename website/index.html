@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>LiquidHub · 下载</title>
-<meta name="description" content="LiquidHub —— 液态玻璃风格的 Android LLM 聊天客户端。当前仅支持 Android。" />
+<meta name="description" content="LiquidHub —— 液态玻璃风格的 Android LLM 客户端，支持多服务商、工作区、知识库与手机控制。" />
 <style>
   :root {
     --violet: #7c5cff;
@@ -16,10 +16,10 @@
     --glass: rgba(255, 255, 255, 0.08);
     --glass-strong: rgba(255, 255, 255, 0.14);
     --stroke: rgba(255, 255, 255, 0.22);
+    --ok: #4ade80;
   }
 
   * { box-sizing: border-box; }
-
   html, body { height: 100%; }
 
   body {
@@ -32,7 +32,6 @@
     overflow-x: hidden;
   }
 
-  /* 液态玻璃背景：多层渐变光斑 */
   .backdrop {
     position: fixed;
     inset: -20%;
@@ -53,221 +52,162 @@
     100% { transform: translate3d(-2.5%, 2%, 0) scale(1.03); }
   }
 
-  .wrap {
-    max-width: 1080px;
-    margin: 0 auto;
-    padding: 28px 22px 80px;
-  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 22px 80px; }
 
-  /* 顶部导航 */
   nav {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 12px 18px;
-    border-radius: 22px;
-    background: var(--glass);
-    border: 1px solid var(--stroke);
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 12px 18px; border-radius: 22px;
+    background: var(--glass); border: 1px solid var(--stroke);
     backdrop-filter: blur(22px) saturate(140%);
     -webkit-backdrop-filter: blur(22px) saturate(140%);
-    position: sticky;
-    top: 16px;
-    z-index: 10;
+    position: sticky; top: 16px; z-index: 10;
   }
-
   .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; letter-spacing: 0.2px; }
-
   .logo {
     width: 34px; height: 34px; border-radius: 50%;
     background: linear-gradient(135deg, var(--violet), var(--cyan));
     box-shadow: 0 0 24px rgba(124, 92, 255, 0.6);
-    display: grid; place-items: center;
-    color: #fff; font-weight: 800; font-size: 16px;
+    display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 16px;
   }
-
   .nav-links { display: flex; gap: 8px; }
   .nav-links a {
     color: var(--text); text-decoration: none; font-size: 13px;
-    padding: 8px 14px; border-radius: 999px;
-    border: 1px solid transparent;
-    transition: 0.2s;
+    padding: 8px 14px; border-radius: 999px; border: 1px solid transparent; transition: 0.2s;
   }
   .nav-links a:hover { background: var(--glass); border-color: var(--stroke); }
 
-  /* Hero */
-  header.hero {
-    text-align: center;
-    padding: 74px 0 40px;
-  }
+  header.hero { text-align: center; padding: 64px 0 24px; }
 
   .pill {
     display: inline-flex; align-items: center; gap: 8px;
     font-size: 12px; color: var(--muted);
     padding: 7px 14px; border-radius: 999px;
     background: var(--glass); border: 1px solid var(--stroke);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
 
   h1 {
-    font-size: clamp(40px, 8vw, 76px);
-    margin: 22px 0 14px;
-    line-height: 1.02;
-    letter-spacing: -1.5px;
+    font-size: clamp(40px, 8vw, 76px); margin: 22px 0 14px; line-height: 1.02; letter-spacing: -1.5px;
     background: linear-gradient(120deg, #ffffff 0%, #c9d3ff 40%, var(--cyan) 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
   }
+  .subtitle { max-width: 640px; margin: 0 auto; color: var(--muted); font-size: 15px; line-height: 1.8; }
 
-  .subtitle {
-    max-width: 640px; margin: 0 auto;
-    color: var(--muted); font-size: 17px; line-height: 1.7;
-  }
-
-  /* 下载区 */
   .download-area {
-    margin: 40px auto 0;
-    max-width: 560px;
-    padding: 26px;
-    border-radius: 30px;
-    background: var(--glass);
+    margin: 36px auto 0; max-width: 900px; padding: 26px;
+    border-radius: 28px; background: var(--glass-strong);
     border: 1px solid var(--stroke);
-    backdrop-filter: blur(26px) saturate(150%);
-    -webkit-backdrop-filter: blur(26px) saturate(150%);
-    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(26px) saturate(140%);
+    -webkit-backdrop-filter: blur(26px) saturate(140%);
+    text-align: left;
   }
+
+  .channels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .channel {
+    padding: 20px; border-radius: 22px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--stroke);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .channel.preview { opacity: 0.92; }
+  .channel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .channel-title { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
+  .tag {
+    font-size: 11px; padding: 4px 10px; border-radius: 999px; letter-spacing: 0.4px;
+    background: rgba(53, 214, 240, 0.18); color: #bdf2ff; border: 1px solid rgba(53, 214, 240, 0.45);
+  }
+  .tag.preview-tag {
+    background: rgba(255, 107, 214, 0.16); color: #ffc4ee; border-color: rgba(255, 107, 214, 0.45);
+  }
+  .channel-version { font-size: 13px; color: var(--muted); }
+  .channel-version b { color: var(--text); font-size: 15px; }
+  .channel-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--muted); font-size: 12.5px; }
+  .channel-meta b { color: var(--text); font-weight: 600; }
 
   .btn-download {
-    display: flex; align-items: center; justify-content: center; gap: 12px;
-    width: 100%;
-    padding: 18px 22px;
-    border: none; border-radius: 20px;
-    font-size: 17px; font-weight: 700; color: #fff;
-    background: linear-gradient(120deg, var(--violet), var(--cyan));
-    box-shadow: 0 14px 40px rgba(124, 92, 255, 0.45);
-    cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; padding: 14px 18px; border-radius: 15px; font-size: 15px; font-weight: 700;
+    color: #fff; text-decoration: none; cursor: pointer;
+    background: linear-gradient(135deg, var(--violet), var(--cyan));
+    box-shadow: 0 10px 28px rgba(124, 92, 255, 0.4);
     transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
   }
-  .btn-download:hover { transform: translateY(-2px); box-shadow: 0 20px 52px rgba(53, 214, 240, 0.5); }
+  .btn-download:hover { transform: translateY(-2px); filter: brightness(1.05); }
   .btn-download:active { transform: translateY(0) scale(0.99); }
-  .btn-download svg { width: 22px; height: 22px; }
+  .btn-download svg { width: 18px; height: 18px; }
 
-  .meta {
-    display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px;
-    margin-top: 16px; color: var(--muted); font-size: 12.5px;
+  .btn-download.disabled {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--muted);
+    box-shadow: none;
+    border: 1px dashed var(--stroke);
+    cursor: not-allowed;
+    pointer-events: none;
   }
-  .meta b { color: var(--text); font-weight: 600; }
 
-  .other-platforms {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px;
-  }
+  .channel-note { font-size: 12px; color: var(--muted); line-height: 1.6; margin: 0; }
+  .channel-note b { color: var(--text); }
+
+  .other-platforms { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
   .platform {
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    padding: 13px; border-radius: 16px;
-    background: rgba(255, 255, 255, 0.035);
-    border: 1px dashed rgba(255, 255, 255, 0.16);
-    color: var(--muted); font-size: 13px; cursor: not-allowed;
+    padding: 9px 14px; border-radius: 999px; font-size: 12.5px;
+    background: var(--glass); border: 1px solid var(--stroke); color: var(--muted);
   }
-  .platform small { opacity: 0.75; }
+  .platform small { color: var(--muted); opacity: 0.8; }
 
   .notice {
-    margin-top: 16px; font-size: 12.5px; color: var(--muted); line-height: 1.6;
-    padding: 12px 14px; border-radius: 14px;
-    background: rgba(53, 214, 240, 0.07);
-    border: 1px solid rgba(53, 214, 240, 0.22);
+    margin-top: 18px; padding: 14px 16px; border-radius: 16px;
+    background: rgba(53, 214, 240, 0.08); border: 1px solid rgba(53, 214, 240, 0.25);
+    color: #cfe9ff; font-size: 12.5px; line-height: 1.7;
   }
 
-  /* 体验测试版 */
-  .beta {
-    margin-top: 18px; padding-top: 18px;
-    border-top: 1px dashed rgba(255, 255, 255, 0.16);
-  }
-  .beta-title {
-    display: flex; align-items: center; gap: 8px;
-    font-size: 13px; color: var(--muted); margin-bottom: 10px;
-  }
-  .beta-tag {
-    font-size: 11px; font-weight: 700; letter-spacing: 0.4px;
-    padding: 3px 9px; border-radius: 999px; color: #051020;
-    background: linear-gradient(120deg, #ffd36b, #ff9de2);
-  }
-  .btn-beta {
-    display: flex; align-items: center; justify-content: center; gap: 10px;
-    width: 100%; padding: 14px 20px;
-    border-radius: 16px; font-size: 15px; font-weight: 600; color: var(--text);
-    text-decoration: none; cursor: pointer;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid var(--stroke);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
-  }
-  .btn-beta:hover {
-    transform: translateY(-2px);
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(53, 214, 240, 0.55);
-  }
-  .btn-beta:active { transform: translateY(0) scale(0.99); }
-  .btn-beta svg { width: 18px; height: 18px; }
-  .beta-note {
-    margin: 10px 2px 0; color: var(--muted); font-size: 12px; line-height: 1.65;
-  }
-  .beta-note b { color: var(--text); font-weight: 600; }
-
-  /* 特性 */
-  .features {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
-    margin-top: 70px;
-  }
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 64px; }
   .card {
-    padding: 22px;
-    border-radius: 24px;
-    background: var(--glass);
-    border: 1px solid var(--stroke);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    padding: 22px; border-radius: 24px; background: var(--glass); border: 1px solid var(--stroke);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   }
   .card h3 { margin: 12px 0 8px; font-size: 16px; }
   .card p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.65; }
   .card .icon {
-    width: 40px; height: 40px; border-radius: 12px;
-    display: grid; place-items: center; font-size: 20px;
+    width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-size: 20px;
     background: linear-gradient(135deg, rgba(124, 92, 255, 0.35), rgba(53, 214, 240, 0.28));
     border: 1px solid var(--stroke);
   }
 
-  /* 安装步骤 */
-  section.steps { margin-top: 70px; }
-  .steps h2 { font-size: 24px; margin: 0 0 18px; }
+  section.block { margin-top: 64px; }
+  .block h2 { font-size: 24px; margin: 0 0 18px; }
+  .changelog {
+    padding: 22px; border-radius: 22px; background: var(--glass); border: 1px solid var(--stroke);
+    white-space: pre-wrap; color: var(--muted); font-size: 13.5px; line-height: 1.8;
+  }
+  .changelog strong { color: var(--text); }
+
   ol.step-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
   ol.step-list li {
     display: flex; gap: 16px; align-items: flex-start;
     padding: 18px 20px; border-radius: 20px;
     background: var(--glass); border: 1px solid var(--stroke);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
   }
   .step-num {
-    flex: 0 0 30px; height: 30px; border-radius: 50%;
-    display: grid; place-items: center; font-size: 13px; font-weight: 700;
+    flex: 0 0 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+    font-size: 13px; font-weight: 700;
     background: linear-gradient(135deg, var(--violet), var(--cyan)); color: #fff;
   }
   ol.step-list p { margin: 3px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
   ol.step-list strong { color: var(--text); font-size: 14.5px; }
 
   footer {
-    margin-top: 80px; padding-top: 26px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 80px; padding-top: 26px; border-top: 1px solid rgba(255, 255, 255, 0.1);
     color: var(--muted); font-size: 12.5px; line-height: 1.8;
     display: flex; flex-wrap: wrap; gap: 10px 24px; justify-content: space-between;
   }
   footer a { color: var(--cyan); text-decoration: none; }
   footer a:hover { text-decoration: underline; }
 
-  @media (max-width: 760px) {
+  @media (max-width: 820px) {
+    .channels { grid-template-columns: 1fr; }
     .features { grid-template-columns: 1fr; }
     .nav-links { display: none; }
     .download-area { padding: 20px; }
@@ -282,35 +222,60 @@
       <div class="brand"><span class="logo">L</span> LiquidHub</div>
       <div class="nav-links">
         <a href="#features">特性</a>
-        <a href="#install">安装</a>
+        <a href="#download">下载</a>
+        <a href="#changelog">更新日志</a>
         <a href="https://github.com/2997669349awa-blip/LiquidHub" target="_blank" rel="noopener">GitHub</a>
       </div>
     </nav>
 
     <header class="hero">
-      <span class="pill"><span class="dot"></span> 当前仅支持 Android</span>
+      <span class="pill"><span class="dot"></span> Android · 正式版与预览版双通道</span>
       <h1>LiquidHub</h1>
       <p class="subtitle">
-        液态玻璃风格的 Android LLM 聊天客户端。基于 RikkaHub 二次开发，
-        保留多服务商切换与全部原有能力，重做界面视觉。
+        液态玻璃风格的 Android LLM 客户端，基于 RikkaHub 二次开发。
+        多服务商、工作区、本地知识库、屏幕理解与主动任务，让 AI 真正在设备上干活。
       </p>
 
       <div class="download-area" id="download">
-        <a class="btn-download" id="apkLink" href="liquidhub-universal-release.apk" download>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-               stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 3v12" />
-            <path d="M7 10l5 5 5-5" />
-            <path d="M5 21h14" />
-          </svg>
-          下载 Android 版 (APK)
-        </a>
+        <div class="channels">
+          <div class="channel">
+            <div class="channel-head">
+              <div class="channel-title">正式版 <span class="tag">稳定</span></div>
+            </div>
+            <div class="channel-version">版本 <b id="stableVersion">加载中…</b></div>
+            <div class="channel-meta">
+              <span>大小 <b id="stableSize">—</b></span>
+              <span>架构 <b>arm64-v8a / x86_64 / 通用</b></span>
+              <span>系统 <b>Android 8.0+</b></span>
+            </div>
+            <a class="btn-download" id="stableLink" href="liquidhub-universal-release.apk" download>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3v12" /><path d="M7 10l5 5 5-5" /><path d="M5 21h14" />
+              </svg>
+              下载正式版 APK
+            </a>
+            <p class="channel-note">稳定优先，应用内更新会优先检查正式版。</p>
+          </div>
 
-        <div class="meta">
-          <span>版本 <b>V0.1.0Data</b></span>
-          <span>大小 <b id="apkSize">约 48 MB</b></span>
-          <span>架构 <b>arm64-v8a / x86_64 / 通用</b></span>
-          <span>系统 <b>Android 8.0+</b></span>
+          <div class="channel preview">
+            <div class="channel-head">
+              <div class="channel-title">预览版 <span class="tag preview-tag">抢先</span></div>
+            </div>
+            <div class="channel-version">版本 <b id="previewVersion">加载中…</b></div>
+            <div class="channel-meta" id="previewMeta">
+              <span>大小 <b id="previewSize">—</b></span>
+              <span>系统 <b>Android 8.0+</b></span>
+            </div>
+            <a class="btn-download disabled" id="previewLink" href="#" aria-disabled="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3v12" /><path d="M7 10l5 5 5-5" /><path d="M5 21h14" />
+              </svg>
+              当前暂无预览版
+            </a>
+            <p class="channel-note" id="previewNote">预览版包含尚未发布的改动，稳定性有限，包名带 debug 后缀，可与正式版共存。</p>
+          </div>
         </div>
 
         <div class="other-platforms">
@@ -321,27 +286,6 @@
         <div class="notice" id="platformNotice">
           提示：首次安装需在系统设置中允许「安装未知来源应用」。下载目前仅提供 Android 版。
         </div>
-
-        <div class="beta">
-          <div class="beta-title">
-            <span class="beta-tag">测试</span>
-            想抢先体验未发布的功能？下载体验测试版
-          </div>
-          <a class="btn-beta" href="liquidhub-debug.apk" download>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                 stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 3v12" />
-              <path d="M7 10l5 5 5-5" />
-              <path d="M5 21h14" />
-            </svg>
-            下载体验测试版 (APK)
-          </a>
-          <p class="beta-note">
-            测试版包含尚未发布的改动：<b>新版图标</b>、工作区<b>国内镜像</b>与<b>远程桌面</b>。
-            稳定性有限，功能可能随时调整。包名为 <b>teto.rikkahub.X.debug</b>，
-            可与正式版同时安装、互不覆盖。
-          </p>
-        </div>
       </div>
     </header>
 
@@ -349,27 +293,42 @@
       <div class="card">
         <div class="icon">L</div>
         <h3>液态玻璃界面</h3>
-        <p>Haze 背景模糊叠加多层渐变与边缘高光，支持毛玻璃与光学折射两种效果，可在设置中切换。</p>
+        <p>Haze 背景模糊叠加多层渐变与边缘高光，支持毛玻璃与光学折射两种效果。</p>
       </div>
       <div class="card">
         <div class="icon">M</div>
-        <h3>多服务商切换</h3>
-        <p>兼容 OpenAI、Anthropic、Google、DeepSeek 等任意 OpenAI 风格接口，模型自由切换。</p>
+        <h3>多服务商</h3>
+        <p>OpenAI 兼容、Anthropic、Google，以及 ChatGPT / Grok 账号登录与余额查询。</p>
       </div>
       <div class="card">
-        <div class="icon">A</div>
-        <h3>深色 / AMOLED</h3>
-        <p>纯黑背景搭配玻璃卡片，自动保证文字对比度，低于 Android 12 时降级为半透明纯色。</p>
+        <div class="icon">W</div>
+        <h3>工作区</h3>
+        <p>本地 Linux 沙盒，环境模板一键装好 Python / Node.js，长任务可转后台并在通知栏看进度。</p>
+      </div>
+      <div class="card">
+        <div class="icon">K</div>
+        <h3>本地知识库</h3>
+        <p>索引上传文档与工作区文件，AI 可离线检索「问我的文件」，中文分词开箱可用。</p>
+      </div>
+      <div class="card">
+        <div class="icon">S</div>
+        <h3>屏幕理解</h3>
+        <p>快捷磁贴「问屏幕」随时分析当前界面；读取最近通知并总结待办、给出回复建议。</p>
+      </div>
+      <div class="card">
+        <div class="icon">P</div>
+        <h3>主动任务</h3>
+        <p>按时间、充电或低电量自动触发提示词，AI 在新会话里主动干活。</p>
       </div>
       <div class="card">
         <div class="icon">T</div>
         <h3>工具与 MCP</h3>
-        <p>沿用上游的 MCP、搜索、工作区终端等能力，界面之外的功能保持一致。</p>
+        <p>对话命令、Agent 技能、MCP 服务器与联网搜索，全部本地可控。</p>
       </div>
       <div class="card">
-        <div class="icon">W</div>
-        <h3>Web 访问</h3>
-        <p>内置 Ktor 服务，可在同一局域网通过浏览器访问对话。</p>
+        <div class="icon">H</div>
+        <h3>手机控制</h3>
+        <p>Shizuku + 无障碍 + 悬浮窗，让 AI 在授权后替你操作手机。</p>
       </div>
       <div class="card">
         <div class="icon">O</div>
@@ -378,12 +337,17 @@
       </div>
     </section>
 
-    <section class="steps" id="install">
+    <section class="block" id="changelog">
+      <h2>更新日志</h2>
+      <div class="changelog" id="changelogBody">加载中…</div>
+    </section>
+
+    <section class="block" id="install">
       <h2>安装步骤</h2>
       <ol class="step-list">
         <li>
           <span class="step-num">1</span>
-          <div><strong>下载 APK</strong><p>点击上方按钮下载安装包，当前仅支持 Android 设备。</p></div>
+          <div><strong>下载 APK</strong><p>在正式版或预览版中选择一个下载，当前仅支持 Android 设备。</p></div>
         </li>
         <li>
           <span class="step-num">2</span>
@@ -407,13 +371,74 @@
   </div>
 
   <script>
-    // APK 直接托管在站点根目录，点击即从本站下载，不跳转 GitHub。
-    // 非 Android 访问时提示仅支持安卓
+    // 下载与版本信息全部来自站点根目录的 updates.json，发布新版本只需更新这一个文件。
+    var FALLBACK = {
+      stable: { version: '1.0.6-Preview10', downloads: [] },
+      preview: null
+    };
+
+    function setText(id, text) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = text;
+    }
+
+    function render(manifest) {
+      var stable = manifest && manifest.stable ? manifest.stable : null;
+      var preview = manifest && manifest.preview ? manifest.preview : null;
+
+      if (stable) {
+        setText('stableVersion', 'V' + stable.version);
+        var stableLink = document.getElementById('stableLink');
+        var download = stable.downloads && stable.downloads.length ? stable.downloads[0] : null;
+        if (download) {
+          stableLink.href = download.url;
+          stableLink.setAttribute('download', download.name || 'liquidhub-release.apk');
+          setText('stableSize', download.size || '—');
+        }
+        setText('changelogBody', stable.changelog || '暂无更新说明');
+      } else {
+        setText('stableVersion', '暂无');
+        document.getElementById('stableLink').classList.add('disabled');
+        document.getElementById('stableLink').textContent = '当前暂无正式版';
+        setText('changelogBody', '暂无更新说明');
+      }
+
+      if (preview) {
+        setText('previewVersion', 'V' + preview.version);
+        var previewLink = document.getElementById('previewLink');
+        var pDownload = preview.downloads && preview.downloads.length ? preview.downloads[0] : null;
+        if (pDownload) {
+          previewLink.classList.remove('disabled');
+          previewLink.href = pDownload.url;
+          previewLink.setAttribute('download', pDownload.name || 'liquidhub-preview.apk');
+          previewLink.innerHTML =
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+            'stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/>' +
+            '<path d="M5 21h14"/></svg> 下载预览版 APK';
+          setText('previewSize', pDownload.size || '—');
+          setText('previewNote', preview.changelog || '预览版包含尚未发布的改动。');
+        } else {
+          setText('previewVersion', 'V' + preview.version);
+        }
+      } else {
+        setText('previewVersion', '当前暂无预览版');
+        setText('previewSize', '—');
+        var pLink = document.getElementById('previewLink');
+        pLink.classList.add('disabled');
+        pLink.removeAttribute('download');
+        pLink.href = '#';
+      }
+    }
+
+    fetch('updates.json', { cache: 'no-store' })
+      .then(function (res) { return res.json(); })
+      .then(render)
+      .catch(function () { render(FALLBACK); });
+
     var ua = navigator.userAgent || '';
-    var isAndroid = /Android/i.test(ua);
-    if (!isAndroid) {
-      var notice = document.getElementById('platformNotice');
-      notice.innerHTML = '注意：下载目前仅支持 Android。当前设备可能无法安装 APK，' +
+    if (!/Android/i.test(ua)) {
+      document.getElementById('platformNotice').innerHTML =
+        '注意：下载目前仅支持 Android。当前设备可能无法安装 APK，' +
         '你仍可下载安装包并传输到 Android 手机上安装。';
     }
   </script>

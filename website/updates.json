@@ -1,12 +1,20 @@
 {
-  "version": "0.1.0",
-  "publishedAt": "2026-09-25T00:00:00Z",
-  "changelog": "LiquidHub V0.1.0Data\n\n- 液态玻璃主题默认开启\n- 二创 X 角标图标\n- 包名 teto.rikkahub.X\n- 更新检查指向本项目",
-  "downloads": [
-    {
-      "name": "liquidhub-universal-release.apk",
-      "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-universal-release.apk",
-      "size": "约 48 MB"
-    }
-  ]
+  "stable": {
+    "version": "1.0.6-Preview10",
+    "publishedAt": "2026-10-31T00:00:00Z",
+    "changelog": "LiquidHub 1.0.6-Preview10\n\n- 同步上游 RikkaHub 3.1.1（207 个提交）\n- 新增：工作区环境模板（Python / Node.js，一键安装）\n- 新增：后台任务（//bg、//logs、通知栏进度）\n- 新增：本地知识库（文档与工作区文件检索）\n- 新增：屏幕理解（快捷磁贴「问屏幕」、通知摘要）\n- 新增：主动任务（定时 / 充电 / 低电量自动执行）\n- 移除：音乐、DSH、Pro 插件\n- 服务商支持账号登录（ChatGPT / Grok）与余额查询",
+    "downloads": [
+      {
+        "name": "liquidhub-universal-release.apk",
+        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-universal-release.apk",
+        "size": "约 66 MB"
+      },
+      {
+        "name": "liquidhub-arm64-v8a-release.apk",
+        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-arm64-v8a-release.apk",
+        "size": "约 62 MB"
+      }
+    ]
+  },
+  "preview": null
 }
