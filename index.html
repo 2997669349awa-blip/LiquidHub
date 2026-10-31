@@ -196,6 +196,31 @@
   footer a { color: var(--cyan); text-decoration: none; }
   footer a:hover { text-decoration: underline; }
 
+  .files { display: grid; gap: 8px; margin-top: 4px; }
+  .file-row {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 10px 12px; border-radius: 14px;
+    background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.12);
+    font-size: 12.5px;
+  }
+  .file-name { color: var(--text); font-weight: 600; }
+  .file-size { color: var(--muted); }
+  .file-links { display: flex; gap: 6px; margin-left: auto; }
+  .mini {
+    padding: 5px 10px; border-radius: 999px; font-size: 12px; text-decoration: none;
+    color: var(--text); background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--stroke);
+  }
+  .mini:hover { background: rgba(255, 255, 255, 0.16); }
+  .mini.primary { background: rgba(53, 214, 240, 0.18); border-color: rgba(53, 214, 240, 0.45); }
+  .sha {
+    width: 100%; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 10.5px; word-break: break-all; opacity: 0.8;
+  }
+  .faq { display: grid; gap: 10px; }
+  .faq li { color: var(--muted); font-size: 13px; line-height: 1.8; }
+  .faq b { color: var(--text); }
+
   @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition: none !important; }
   }
@@ -249,7 +274,8 @@
               </svg>
               下载正式版 APK
             </a>
-            <p class="channel-note">稳定优先，应用内更新会优先检查正式版。</p>
+            <div class="files" id="stableFiles"></div>
+            <p class="channel-note">稳定优先，应用内更新会优先检查正式版。若提示「安装包已损坏」，请核对下方 SHA-256 或换一个下载源。</p>
           </div>
 
           <div class="channel preview">
@@ -268,6 +294,7 @@
               </svg>
               当前暂无预览版
             </a>
+            <div class="files" id="previewFiles"></div>
             <p class="channel-note" id="previewNote">预览版包含尚未发布的改动，稳定性有限，包名带 debug 后缀，可与正式版共存。</p>
           </div>
         </div>
@@ -336,6 +363,16 @@
       <div class="changelog" id="changelogBody">加载中…</div>
     </section>
 
+    <section class="block" id="faq">
+      <h2>下载常见问题</h2>
+      <ul class="faq">
+        <li><b>下载太慢：</b>优先使用「加速」按钮（jsDelivr / ghfast 镜像），或按机型选择 arm64 包，体积比通用包小。</li>
+        <li><b>提示安装包已损坏：</b>多数是下载被中断导致文件不完整。请重新下载，并核对文件大小与 SHA-256；仍失败就换另一个下载源。</li>
+        <li><b>无法覆盖安装：</b>1.0.7 使用了新的签名密钥，旧版本需要先卸载再安装；之后版本可正常覆盖升级。</li>
+        <li><b>校验方法：</b>在文件管理器中查看 APK 大小与页面显示一致；或用支持 SHA-256 的工具比对哈希。</li>
+      </ul>
+    </section>
+
     <section class="block" id="install">
       <h2>安装步骤</h2>
       <ol class="step-list">
@@ -365,69 +402,133 @@
   </div>
 
   <script>
-    // 下载与版本信息全部来自站点根目录的 updates.json，发布新版本只需更新这一个文件。
-    var FALLBACK = {
-      stable: { version: '1.0.7', downloads: [] },
-      preview: null
-    };
+    // 下载与版本信息来自站点根目录的 updates.json；镜像与校验来自 checksums.json。
+    var OWNER = '2997669349awa-blip';
+    var REPO = 'LiquidHub';
+    var FALLBACK = { stable: { version: '1.0.7', downloads: [] }, preview: null };
+    var checksums = {};
 
     function setText(id, text) {
       var el = document.getElementById(id);
       if (el) el.textContent = text;
     }
 
-    function render(manifest) {
-      var stable = manifest && manifest.stable ? manifest.stable : null;
-      var preview = manifest && manifest.preview ? manifest.preview : null;
+    function labelOf(name) {
+      if (name.indexOf('arm64') >= 0) return 'arm64-v8a（推荐）';
+      if (name.indexOf('x86_64') >= 0) return 'x86_64';
+      if (name.indexOf('universal') >= 0) return '通用包';
+      return name;
+    }
 
-      if (stable) {
-        setText('stableVersion', 'V' + stable.version);
-        var stableLink = document.getElementById('stableLink');
-        var download = stable.downloads && stable.downloads.length ? stable.downloads[0] : null;
-        if (download) {
-          stableLink.href = download.url;
-          stableLink.setAttribute('download', download.name || 'liquidhub-release.apk');
-          setText('stableSize', download.size || '—');
+    function mirrorLinks(file, version) {
+      var links = [{ label: '本站', url: file.url, primary: true }];
+      var isUniversal = file.name.indexOf('universal') >= 0;
+      if (!isUniversal) {
+        links.push({
+          label: 'jsDelivr',
+          url: 'https://cdn.jsdelivr.net/gh/' + OWNER + '/' + REPO + '@gh-pages/' + file.name
+        });
+      }
+      links.push({
+        label: 'ghfast',
+        url: 'https://ghfast.top/https://github.com/' + OWNER + '/' + REPO +
+          '/releases/download/v' + version + '/' + file.name
+      });
+      return links;
+    }
+
+    function fileRow(file, version) {
+      var row = document.createElement('div');
+      row.className = 'file-row';
+
+      var name = document.createElement('span');
+      name.className = 'file-name';
+      name.textContent = labelOf(file.name);
+      row.appendChild(name);
+
+      var size = document.createElement('span');
+      size.className = 'file-size';
+      size.textContent = file.size || '';
+      row.appendChild(size);
+
+      var links = document.createElement('div');
+      links.className = 'file-links';
+      mirrorLinks(file, version).forEach(function (link) {
+        var a = document.createElement('a');
+        a.className = 'mini' + (link.primary ? ' primary' : '');
+        a.href = link.url;
+        a.textContent = link.label;
+        a.setAttribute('download', file.name);
+        links.appendChild(a);
+      });
+      row.appendChild(links);
+
+      var sum = checksums[file.name] && checksums[file.name].sha256;
+      if (sum) {
+        var sha = document.createElement('div');
+        sha.className = 'sha';
+        sha.textContent = 'SHA-256 ' + sum;
+        row.appendChild(sha);
+      }
+      return row;
+    }
+
+    function renderChannel(channel, info, prefix) {
+      var versionEl = document.getElementById(prefix + 'Version');
+      var sizeEl = document.getElementById(prefix + 'Size');
+      var linkEl = document.getElementById(prefix + 'Link');
+      var filesEl = document.getElementById(prefix + 'Files');
+      if (!filesEl) return;
+      filesEl.innerHTML = '';
+
+      if (!info) {
+        if (versionEl) versionEl.textContent = prefix === 'preview' ? '当前暂无预览版' : '暂无';
+        if (sizeEl) sizeEl.textContent = '—';
+        if (linkEl) {
+          linkEl.classList.add('disabled');
+          linkEl.removeAttribute('download');
+          linkEl.href = '#';
         }
-        setText('changelogBody', stable.changelog || '暂无更新说明');
-      } else {
-        setText('stableVersion', '暂无');
-        document.getElementById('stableLink').classList.add('disabled');
-        document.getElementById('stableLink').textContent = '当前暂无正式版';
-        setText('changelogBody', '暂无更新说明');
+        return;
       }
 
-      if (preview) {
-        setText('previewVersion', 'V' + preview.version);
-        var previewLink = document.getElementById('previewLink');
-        var pDownload = preview.downloads && preview.downloads.length ? preview.downloads[0] : null;
-        if (pDownload) {
-          previewLink.classList.remove('disabled');
-          previewLink.href = pDownload.url;
-          previewLink.setAttribute('download', pDownload.name || 'liquidhub-preview.apk');
-          previewLink.innerHTML =
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
-            'stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/>' +
-            '<path d="M5 21h14"/></svg> 下载预览版 APK';
-          setText('previewSize', pDownload.size || '—');
-          setText('previewNote', preview.changelog || '预览版包含尚未发布的改动。');
-        } else {
-          setText('previewVersion', 'V' + preview.version);
+      if (versionEl) versionEl.textContent = 'V' + info.version;
+      var downloads = info.downloads || [];
+      var recommended = downloads.filter(function (f) { return f.name.indexOf('arm64') >= 0; })[0] || downloads[0];
+      if (recommended) {
+        if (linkEl) {
+          linkEl.href = recommended.url;
+          linkEl.setAttribute('download', recommended.name);
+          linkEl.classList.remove('disabled');
         }
-      } else {
-        setText('previewVersion', '当前暂无预览版');
-        setText('previewSize', '—');
-        var pLink = document.getElementById('previewLink');
-        pLink.classList.add('disabled');
-        pLink.removeAttribute('download');
-        pLink.href = '#';
+        if (sizeEl) sizeEl.textContent = recommended.size || '';
+      }
+      downloads.forEach(function (file) {
+        filesEl.appendChild(fileRow(file, info.version));
+      });
+    }
+
+    function render(manifest) {
+      renderChannel('stable', manifest && manifest.stable, 'stable');
+      renderChannel('preview', manifest && manifest.preview, 'preview');
+      var body = document.getElementById('changelogBody');
+      if (body) {
+        var stable = manifest && manifest.stable;
+        body.textContent = (stable && stable.changelog) || '暂无更新说明';
+      }
+      var previewNote = document.getElementById('previewNote');
+      if (previewNote && !(manifest && manifest.preview)) {
+        previewNote.textContent = '当前暂无预览版，发布后会同时出现在这里与 GitHub 预发布。';
       }
     }
 
-    fetch('updates.json', { cache: 'no-store' })
-      .then(function (res) { return res.json(); })
-      .then(render)
-      .catch(function () { render(FALLBACK); });
+    Promise.all([
+      fetch('updates.json', { cache: 'no-store' }).then(function (r) { return r.json(); }).catch(function () { return FALLBACK; }),
+      fetch('checksums.json', { cache: 'no-store' }).then(function (r) { return r.json(); }).catch(function () { return {}; })
+    ]).then(function (results) {
+      checksums = results[1] || {};
+      render(results[0]);
+    });
 
     var ua = navigator.userAgent || '';
     if (!/Android/i.test(ua)) {
