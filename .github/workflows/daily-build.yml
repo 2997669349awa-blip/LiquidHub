@@ -90,6 +90,7 @@ jobs:
 
           # 写入Google Services配置
           echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
+          python3 tools/ensure-google-services.py app/google-services.json
 
       - name: Gradle Build
         run: |

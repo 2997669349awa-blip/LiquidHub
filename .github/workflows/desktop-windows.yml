@@ -1,10 +1,8 @@
 name: Desktop Windows
 
 on:
+  # 桌面模块已在上游同步时移除，停止在发布标签上自动触发，避免误报失败
   workflow_dispatch:
-  push:
-    tags:
-      - "v*"
 
 jobs:
   build-windows:
