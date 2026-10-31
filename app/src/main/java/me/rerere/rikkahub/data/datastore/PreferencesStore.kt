@@ -173,6 +173,13 @@ class SettingsStore internal constructor(
         val WEB_SERVER_ACCESS_PASSWORD = stringPreferencesKey("web_server_access_password")
         val WEB_SERVER_LOCALHOST_ONLY = booleanPreferencesKey("web_server_localhost_only")
 
+        // 工作区自定义环境模板
+        val CUSTOM_WORKSPACE_TEMPLATES = stringPreferencesKey("custom_workspace_templates")
+        // 后台任务历史（最近 20 条）
+        val BACKGROUND_TASK_HISTORY = stringPreferencesKey("background_task_history")
+        // 主动任务（定时/充电/低电量）
+        val SCHEDULED_TASKS = stringPreferencesKey("scheduled_tasks")
+
         // 提示词注入
         val MODE_INJECTIONS = stringPreferencesKey("mode_injections")
         val LOREBOOKS = stringPreferencesKey("lorebooks")

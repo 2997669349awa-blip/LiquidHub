@@ -60,6 +60,7 @@ interface WorkspaceBackend {
         cwd: String,
         timeoutMillis: Long,
         stdin: ByteArray?,
+        onOutput: ((String) -> Unit)? = null,
     ): WorkspaceCommandResult
 }
 

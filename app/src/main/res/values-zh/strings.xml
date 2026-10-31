@@ -1810,4 +1810,13 @@ mDNS 地址：使用 .local 主机名，同一网络中的其他设备可通过�
   <string name="web_search_enabled">已启用网页搜索</string>
   <string name="setting_model_page_prompt_compress">上下文压缩</string>
   <string name="tool_ui_delete_memory">删除记忆</string>
+  <string name="extensions_page_knowledge">知识库</string>
+  <string name="extensions_page_knowledge_desc">索引文档与工作区文件，支持本地检索</string>
+  <string name="screen_ask_tile_label">问屏幕</string>
+  <string name="phone_control_page_notification">通知读取</string>
+  <string name="phone_control_page_notification_desc">允许 AI 读取最近通知，用于摘要与建议回复</string>
+  <string name="phone_control_page_summarize_notifications">总结最近通知</string>
+  <string name="phone_control_page_summarize_notifications_desc">把最近通知发给 AI，整理待办并给出回复建议</string>
+  <string name="phone_control_page_summarize">总结</string>
+  <string name="phone_control_page_notification_empty">暂时还没有记录到通知</string>
 </resources>

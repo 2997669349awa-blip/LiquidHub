@@ -22,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import me.rerere.common.android.appTempFolder
@@ -91,6 +92,12 @@ class RikkaHubApp : Application() {
         // 初始化手机控制管理器（悬浮球 / 无障碍 / Shizuku 工具依赖它的 context）
         runCatching { me.rerere.rikkahub.data.phone.PhoneControlManager.init(this) }
 
+        // 恢复后台任务历史，并把上次进程残留的 RUNNING 任务标记为 INTERRUPTED
+        initBackgroundTasks()
+
+        // 定期检查到点的主动任务（定时任务）
+        scheduleScheduledTaskWorker()
+
         // delete temp files
         deleteTempFiles()
 
@@ -149,6 +156,40 @@ class RikkaHubApp : Application() {
                 Log.e(TAG, "resumeMemoryConsolidation failed", it)
             }
         }
+    }
+
+    private fun initBackgroundTasks() {
+        get<AppScope>().launch(Dispatchers.IO) {
+            runCatching {
+                val manager = get<me.rerere.rikkahub.service.BackgroundTaskManager>()
+                val settingsStore = get<SettingsStore>()
+                val stored = settingsStore.settingsFlow.first().backgroundTaskHistory
+                manager.restoreHistory(stored)
+                manager.markAllInterrupted()
+                manager.historyListener = { history ->
+                    get<AppScope>().launch {
+                        runCatching {
+                            settingsStore.update { it.copy(backgroundTaskHistory = history) }
+                        }.onFailure { Log.e(TAG, "persist background task history failed", it) }
+                    }
+                }
+                settingsStore.update { it.copy(backgroundTaskHistory = manager.history()) }
+            }.onFailure { Log.e(TAG, "initBackgroundTasks failed", it) }
+        }
+    }
+
+    private fun scheduleScheduledTaskWorker() {
+        runCatching {
+            val request = androidx.work.PeriodicWorkRequestBuilder<me.rerere.rikkahub.service.ScheduledTaskWorker>(
+                me.rerere.rikkahub.service.ScheduledTaskWorker.INTERVAL_MINUTES,
+                java.util.concurrent.TimeUnit.MINUTES,
+            ).build()
+            androidx.work.WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                me.rerere.rikkahub.service.ScheduledTaskWorker.UNIQUE_NAME,
+                androidx.work.ExistingPeriodicWorkPolicy.UPDATE,
+                request,
+            )
+        }.onFailure { Log.e(TAG, "scheduleScheduledTaskWorker failed", it) }
     }
 
     private fun incrementLaunchCount() {

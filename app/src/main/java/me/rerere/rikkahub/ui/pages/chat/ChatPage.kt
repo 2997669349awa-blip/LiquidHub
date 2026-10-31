@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
@@ -148,6 +150,25 @@ fun ChatPage(id: Uuid, text: String?, files: List<Uri>, nodeId: Uuid? = null) {
     }
 
     val startVoiceMode = rememberVoiceModeStarter(vm, setting)
+    val commandResult by vm.commandResult.collectAsStateWithLifecycle()
+
+    commandResult?.let { result ->
+        AlertDialog(
+            onDismissRequest = vm::dismissCommandResult,
+            title = { Text("命令结果") },
+            text = {
+                Text(
+                    text = result,
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = vm::dismissCommandResult) { Text("关闭") }
+            },
+        )
+    }
+
+
 
     val inputState = vm.inputState
 
@@ -362,6 +383,12 @@ private fun ChatPageContent(
                         vm.stopGeneration()
                     },
                     onSendClick = {
+                        val trimmed = inputState.textContent.text.toString().trim()
+                        if (trimmed.startsWith("//")) {
+                            vm.runCommand(trimmed)
+                            inputState.clearInput()
+                            return@ChatInput
+                        }
                         if (currentChatModel == null) {
                             toaster.show("请先选择模型", type = ToastType.Error)
                             return@ChatInput

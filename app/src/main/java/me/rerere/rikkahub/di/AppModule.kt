@@ -32,6 +32,18 @@ val appModule = module {
     }
 
     single {
+        me.rerere.rikkahub.service.BackgroundTaskManager()
+    }
+
+    single {
+        me.rerere.rikkahub.data.schedule.ScheduledTaskRunner(
+            settingsStore = get(),
+            conversationRepository = get(),
+            chatService = get(),
+        )
+    }
+
+    single {
         LocalTools(get(), get(), get(), get())
     }
 
@@ -114,6 +126,7 @@ val appModule = module {
             skillManager = get(),
             workspaceRepository = get(),
             workspaceDesktopManager = get(),
+            ragRepository = get(),
         )
     }
 

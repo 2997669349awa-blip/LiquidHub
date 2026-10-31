@@ -16,7 +16,9 @@ import com.google.firebase.analytics.FirebaseAnalytics
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -62,6 +64,7 @@ class ChatVM(
     private val analytics: FirebaseAnalytics,
     private val filesManager: FilesManager,
     private val favoriteRepository: FavoriteRepository,
+    private val backgroundTaskManager: me.rerere.rikkahub.service.BackgroundTaskManager,
 ) : ViewModel() {
     private val _conversationId: Uuid = Uuid.parse(id)
     val conversation: StateFlow<Conversation> = chatService.getConversationFlow(_conversationId)
@@ -232,6 +235,122 @@ class ChatVM(
         analytics.logEvent("ai_send_message", null)
 
         chatService.sendMessage(_conversationId, content, answer)
+    }
+
+    private val _commandResult = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    val commandResult = _commandResult.asStateFlow()
+
+    fun dismissCommandResult() {
+        _commandResult.value = null
+    }
+
+    /** 执行输入框命令（以 // 开头）。结果通过 [commandResult] 展示，不会发给 AI。 */
+    fun runCommand(raw: String) {
+        _commandResult.value = executeCommand(raw)
+    }
+
+    private fun executeCommand(raw: String): String {
+        val cmd = raw.removePrefix("//").trim()
+        val lower = cmd.lowercase()
+        return when {
+            lower.isEmpty() || lower == "help" -> me.rerere.rikkahub.utils.ChatCommandSpecs.helpText()
+
+            lower == "tasks" -> {
+                val tasks = me.rerere.rikkahub.service.ChatTaskManager.activeTasks()
+                val background = backgroundTaskManager.list()
+                val lines = buildList {
+                    tasks.forEach { add("${it.id}  ·  生成  ·  会话 ${it.conversationId.toString().take(8)}") }
+                    background.forEach {
+                        add("${it.id}  ·  后台  ·  ${it.state.name.lowercase()}  ·  ${it.command.take(40)}")
+                    }
+                }
+                if (lines.isEmpty()) "当前没有进行中的任务" else lines.joinToString("\n")
+            }
+
+            lower == "killall" -> {
+                val generation = me.rerere.rikkahub.service.ChatTaskManager.killAll()
+                val background = backgroundTaskManager.killAll()
+                "已请求停止 $generation 个生成任务、$background 个后台任务"
+            }
+
+            lower == "kill" -> {
+                me.rerere.rikkahub.service.ChatTaskManager.markCutOff(_conversationId.toString())
+                me.rerere.rikkahub.service.ChatTaskManager.killByArg(_conversationId.toString())
+                stopGeneration()
+                me.rerere.rikkahub.data.phone.PhoneControlManager.stopAll()
+                "已彻底终止当前会话：生成、后台任务与手机控制均已切断"
+            }
+
+            lower.startsWith("kill-") || lower.startsWith("kill ") -> {
+                val id = me.rerere.rikkahub.utils.parseChatCommandArg(cmd)
+                when {
+                    id.isBlank() -> "用法：//kill <任务ID 或 会话ID>（用 //tasks 查看）"
+                    me.rerere.rikkahub.service.ChatTaskManager.killByArg(id) -> "已请求停止生成任务：$id"
+                    backgroundTaskManager.kill(id) -> "已停止后台任务：$id"
+                    else -> "未找到进行中的任务：$id（用 //tasks 查看可用 ID）"
+                }
+            }
+
+            lower == "bg" || lower.startsWith("bg-") || lower.startsWith("bg ") -> {
+                val arg = me.rerere.rikkahub.utils.parseChatCommandArg(cmd)
+                val target = if (arg.isBlank()) backgroundTaskManager.list().lastOrNull()
+                else backgroundTaskManager.find(arg)
+                when {
+                    target == null -> "没有可转后台的任务（用 //tasks 查看）"
+                    !target.isRunning -> "任务 ${target.id} 已结束，可用 //logs ${target.id} 查看输出"
+                    backgroundTaskManager.detach(target.id) -> {
+                        runCatching { me.rerere.rikkahub.service.WorkspaceTaskService.sync(context) }
+                        "任务 ${target.id} 已转入后台，进度见通知栏；用 //logs ${target.id} 查看输出"
+                    }
+                    else -> "转后台失败：${target.id}"
+                }
+            }
+
+            lower.startsWith("logs-") || lower.startsWith("logs ") -> {
+                val id = me.rerere.rikkahub.utils.parseChatCommandArg(cmd)
+                if (id.isBlank()) {
+                    "用法：//logs <任务ID>（用 //tasks 查看）"
+                } else {
+                    val task = backgroundTaskManager.find(id)
+                    if (task == null) {
+                        "未找到任务：$id（可用：${backgroundTaskManager.list().joinToString(", ") { it.id }.ifBlank { "无" }}）"
+                    } else {
+                        val output = backgroundTaskManager.readOutput(id, 50).orEmpty()
+                        buildString {
+                            appendLine("${task.id} · ${task.state.name.lowercase()} · ${task.command}")
+                            appendLine("—".repeat(20))
+                            append(output.ifBlank { "(暂无输出)" })
+                        }.trim()
+                    }
+                }
+            }
+
+            lower.startsWith("recover-") || lower.startsWith("recover ") -> {
+                val id = me.rerere.rikkahub.utils.parseChatCommandArg(cmd)
+                val task = if (id.isBlank()) null
+                else me.rerere.rikkahub.service.ChatTaskManager.findByArg(id)
+                if (task == null) {
+                    "未找到任务：$id（用 //tasks 查看可用 ID）"
+                } else {
+                    chatService.recoverTask(task.conversationId)
+                    "已尝试恢复任务 ${task.id}"
+                }
+            }
+
+            lower == "stop" -> {
+                stopGeneration()
+                "已停止当前会话的生成"
+            }
+
+            lower == "status" -> buildString {
+                append("LiquidHub ${me.rerere.rikkahub.BuildConfig.APP_VERSION} (${me.rerere.rikkahub.BuildConfig.VERSION_NAME})\n")
+                append("进行中的任务：${me.rerere.rikkahub.service.ChatTaskManager.activeTasks().size}\n")
+                append("后台任务：${backgroundTaskManager.list().count { it.isRunning }}\n")
+                append("手机控制：${if (me.rerere.rikkahub.data.phone.PhoneControlManager.active.value) "开启" else "关闭"}")
+            }
+
+            else -> "未知命令：$cmd\n（输入 //help 查看全部命令）"
+        }
     }
 
     fun handleMessageEdit(parts: List<UIMessagePart>, messageId: Uuid) {

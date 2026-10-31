@@ -45,6 +45,7 @@ class ChatToolFactory(
     private val skillManager: SkillManager,
     private val workspaceRepository: WorkspaceRepository,
     private val workspaceDesktopManager: me.rerere.rikkahub.data.workspace.WorkspaceDesktopManager,
+    private val ragRepository: me.rerere.rikkahub.data.repository.RagRepository,
 ) {
     suspend fun createTools(
         settings: Settings,
@@ -66,6 +67,7 @@ class ChatToolFactory(
                 addAll(createConversationTools(conversationRepository, assistant.id))
             }
             addAll(workspaceTools)
+            addAll(createKnowledgeTools(ragRepository))
             val effectiveSkills = if (!pinnedSkill.isNullOrBlank()) setOf(pinnedSkill) else assistant.enabledSkills
             if (effectiveSkills.isNotEmpty()) {
                 addAll(

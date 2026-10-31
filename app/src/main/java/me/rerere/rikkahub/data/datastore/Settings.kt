@@ -18,6 +18,9 @@ import me.rerere.rikkahub.data.model.Lorebook
 import me.rerere.rikkahub.data.model.PromptInjection
 import me.rerere.rikkahub.data.model.QuickMessage
 import me.rerere.rikkahub.data.model.Tag
+import me.rerere.rikkahub.data.model.ScheduledTask
+import me.rerere.rikkahub.service.BackgroundShellTask
+import me.rerere.workspace.WorkspaceTemplate
 import me.rerere.rikkahub.data.sync.s3.S3Config
 import me.rerere.rikkahub.ui.theme.CustomTheme
 import me.rerere.rikkahub.ui.theme.PresetThemes
@@ -86,6 +89,9 @@ data class Settings(
     val backupReminderConfig: BackupReminderConfig = BackupReminderConfig(),
     val sponsorAlertDismissedAt: Int = 0,
     val terminalProviderPromptHandled: Boolean = false,
+    val customWorkspaceTemplates: List<WorkspaceTemplate> = emptyList(),
+    val backgroundTaskHistory: List<BackgroundShellTask> = emptyList(),
+    val scheduledTasks: List<ScheduledTask> = emptyList(),
 ) {
     companion object {
         // 构造一个用于初始化的settings, 但它不能用于保存，防止使用初始值存储

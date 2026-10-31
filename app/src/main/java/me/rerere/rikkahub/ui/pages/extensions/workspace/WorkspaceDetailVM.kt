@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.webkit.MimeTypeMap
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
@@ -11,13 +12,20 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.rerere.rikkahub.data.db.entity.WorkspaceEntity
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
+import me.rerere.rikkahub.data.workspace.TemplateInstallNotifier
+import me.rerere.workspace.TemplateApplyProgress
+import me.rerere.workspace.TemplateApplyResult
+import me.rerere.workspace.TemplateScript
+import me.rerere.workspace.WorkspaceTemplate
 import me.rerere.workspace.RootfsInstallProgress
 import me.rerere.workspace.RootfsInstallStage
 import me.rerere.workspace.WorkspaceCommandResult
@@ -117,6 +125,126 @@ class WorkspaceDetailVM(
 
     private val _installError = MutableStateFlow<String?>(null)
     val installError = _installError.asStateFlow()
+
+    private val _templateProgress = MutableStateFlow<TemplateApplyProgress?>(null)
+    val templateProgress = _templateProgress.asStateFlow()
+
+    private val _templateError = MutableStateFlow<String?>(null)
+    val templateError = _templateError.asStateFlow()
+
+    private val _applyingTemplate = MutableStateFlow(false)
+    val applyingTemplate = _applyingTemplate.asStateFlow()
+
+    private val _templateMessage = MutableStateFlow<String?>(null)
+    val templateMessage = _templateMessage.asStateFlow()
+
+    /** 用户自定义环境模板（来自 Settings）。 */
+    val customTemplates = repository.customTemplatesFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * 应用环境模板：rootfs 缺失时先装 rootfs，然后顺序执行模板脚本。
+     * 进度同时推送到页面与通知栏。
+     */
+    fun applyTemplate(
+        template: WorkspaceTemplate,
+        rootfsUrl: String?,
+        context: Context,
+    ) {
+        if (_applyingTemplate.value) return
+        viewModelScope.launch {
+            val workspace = state.value.workspace ?: return@launch
+            _installError.value = null
+            _templateError.value = null
+            _applyingTemplate.value = true
+            TemplateInstallNotifier.start(context, workspace.id, workspace.name, template.name)
+            try {
+                terminalSessionManager.closeWorkspace(workspace.root)
+                val result = repository.applyTemplate(
+                    id = workspace.id,
+                    template = template,
+                    rootfsUrl = rootfsUrl,
+                    onRootfsProgress = { _installProgress.value = it },
+                    onScriptProgress = { progress ->
+                        _templateProgress.value = progress
+                        TemplateInstallNotifier.progress(context, workspace.id, workspace.name, progress)
+                    },
+                )
+                when (result) {
+                    TemplateApplyResult.Success -> {
+                        TemplateInstallNotifier.success(context, workspace.id, template.name)
+                        _templateMessage.value = "模板「${template.name}」配置完成"
+                    }
+
+                    is TemplateApplyResult.Failed -> {
+                        TemplateInstallNotifier.fail(
+                            context = context,
+                            workspaceId = workspace.id,
+                            templateName = template.name,
+                            scriptName = result.script.name,
+                            logTail = result.output.takeLast(2_000),
+                        )
+                        _templateError.value =
+                            "步骤「${result.script.name}」失败（退出码 ${result.exitCode}）\n\n${result.output.takeLast(1_500)}"
+                    }
+                }
+                loadWorkspace()
+                refresh()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (error: Throwable) {
+                _installError.value = error.message ?: "模板应用失败"
+            } finally {
+                _installProgress.value = null
+                _templateProgress.value = null
+                _applyingTemplate.value = false
+            }
+        }
+    }
+
+    /** 把当前工作区保存为自定义模板；[scriptsText] 每行一条命令。 */
+    fun saveAsTemplate(name: String, description: String, scriptsText: String, rootfsUrl: String?) {
+        viewModelScope.launch {
+            val finalName = name.trim().ifBlank { "My Template" }
+            val scripts = scriptsText.lines()
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .mapIndexed { index, command ->
+                    TemplateScript(
+                        name = "Step ${index + 1}: ${command.take(40)}",
+                        command = command,
+                    )
+                }
+            val template = WorkspaceTemplate(
+                id = "custom-${java.util.UUID.randomUUID()}",
+                name = finalName,
+                description = description.trim(),
+                icon = "Terminal",
+                builtin = false,
+                rootfsUrl = rootfsUrl,
+                scripts = scripts,
+                createdAt = System.currentTimeMillis(),
+            )
+            runCatching { repository.saveCustomTemplate(template) }
+                .onSuccess { _templateMessage.value = "已保存模板「$finalName」" }
+                .onFailure { _templateError.value = "保存模板失败：${it.message}" }
+        }
+    }
+
+    fun deleteTemplate(templateId: String) {
+        viewModelScope.launch {
+            runCatching { repository.deleteCustomTemplate(templateId) }
+                .onFailure { _templateError.value = "删除模板失败：${it.message}" }
+        }
+    }
+
+    fun consumeTemplateMessage() {
+        _templateMessage.value = null
+    }
+
+    fun dismissTemplateError() {
+        _templateError.value = null
+    }
 
     private val _settingsError = MutableStateFlow<String?>(null)
     val settingsError = _settingsError.asStateFlow()

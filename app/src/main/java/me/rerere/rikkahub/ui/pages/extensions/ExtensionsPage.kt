@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -18,6 +19,8 @@ import me.rerere.hugeicons.HugeIcons
 import me.rerere.rikkahub.R
 import me.rerere.hugeicons.stroke.Book03
 import me.rerere.hugeicons.stroke.File02
+import me.rerere.hugeicons.stroke.Database02
+import me.rerere.hugeicons.stroke.Clock02
 import me.rerere.hugeicons.stroke.Folder01
 import me.rerere.hugeicons.stroke.Puzzle
 import me.rerere.hugeicons.stroke.Zap
@@ -74,6 +77,18 @@ fun ExtensionsPage() {
                         leadingContent = { CardGroupIcon(HugeIcons.Puzzle, containerColor = containerColor, contentColor = contentColor) },
                         headlineContent = { Text(stringResource(R.string.extensions_page_agent_skills)) },
                         supportingContent = { Text(stringResource(R.string.extensions_page_agent_skills_desc)) },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.ScheduledTasks) },
+                        leadingContent = { Icon(HugeIcons.Clock02, null) },
+                        headlineContent = { Text("主动任务") },
+                        supportingContent = { Text("定时 / 充电 / 低电量自动执行提示词") },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.Knowledge) },
+                        leadingContent = { Icon(HugeIcons.Database02, null) },
+                        headlineContent = { Text(stringResource(R.string.extensions_page_knowledge)) },
+                        supportingContent = { Text(stringResource(R.string.extensions_page_knowledge_desc)) },
                     )
                     item(
                         onClick = { navController.navigate(Screen.Workspaces) },

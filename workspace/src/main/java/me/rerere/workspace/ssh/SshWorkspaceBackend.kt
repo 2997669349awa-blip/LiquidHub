@@ -158,6 +158,7 @@ class SshWorkspaceBackend(
         cwd: String,
         timeoutMillis: Long,
         stdin: ByteArray?,
+        onOutput: ((String) -> Unit)?,
     ): WorkspaceCommandResult {
         val workingDir = normalizeAbsolute(layout.absolutePath(WorkspaceStorageArea.FILES, cwd))
         return pool.use(id, config, retry = false) { connection ->

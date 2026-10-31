@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -43,11 +45,14 @@ import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.ai.tools.local.LocalToolOption
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.datastore.getCurrentAssistant
+import me.rerere.rikkahub.data.phone.NotificationDigestManager
 import me.rerere.rikkahub.data.phone.PhoneControlManager
 import me.rerere.rikkahub.data.phone.ShizukuShell
 import me.rerere.rikkahub.ui.components.nav.BackButton
+import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.ui.components.ui.CardGroup
 import me.rerere.rikkahub.ui.theme.CustomColors
+import me.rerere.rikkahub.utils.navigateToChatPage
 import org.koin.compose.koinInject
 import rikka.shizuku.Shizuku
 
@@ -59,6 +64,7 @@ fun SettingPhoneControlPage() {
     val settings by settingsStore.settingsFlow.collectAsStateWithLifecycle()
     val assistant = settings.getCurrentAssistant()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val navController = LocalNavController.current
 
     // 授权页返回后刷新状态
     var refresh by remember { mutableIntStateOf(0) }
@@ -83,6 +89,7 @@ fun SettingPhoneControlPage() {
     val accessibilityEnabled = remember(refresh) { PhoneControlManager.isAccessibilityEnabled }
     val overlayGranted = remember(refresh) { PhoneControlManager.hasOverlayPermission() }
     val phoneControlEnabled = assistant.localTools.contains(LocalToolOption.PhoneControl)
+    val notificationAccess = remember(refresh) { NotificationDigestManager.isListenerEnabled(context) }
 
     Scaffold(
         topBar = {
@@ -165,6 +172,52 @@ fun SettingPhoneControlPage() {
                                 }
                             },
                         ) { Text(stringResource(R.string.permission_go_grant)) }
+                    },
+                )
+                item(
+                    headlineContent = { Text(stringResource(R.string.phone_control_page_notification)) },
+                    supportingContent = { Text(stringResource(R.string.phone_control_page_notification_desc)) },
+                    trailingContent = {
+                        Button(
+                            enabled = !notificationAccess,
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                }
+                            },
+                        ) {
+                            Text(
+                                if (notificationAccess) stringResource(R.string.phone_control_page_granted)
+                                else stringResource(R.string.permission_go_grant)
+                            )
+                        }
+                    },
+                )
+                item(
+                    headlineContent = { Text(stringResource(R.string.phone_control_page_summarize_notifications)) },
+                    supportingContent = { Text(stringResource(R.string.phone_control_page_summarize_notifications_desc)) },
+                    trailingContent = {
+                        TextButton(
+                            onClick = {
+                                val entries = NotificationDigestManager.snapshot(20)
+                                if (entries.isEmpty()) {
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(R.string.phone_control_page_notification_empty),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                } else {
+                                    val digest = entries.joinToString("\n") { entry ->
+                                        val body = entry.text.takeIf { it.isNotBlank() }?.let { " - $it" }.orEmpty()
+                                        "【${entry.appLabel}】${entry.title}$body"
+                                    }
+                                    navigateToChatPage(
+                                        navController,
+                                        initText = "请总结我最近收到的通知，按重要程度排序，列出需要我处理的事项，并对需要回复的通知给出回复建议。\n\n$digest",
+                                    )
+                                }
+                            },
+                        ) { Text(stringResource(R.string.phone_control_page_summarize)) }
                     },
                 )
                 item(

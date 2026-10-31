@@ -29,6 +29,7 @@ val WorkspaceToolDefaultApprovals: Map<String, Boolean> = mapOf(
     "workspace_write_file" to false,
     "workspace_edit_file" to false,
     "workspace_shell" to true,
+    "workspace_task" to true,
 )
 
 /** 直接写文件的工具, 只在支持 [WorkspaceCapabilities.fileWriteTools] 的工作区提供 */
@@ -57,6 +58,7 @@ suspend fun createWorkspaceTools(
             add(createEditFileTool(workspaceId, layout, ::needsApproval, workspaceRepository))
         }
         add(createShellTool(workspaceId, layout, ::needsApproval, workspaceRepository, shellCwd))
+        add(createTaskTool(::needsApproval))
     }
 }
 
@@ -227,6 +229,8 @@ private fun createShellTool(
         if (!defaultCwd.isNullOrBlank()) {
             append("Defaults to '$defaultCwd'. ")
         }
+        append("Set background=true for long-running commands (installs, training, servers): the call returns immediately with a task ID, ")
+        append("then use workspace_task to read output or stop it. ")
         append("Requires Rootfs to be installed and ready.")
     },
     parameters = {
@@ -254,6 +258,10 @@ private fun createShellTool(
                         "Command timeout in seconds. Defaults to 30, max $SHELL_TIMEOUT_MAX_SECONDS."
                     )
                 })
+                put("background", buildJsonObject {
+                    put("type", "boolean")
+                    put("description", "Run in background and return a task ID immediately. Use for installs or long tasks.")
+                })
             },
             required = listOf("command"),
         )
@@ -267,18 +275,170 @@ private fun createShellTool(
             ?.coerceIn(1L, SHELL_TIMEOUT_MAX_SECONDS)
             ?.times(1_000L)
             ?: WorkspaceManager.DEFAULT_COMMAND_TIMEOUT_MS
-        val result = workspaceRepository.executeCommand(workspaceId, command, cwd, timeoutMillis)
-        listOf(
-            UIMessagePart.Text(
-                buildJsonObject {
-                    put("exitCode", result.exitCode)
-                    put("stdout", result.stdout)
-                    put("stderr", result.stderr)
-                    put("timedOut", result.timedOut)
-                    if (result.truncated) put("truncated", true)
-                }.toString()
+        val background = (params["background"]?.jsonPrimitive?.contentOrNull)?.toBooleanStrictOrNull() ?: false
+        val koin = getKoin()
+        val taskManager = koin.get<me.rerere.rikkahub.service.BackgroundTaskManager>()
+        val workspace = workspaceRepository.getById(workspaceId)
+            ?: error("Workspace not found: $workspaceId")
+
+        val started = taskManager.start(
+            workspaceId = workspaceId,
+            workspaceRoot = workspace.root,
+            workspaceName = workspace.name,
+            command = command,
+        ) { onOutput ->
+            workspaceRepository.executeCommand(workspaceId, command, cwd, timeoutMillis, onOutput = onOutput)
+        }
+        runCatching {
+            val context = koin.get<android.content.Context>()
+            me.rerere.rikkahub.service.WorkspaceTaskService.sync(context)
+        }
+
+        if (background) {
+            listOf(
+                UIMessagePart.Text(
+                    buildJsonObject {
+                        put("taskId", started.task.id)
+                        put("status", "running")
+                        put(
+                            "message",
+                            "Task started in background. Use workspace_task(action=\"read\", taskId=\"${started.task.id}\") to check output."
+                        )
+                    }.toString()
+                )
             )
+        } else {
+            val startAt = System.currentTimeMillis()
+            try {
+                when (val outcome = started.result.await()) {
+                    is me.rerere.rikkahub.service.TaskOutcome.Completed -> {
+                        val result = outcome.result
+                        listOf(
+                            UIMessagePart.Text(
+                                buildJsonObject {
+                                    put("exitCode", result.exitCode)
+                                    put("stdout", result.stdout)
+                                    put("stderr", result.stderr)
+                                    put("timedOut", result.timedOut)
+                                    if (result.truncated) put("truncated", true)
+                                    put("taskId", started.task.id)
+                                    if (System.currentTimeMillis() - startAt >= 60_000) {
+                                        put(
+                                            "hint",
+                                            "This command took over 60s. For long commands next time set background=true, " +
+                                                "or the user can run //bg ${started.task.id} to detach it."
+                                        )
+                                    }
+                                }.toString()
+                            )
+                        )
+                    }
+
+                    me.rerere.rikkahub.service.TaskOutcome.Detached -> listOf(
+                        UIMessagePart.Text(
+                            buildJsonObject {
+                                put("taskId", started.task.id)
+                                put("status", "detached")
+                                put(
+                                    "message",
+                                    "The user moved this command to the background. Use workspace_task(action=\"read\", taskId=\"${started.task.id}\") for output."
+                                )
+                            }.toString()
+                        )
+                    )
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                if (!taskManager.isDetached(started.task.id)) taskManager.kill(started.task.id)
+                throw e
+            }
+        }
+    },
+)
+
+private fun createTaskTool(needsApproval: (String) -> Boolean) = Tool(
+    name = "workspace_task",
+    description = "Inspect or control background shell tasks started by workspace_shell with background=true " +
+        "or detached by the user. Actions: list (all tasks), read (output of one task), kill (stop a task).",
+    parameters = {
+        InputSchema.Obj(
+            properties = buildJsonObject {
+                put("action", buildJsonObject {
+                    put("type", "string")
+                    put("description", "One of: list, read, kill")
+                })
+                put("taskId", buildJsonObject {
+                    put("type", "string")
+                    put("description", "Task ID, required for read and kill")
+                })
+            },
+            required = listOf("action"),
         )
+    },
+    needsApproval = { needsApproval("workspace_task") },
+    execute = {
+        val params = it.jsonObject
+        val action = params.string("action") ?: "list"
+        val taskId = params.string("taskId")
+        val manager = getKoin().get<me.rerere.rikkahub.service.BackgroundTaskManager>()
+        when (action.lowercase()) {
+            "list" -> {
+                val tasks = (manager.list() + manager.history()).distinctBy { it.id }
+                listOf(
+                    UIMessagePart.Text(
+                        buildJsonObject {
+                            put("tasks", kotlinx.serialization.json.buildJsonArray {
+                                tasks.forEach { task ->
+                                    add(buildJsonObject {
+                                        put("id", task.id)
+                                        put("command", task.command)
+                                        put("state", task.state.name.lowercase())
+                                        put("workspace", task.workspaceName)
+                                        put("durationMs", task.durationMs())
+                                        task.exitCode?.let { put("exitCode", it) }
+                                    })
+                                }
+                            })
+                        }.toString()
+                    )
+                )
+            }
+
+            "read" -> {
+                require(!taskId.isNullOrBlank()) { "taskId is required for read" }
+                val task = manager.find(taskId) ?: error("Task not found: $taskId")
+                val output = manager.readOutput(taskId, 200).orEmpty()
+                listOf(
+                    UIMessagePart.Text(
+                        buildJsonObject {
+                            put("id", task.id)
+                            put("state", task.state.name.lowercase())
+                            put("command", task.command)
+                            task.exitCode?.let { put("exitCode", it) }
+                            put("output", output)
+                        }.toString()
+                    )
+                )
+            }
+
+            "kill" -> {
+                require(!taskId.isNullOrBlank()) { "taskId is required for kill" }
+                val killed = manager.kill(taskId)
+                val task = manager.find(taskId)
+                listOf(
+                    UIMessagePart.Text(
+                        buildJsonObject {
+                            put("killed", killed)
+                            task?.let {
+                                put("id", it.id)
+                                put("state", it.state.name.lowercase())
+                            }
+                        }.toString()
+                    )
+                )
+            }
+
+            else -> error("Unknown action: $action (expected list, read or kill)")
+        }
     },
 )
 

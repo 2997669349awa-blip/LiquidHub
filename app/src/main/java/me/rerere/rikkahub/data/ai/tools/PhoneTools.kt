@@ -17,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -25,6 +26,7 @@ import me.rerere.ai.core.InputSchema
 import me.rerere.ai.core.Tool
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.rikkahub.data.files.FilesManager
+import me.rerere.rikkahub.data.phone.NotificationDigestManager
 import me.rerere.rikkahub.data.phone.PhoneControlManager
 import me.rerere.rikkahub.data.phone.ShizukuShell
 import me.rerere.rikkahub.service.PhoneAccessibilityService
@@ -398,6 +400,44 @@ fun createPhoneTools(context: Context): List<Tool> = listOf(
             listOf(
                 UIMessagePart.Image(url = uris.first().toString()),
                 textResult { put("ok", true); put("size", bytes.size) }
+            )
+        }
+    ),
+    Tool(
+        name = "phone_read_notifications",
+        description = "读取最近收到的通知（需要用户开启通知读取权限）。用于总结通知、提取待办事项或建议回复。",
+        parameters = {
+            InputSchema.Obj(
+                properties = buildJsonObject {
+                    put("limit", buildJsonObject {
+                        put("type", "integer")
+                        put("description", "最多返回条数，默认 20，最大 50")
+                    })
+                },
+                required = emptyList(),
+            )
+        },
+        execute = {
+            val limit = it.str("limit").toIntOrNull()?.coerceIn(1, 50) ?: 20
+            val enabled = NotificationDigestManager.isListenerEnabled(context)
+            val entries = NotificationDigestManager.snapshot(limit)
+            listOf(
+                textResult {
+                    put("listenerEnabled", enabled)
+                    put("notifications", buildJsonArray {
+                        entries.forEach { entry ->
+                            add(buildJsonObject {
+                                put("app", entry.appLabel)
+                                put("title", entry.title)
+                                put("text", entry.text)
+                                put("postedAt", entry.postedAt)
+                            })
+                        }
+                    })
+                    if (!enabled) {
+                        put("hint", "通知读取权限未开启，请在 设置 > 其他 > 手机控制 中开启通知读取")
+                    }
+                }
             )
         }
     ),

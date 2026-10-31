@@ -126,6 +126,37 @@
       </intent-filter>
     </activity>
     <service
+      android:name=".service.WorkspaceTaskService"
+      android:exported="false"
+      android:foregroundServiceType="dataSync" />
+    <service
+      android:name=".service.AppNotificationListenerService"
+      android:exported="true"
+      android:label="@string/app_name"
+      android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+      <intent-filter>
+        <action android:name="android.service.notification.NotificationListenerService" />
+      </intent-filter>
+    </service>
+    <service
+      android:name=".service.ScreenAskTileService"
+      android:exported="true"
+      android:icon="@drawable/ic_stat_rikkahub"
+      android:label="@string/screen_ask_tile_label"
+      android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+      <intent-filter>
+        <action android:name="android.service.quicksettings.action.QS_TILE" />
+      </intent-filter>
+    </service>
+    <receiver
+      android:name=".service.ScheduleTriggerReceiver"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+        <action android:name="android.intent.action.BATTERY_LOW" />
+      </intent-filter>
+    </receiver>
+    <service
       android:name=".service.ChatGenerationForegroundService"
       android:exported="false"
       android:foregroundServiceType="dataSync" />

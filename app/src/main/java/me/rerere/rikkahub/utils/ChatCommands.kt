@@ -15,7 +15,9 @@ object ChatCommandSpecs {
 
     val commands: List<ChatCommandSpec> = listOf(
         ChatCommandSpec("//help", "显示全部命令"),
-        ChatCommandSpec("//tasks", "列出进行中的任务（任务 ID + 会话 ID）"),
+        ChatCommandSpec("//tasks", "列出进行中的任务（生成与后台 shell 任务）"),
+        ChatCommandSpec("//bg <任务ID>", "把运行中的 shell 任务转入后台，进度见通知栏；省略 ID 时取最近一个"),
+        ChatCommandSpec("//logs <任务ID>", "查看后台任务最近 50 行输出"),
         ChatCommandSpec("//kill", "停止当前会话正在进行的生成"),
         ChatCommandSpec("//kill <任务ID或会话ID>", "停止指定任务；ID 取 //tasks 输出的值，也可写成 //kill-<ID>"),
         ChatCommandSpec("//killall", "停止全部进行中的任务"),
@@ -31,3 +33,10 @@ object ChatCommandSpecs {
             commands.forEach { appendLine("${it.usage}  —  ${it.description}") }
         }.trim()
 }
+
+/**
+ * Extracts the argument of commands that accept either "cmd arg" or "cmd-arg" forms.
+ * Returns an empty string when no argument is present.
+ */
+fun parseChatCommandArg(cmd: String): String =
+    cmd.dropWhile { it != '-' && !it.isWhitespace() }.drop(1).trim()

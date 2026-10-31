@@ -1851,4 +1851,13 @@
   <string name="phone_control_page_enable">为当前助手启用手机控制</string>
   <string name="phone_control_page_enable_desc">开启后，AI 才能通过手机控制工具操作本机</string>
   <string name="phone_control_page_hint">授权完成后，在对话里让 AI 调用 phone_start 即可开始；悬浮球会实时显示 AI 的动作，单击悬浮球停止。手机控制默认只对当前助手生效。</string>
+  <string name="extensions_page_knowledge">Knowledge base</string>
+  <string name="extensions_page_knowledge_desc">Index documents and workspace files for local retrieval</string>
+  <string name="screen_ask_tile_label">Ask screen</string>
+  <string name="phone_control_page_notification">Notification access</string>
+  <string name="phone_control_page_notification_desc">Let AI read recent notifications to summarize and suggest replies</string>
+  <string name="phone_control_page_summarize_notifications">Summarize recent notifications</string>
+  <string name="phone_control_page_summarize_notifications_desc">Send recent notifications to AI for a to-do list and reply suggestions</string>
+  <string name="phone_control_page_summarize">Summarize</string>
+  <string name="phone_control_page_notification_empty">No notifications recorded yet</string>
 </resources>

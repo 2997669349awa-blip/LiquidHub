@@ -98,6 +98,7 @@ class LocalWorkspaceBackend(
         cwd: String,
         timeoutMillis: Long,
         stdin: ByteArray?,
+        onOutput: ((String) -> Unit)?,
     ): WorkspaceCommandResult {
         manager.ensureWorkspace(root)
         return manager.executeCommand(
@@ -107,6 +108,7 @@ class LocalWorkspaceBackend(
             timeoutMillis = timeoutMillis,
             stdin = stdin,
             shellCompatibilityMode = shellCompatibilityMode,
+            onOutput = onOutput,
         )
     }
 

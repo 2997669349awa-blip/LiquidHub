@@ -35,6 +35,34 @@ private const val TAG = "MessageFtsManager"
  * 所以另用普通表 message_fts_rowid 记录每行索引属于哪个会话，按会话增删都先经它查出 rowid。
  * title、update_at 两列已不再写入，搜索时从 conversationentity 读取，保留只是为了已有索引不用重建。
  */
+internal fun createRagTables(db: SupportSQLiteDatabase) {
+    db.execSQL(
+        """
+        CREATE VIRTUAL TABLE IF NOT EXISTS rag_chunk USING fts5(
+            text,
+            source_type UNINDEXED,
+            source_key UNINDEXED,
+            title UNINDEXED,
+            locator UNINDEXED,
+            updated_at UNINDEXED,
+            tokenize = 'simple'
+        )
+        """.trimIndent()
+    )
+    db.execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS rag_source_meta (
+            source_key TEXT PRIMARY KEY,
+            source_type TEXT NOT NULL,
+            title TEXT,
+            fingerprint TEXT,
+            chunk_count INTEGER NOT NULL DEFAULT 0,
+            indexed_at INTEGER NOT NULL DEFAULT 0
+        )
+        """.trimIndent()
+    )
+}
+
 internal fun createMessageFtsTables(db: SupportSQLiteDatabase) {
     db.execSQL(
         """

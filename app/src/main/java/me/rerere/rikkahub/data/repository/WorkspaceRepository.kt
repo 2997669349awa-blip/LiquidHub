@@ -7,6 +7,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import me.rerere.rikkahub.data.datastore.SettingsStore
@@ -18,6 +19,10 @@ import me.rerere.rikkahub.utils.JsonInstant
 import me.rerere.rikkahub.utils.SecretCipher
 import me.rerere.workspace.RootfsInstallProgress
 import me.rerere.workspace.RootfsInstaller
+import me.rerere.workspace.TemplateApplier
+import me.rerere.workspace.TemplateApplyProgress
+import me.rerere.workspace.TemplateApplyResult
+import me.rerere.workspace.WorkspaceTemplate
 import me.rerere.workspace.WorkspaceBackend
 import me.rerere.workspace.WorkspaceCommandResult
 import me.rerere.workspace.WorkspaceFileEntry
@@ -45,6 +50,7 @@ class WorkspaceRepository(
     private val rootfsInstaller: RootfsInstaller,
     private val settingsStore: SettingsStore,
     private val sshPool: SshConnectionPool,
+    private val templateApplier: TemplateApplier = TemplateApplier(manager),
 ) {
     fun listFlow(): Flow<List<WorkspaceEntity>> = dao.listFlow()
 
@@ -240,6 +246,81 @@ class WorkspaceRepository(
         }.getOrNull()
     }
 
+    /**
+     * 应用环境模板: rootfs 缺失时先安装（[rootfsUrl] 为空则报错），然后顺序执行模板脚本。
+     * 脚本全部成功 → READY；任一失败 → PARTIAL（可重跑）。取消时恢复原状态。
+     */
+    suspend fun applyTemplate(
+        id: String,
+        template: WorkspaceTemplate,
+        rootfsUrl: String?,
+        onRootfsProgress: (RootfsInstallProgress) -> Unit = {},
+        onScriptProgress: (TemplateApplyProgress) -> Unit = {},
+        onOutput: ((String) -> Unit)? = null,
+    ): TemplateApplyResult {
+        val workspace = dao.getById(id) ?: error("Workspace not found: $id")
+        if (!withContext(Dispatchers.IO) { manager.hasRootfs(workspace.root) }) {
+            val url = rootfsUrl ?: error("Rootfs not installed and template has no rootfs URL")
+            installRootfs(id, url, onRootfsProgress)
+        }
+        val current = dao.getById(id) ?: error("Workspace not found: $id")
+        updateShellState(current, WorkspaceShellStatus.INSTALLING.name)
+        try {
+            val result = runInterruptible(Dispatchers.IO) {
+                templateApplier.apply(
+                    root = workspace.root,
+                    template = template,
+                    onProgress = onScriptProgress,
+                    onOutput = onOutput,
+                )
+            }
+            val target = if (result is TemplateApplyResult.Success) {
+                WorkspaceShellStatus.READY
+            } else {
+                WorkspaceShellStatus.PARTIAL
+            }
+            updateShellState(current, target.name)
+            return result
+        } catch (e: CancellationException) {
+            withContext(NonCancellable) {
+                restoreShellState(current)
+            }
+            throw e
+        } catch (e: InterruptedException) {
+            withContext(NonCancellable) {
+                restoreShellState(current)
+            }
+            throw CancellationException("Template apply cancelled").also { it.initCause(e) }
+        } catch (e: Throwable) {
+            Log.e(TAG, "applyTemplate failed: workspace=${workspace.id}, template=${template.id}", e)
+            updateShellState(current, WorkspaceShellStatus.BROKEN.name)
+            throw e
+        }
+    }
+
+    /** 保存（或覆盖）一个自定义环境模板。 */
+    suspend fun saveCustomTemplate(template: WorkspaceTemplate) {
+        settingsStore.update { settings ->
+            settings.copy(
+                customWorkspaceTemplates = settings.customWorkspaceTemplates
+                    .filterNot { it.id == template.id } + template
+            )
+        }
+    }
+
+    /** 删除指定自定义模板。 */
+    suspend fun deleteCustomTemplate(templateId: String) {
+        settingsStore.update { settings ->
+            settings.copy(
+                customWorkspaceTemplates = settings.customWorkspaceTemplates.filterNot { it.id == templateId }
+            )
+        }
+    }
+
+    /** 自定义模板列表流。 */
+    fun customTemplatesFlow(): Flow<List<WorkspaceTemplate>> =
+        settingsStore.settingsFlow.map { it.customWorkspaceTemplates }
+
     suspend fun listFiles(
         id: String,
         area: WorkspaceStorageArea,
@@ -369,7 +450,7 @@ class WorkspaceRepository(
         val workspace = dao.getById(id) ?: error("Workspace not found: $id")
         // runInterruptible 让协程取消转化为线程中断，从而打断阻塞的 Process.waitFor 并杀掉进程
         return runInterruptible(Dispatchers.IO) {
-            backendOf(workspace).executeCommand(command, cwd, timeoutMillis, stdin)
+            backendOf(workspace).executeCommand(command, cwd, timeoutMillis, stdin, onOutput)
         }
     }
 

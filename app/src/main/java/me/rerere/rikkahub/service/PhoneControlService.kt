@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.phone.PhoneControlManager
+import me.rerere.rikkahub.data.phone.ScreenAskHelper
 
 class PhoneControlService : Service() {
 
@@ -113,6 +114,11 @@ class PhoneControlService : Service() {
                 setTextColor(Color.WHITE)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             }
+            val askScreen = Button(ctx).apply {
+                setText("问屏幕")
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+                setOnClickListener { ScreenAskHelper.askCurrentScreen(ctx) }
+            }
             val confirm = LinearLayout(ctx).apply {
                 orientation = LinearLayout.HORIZONTAL
                 visibility = View.GONE
@@ -137,6 +143,7 @@ class PhoneControlService : Service() {
                     setColor(Color.parseColor("#E62D6CDF"))
                 }
                 addView(ballText)
+                addView(askScreen)
                 addView(confirm)
                 setOnClickListener {
                     if (PhoneControlManager.pendingWebRequest.value == null) {

@@ -174,6 +174,9 @@ internal val SETTINGS_FIELDS: List<SettingsField<*, *>> = with(SettingsStore) {
         // 赞助提醒
         plain(SPONSOR_ALERT_DISMISSED_AT, Settings::sponsorAlertDismissedAt) { copy(sponsorAlertDismissedAt = it) },
         plain(TERMINAL_PROVIDER_PROMPT_HANDLED, Settings::terminalProviderPromptHandled) { copy(terminalProviderPromptHandled = it) },
+        json(CUSTOM_WORKSPACE_TEMPLATES, Settings::customWorkspaceTemplates) { copy(customWorkspaceTemplates = it) },
+        json(BACKGROUND_TASK_HISTORY, Settings::backgroundTaskHistory) { copy(backgroundTaskHistory = it) },
+        json(SCHEDULED_TASKS, Settings::scheduledTasks) { copy(scheduledTasks = it) },
     )
 }
 

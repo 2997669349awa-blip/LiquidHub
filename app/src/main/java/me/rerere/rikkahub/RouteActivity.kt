@@ -93,6 +93,8 @@ import me.rerere.rikkahub.ui.pages.backup.BackupPage
 import me.rerere.rikkahub.ui.pages.chat.ChatPage
 import me.rerere.rikkahub.ui.pages.debug.DebugPage
 import me.rerere.rikkahub.ui.pages.extensions.ExtensionsPage
+import me.rerere.rikkahub.ui.pages.extensions.knowledge.KnowledgePage
+import me.rerere.rikkahub.ui.pages.extensions.schedule.ScheduledTasksPage
 import me.rerere.rikkahub.ui.pages.extensions.PromptPage
 import me.rerere.rikkahub.ui.pages.extensions.QuickMessagesPage
 import me.rerere.rikkahub.ui.pages.extensions.skills.SkillDetailPage
@@ -578,6 +580,14 @@ class RouteActivity : ComponentActivity() {
                                 WorkspaceTerminalPage(key.id)
                             }
 
+                            entry<Screen.Knowledge> {
+                                KnowledgePage()
+                            }
+
+                            entry<Screen.ScheduledTasks> {
+                                ScheduledTasksPage()
+                            }
+
                             entry<Screen.WorkspaceSshEditor> { key ->
                                 WorkspaceSshEditorPage(key.id)
                             }
@@ -828,6 +838,12 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data object Workspaces : Screen
+
+    @Serializable
+    data object Knowledge : Screen
+
+    @Serializable
+    data object ScheduledTasks : Screen
 
     @Serializable
     data class WorkspaceDetail(val id: String) : Screen

@@ -45,6 +45,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.hugeicons.HugeIcons
+import me.rerere.hugeicons.stroke.ComputerPhoneSync
+import me.rerere.hugeicons.stroke.BubbleChatQuestion
+import me.rerere.hugeicons.stroke.ComputerTerminal01
+import me.rerere.hugeicons.stroke.BookOpen01
 import me.rerere.hugeicons.stroke.AiMagic
 import me.rerere.hugeicons.stroke.Alert01
 import me.rerere.hugeicons.stroke.Book01
@@ -260,6 +264,39 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                         leadingContent = { CardGroupIcon(HugeIcons.ServerStack01, containerColor = containerColor, contentColor = contentColor) },
                         supportingContent = { Text(stringResource(R.string.setting_page_web_server_desc)) },
                         headlineContent = { Text(stringResource(R.string.setting_page_web_server)) },
+                    )
+                }
+            }
+
+            item("liquidhubSettings") {
+                val containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                val contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                CardGroup(
+                    title = { Text("LiquidHub 功能") },
+                ) {
+                    item(
+                        onClick = { navController.navigate(Screen.PhoneControl) },
+                        leadingContent = { CardGroupIcon(HugeIcons.ComputerPhoneSync, containerColor = containerColor, contentColor = contentColor) },
+                        supportingContent = { Text("Shizuku / 无障碍 / 悬浮窗，通知读取") },
+                        headlineContent = { Text("手机控制") },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.Cosplay) },
+                        leadingContent = { CardGroupIcon(HugeIcons.BubbleChatQuestion, containerColor = containerColor, contentColor = contentColor) },
+                        supportingContent = { Text("自定义角色，设定词直接注入系统提示词") },
+                        headlineContent = { Text("扮演") },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.DialogCommands) },
+                        leadingContent = { CardGroupIcon(HugeIcons.ComputerTerminal01, containerColor = containerColor, contentColor = contentColor) },
+                        supportingContent = { Text("输入框 // 命令本地执行，不发给 AI") },
+                        headlineContent = { Text("对话框命令") },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.LocalModels) },
+                        leadingContent = { CardGroupIcon(HugeIcons.BookOpen01, containerColor = containerColor, contentColor = contentColor) },
+                        supportingContent = { Text("扫描并管理本机 Ollama 模型") },
+                        headlineContent = { Text("本地模型") },
                     )
                 }
             }

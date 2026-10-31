@@ -113,7 +113,19 @@ class ChatRequestFactory(
             conversationId = conversation.id,
             conversationSystemPrompt = conversation.customSystemPrompt,
             workspaceCwd = conversation.workspaceCwd,
-            memories = if (assistant.enableMemory) memoryRepository.getFiles(assistant.memoryId) else emptyList(),
+            memories = if (assistant.enableMemory) {
+                me.rerere.rikkahub.data.ai.MemorySelector.select(
+                    memories = memoryRepository.getFiles(assistant.memoryId),
+                    queryText = conversation.currentMessages.takeLast(6)
+                        .flatMap { message ->
+                            message.parts.filterIsInstance<me.rerere.ai.ui.UIMessagePart.Text>().map { it.text }
+                        }
+                        .joinToString("\n")
+                        .takeLast(1_500),
+                )
+            } else {
+                emptyList()
+            },
             tools = chatToolFactory.createTools(
                 settings = settings,
                 assistant = assistant,

@@ -102,6 +102,14 @@ val repositoryModule = module {
     }
 
     single {
+        me.rerere.rikkahub.data.db.rag.RagManager(get())
+    }
+
+    single {
+        me.rerere.rikkahub.data.repository.RagRepository(get(), get(), get())
+    }
+
+    single {
         SkillManager(get(), get())
     }
 }

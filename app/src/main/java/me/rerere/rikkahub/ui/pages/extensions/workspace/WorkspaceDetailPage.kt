@@ -41,7 +41,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FloatingToolbarDefaults.ScreenOffset
 import androidx.compose.material3.HorizontalFloatingToolbar
@@ -129,7 +132,10 @@ import me.rerere.rikkahub.ui.theme.CustomColors
 import me.rerere.rikkahub.utils.fileSizeToString
 import me.rerere.rikkahub.utils.writeClipboardText
 import me.rerere.ui.components.RikkaConfirmDialog
+import me.rerere.workspace.BuiltinTemplates
 import me.rerere.workspace.RootfsInstallProgress
+import me.rerere.workspace.TemplateApplyProgress
+import me.rerere.workspace.WorkspaceTemplate
 import me.rerere.workspace.RootfsInstallStage
 import me.rerere.workspace.WorkspaceFileEntry
 import me.rerere.workspace.WorkspaceShellStatus
@@ -155,11 +161,17 @@ fun WorkspaceDetailPage(id: String) {
     val vm: WorkspaceDetailVM = koinViewModel(parameters = { parametersOf(id) })
     val state by vm.state.collectAsStateWithLifecycle()
     val installProgress by vm.installProgress.collectAsStateWithLifecycle()
+    val templateProgress by vm.templateProgress.collectAsStateWithLifecycle()
+    val templateError by vm.templateError.collectAsStateWithLifecycle()
+    val templateMessage by vm.templateMessage.collectAsStateWithLifecycle()
+    val applyingTemplate by vm.applyingTemplate.collectAsStateWithLifecycle()
+    val customTemplates by vm.customTemplates.collectAsStateWithLifecycle()
     val installError by vm.installError.collectAsStateWithLifecycle()
     val settingsError by vm.settingsError.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState { WorkspaceDetailTab.entries.size }
     var deleteTarget by remember { mutableStateOf<WorkspaceFileEntry?>(null) }
     var showInstallDialog by remember { mutableStateOf(false) }
+    var showSaveTemplateDialog by remember { mutableStateOf(false) }
     var previewImageUri by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val filePicker = rememberLauncherForActivityResult(
@@ -252,7 +264,10 @@ fun WorkspaceDetailPage(id: String) {
                     WorkspaceDetailTab.BASIC -> WorkspaceBasicPage(
                         workspace = state.workspace,
                         installProgress = installProgress,
+                        templateProgress = templateProgress,
+                        applyingTemplate = applyingTemplate,
                         onInstallRootfs = { showInstallDialog = true },
+                        onSaveAsTemplate = { showSaveTemplateDialog = true },
                         onToolApprovalChange = vm::setToolApproval,
                         onShellCompatibilityModeChange = vm::setShellCompatibilityMode,
                         onEditSsh = { navController.navigate(Screen.WorkspaceSshEditor(id)) },
@@ -348,13 +363,54 @@ fun WorkspaceDetailPage(id: String) {
         if (showInstallDialog) {
             InstallRootfsDialog(
                 workspace = workspace,
+                templates = BuiltinTemplates.ALL + customTemplates,
+                hasRootfs = workspace.shellStatus == WorkspaceShellStatus.READY.name ||
+                    workspace.shellStatus == WorkspaceShellStatus.PARTIAL.name,
                 onDismiss = { showInstallDialog = false },
-                onConfirm = { url ->
-                    vm.installRootfs(url)
+                onDeleteTemplate = vm::deleteTemplate,
+                onConfirm = { url, template ->
+                    if (template != null) {
+                        vm.applyTemplate(template, url, context)
+                    } else {
+                        vm.installRootfs(url)
+                    }
                     showInstallDialog = false
                 },
             )
         }
+    }
+
+    state.workspace?.let {
+        if (showSaveTemplateDialog) {
+            SaveAsTemplateDialog(
+                defaultRootfsUrl = DEFAULT_ROOTFS_URL,
+                onDismiss = { showSaveTemplateDialog = false },
+                onConfirm = { name, description, scripts, rootfsUrl ->
+                    vm.saveAsTemplate(name, description, scripts, rootfsUrl)
+                    showSaveTemplateDialog = false
+                },
+            )
+        }
+    }
+
+    templateMessage?.let { message ->
+        LaunchedEffect(message) {
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            vm.consumeTemplateMessage()
+        }
+    }
+
+    templateError?.let { message ->
+        AlertDialog(
+            onDismissRequest = vm::dismissTemplateError,
+            title = { Text("环境模板执行失败") },
+            text = { Text(message, modifier = Modifier.verticalScroll(rememberScrollState())) },
+            confirmButton = {
+                TextButton(onClick = vm::dismissTemplateError) {
+                    Text(stringResource(R.string.common_confirm))
+                }
+            },
+        )
     }
 
     installError?.let { message ->
@@ -411,7 +467,10 @@ fun WorkspaceDetailPage(id: String) {
 private fun WorkspaceBasicPage(
     workspace: WorkspaceEntity?,
     installProgress: RootfsInstallProgress?,
+    templateProgress: TemplateApplyProgress?,
+    applyingTemplate: Boolean,
     onInstallRootfs: () -> Unit,
+    onSaveAsTemplate: () -> Unit,
     onToolApprovalChange: (String, Boolean) -> Unit,
     onShellCompatibilityModeChange: (Boolean) -> Unit,
     onEditSsh: () -> Unit,
@@ -419,7 +478,11 @@ private fun WorkspaceBasicPage(
     val shellStatus = workspace?.shellStatus
     // 加载完成前按本地工作区展示
     val hasRootfs = workspace?.capabilities()?.rootfs ?: true
-    val installing = installProgress != null || shellStatus == WorkspaceShellStatus.INSTALLING.name
+    val installing = installProgress != null || templateProgress != null || applyingTemplate ||
+        shellStatus == WorkspaceShellStatus.INSTALLING.name
+    val rootfsPresent = shellStatus == WorkspaceShellStatus.READY.name ||
+        shellStatus == WorkspaceShellStatus.PARTIAL.name
+    val partial = shellStatus == WorkspaceShellStatus.PARTIAL.name
     val rootfsReady = shellStatus == WorkspaceShellStatus.READY.name
     val installButtonText = when {
         installing -> stringResource(R.string.workspace_detail_installing)
@@ -660,10 +723,15 @@ private fun RootfsProgress(progress: RootfsInstallProgress) {
 @Composable
 private fun InstallRootfsDialog(
     workspace: WorkspaceEntity,
+    templates: List<WorkspaceTemplate>,
+    hasRootfs: Boolean,
     onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
+    onDeleteTemplate: (String) -> Unit,
+    onConfirm: (String, WorkspaceTemplate?) -> Unit,
 ) {
     var url by rememberSaveable(workspace.id) { mutableStateOf(DEFAULT_ROOTFS_URL) }
+    var selectedTemplateId by rememberSaveable(workspace.id) { mutableStateOf<String?>(null) }
+    val selectedTemplate = templates.firstOrNull { it.id == selectedTemplateId }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -671,23 +739,68 @@ private fun InstallRootfsDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = stringResource(R.string.workspace_detail_install_rootfs_desc, workspace.name),
+                    text = if (hasRootfs) {
+                        "已存在 rootfs：本次只执行所选模板脚本，不重新下载系统。"
+                    } else {
+                        stringResource(R.string.workspace_detail_install_rootfs_desc, workspace.name)
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                OutlinedTextField(
-                    value = url,
-                    onValueChange = { url = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.workspace_detail_download_url)) },
-                    maxLines = 5,
+                Text(
+                    text = "环境模板",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
                 )
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilterChip(
+                        selected = selectedTemplateId == null,
+                        onClick = { selectedTemplateId = null },
+                        label = { Text("仅 rootfs") },
+                    )
+                    templates.forEach { template ->
+                        FilterChip(
+                            selected = template.id == selectedTemplateId,
+                            onClick = { selectedTemplateId = template.id },
+                            label = { Text(template.name) },
+                        )
+                    }
+                }
+                selectedTemplate?.let { template ->
+                    if (template.description.isNotBlank()) {
+                        Text(
+                            text = template.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (!template.builtin) {
+                        TextButton(onClick = {
+                            onDeleteTemplate(template.id)
+                            selectedTemplateId = null
+                        }) {
+                            Text("删除此自定义模板", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+                if (!hasRootfs) {
+                    OutlinedTextField(
+                        value = url,
+                        onValueChange = { url = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.workspace_detail_download_url)) },
+                        maxLines = 5,
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(url.trim()) },
-                enabled = url.isNotBlank(),
+                onClick = { onConfirm(url.trim(), selectedTemplate) },
+                enabled = if (hasRootfs) selectedTemplate != null else url.isNotBlank(),
             ) {
                 Text(stringResource(R.string.common_install))
             }
@@ -1205,3 +1318,68 @@ internal fun String.toShellStatusLabel(): String = when (this) {
 
 private const val DEFAULT_ROOTFS_URL =
     "https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-arm64.tar.gz"
+
+@Composable
+private fun SaveAsTemplateDialog(
+    defaultRootfsUrl: String,
+    onDismiss: () -> Unit,
+    onConfirm: (name: String, description: String, scripts: String, rootfsUrl: String?) -> Unit,
+) {
+    var name by rememberSaveable { mutableStateOf("") }
+    var description by rememberSaveable { mutableStateOf("") }
+    var scripts by rememberSaveable { mutableStateOf("") }
+    var useRootfsUrl by rememberSaveable { mutableStateOf(true) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("保存为环境模板") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("模板名称") },
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("描述（可选）") },
+                    maxLines = 2,
+                )
+                OutlinedTextField(
+                    value = scripts,
+                    onValueChange = { scripts = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("安装脚本（每行一条命令）") },
+                    placeholder = { Text("apt-get install -y python3") },
+                    minLines = 4,
+                    maxLines = 10,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = useRootfsUrl, onCheckedChange = { useRootfsUrl = it })
+                    Text(
+                        text = "记录当前 rootfs 来源（新工作区将重新下载）",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirm(name, description, scripts, if (useRootfsUrl) defaultRootfsUrl else null)
+                },
+                enabled = name.isNotBlank(),
+            ) { Text("保存") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+        },
+    )
+}

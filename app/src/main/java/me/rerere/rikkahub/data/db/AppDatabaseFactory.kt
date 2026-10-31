@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import me.rerere.rikkahub.data.db.fts.createMessageFtsTables
+import me.rerere.rikkahub.data.db.fts.createRagTables
 import me.rerere.rikkahub.data.db.migrations.Migration_11_12
 import me.rerere.rikkahub.data.db.migrations.Migration_13_14
 import me.rerere.rikkahub.data.db.migrations.Migration_14_15
@@ -33,6 +34,7 @@ internal object AppDatabaseFactory {
                     // 旧版本搜索用 jieba 分词，会把词典解压到这里（约 14MB），现在不再需要
                     File(context.filesDir, "simple_dict").takeIf { it.exists() }?.deleteRecursively()
                     createMessageFtsTables(db)
+                    createRagTables(db)
                 }
             })
             .openHelperFactory(SQLiteConfiguration.openHelperFactory(context))
