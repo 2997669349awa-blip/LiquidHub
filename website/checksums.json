@@ -1,0 +1,14 @@
+{
+  "liquidhub-1.0.7-arm64-v8a.apk": {
+    "sha256": "0ded0abb3e13eb8ad0e916f1aeb2647b0db8a564567fb7c66b26e5d4b61161b8",
+    "size": 18738125
+  },
+  "liquidhub-1.0.7-universal.apk": {
+    "sha256": "94be6a2d2369356f5e08125a33129fb5f42ea175a6a52509bfb3414dc05793d3",
+    "size": 22411522
+  },
+  "liquidhub-1.0.7-x86_64.apk": {
+    "sha256": "3c310f3da0908f4e9016efb955d310e5a55a8440192f9f3f49dd2a9d8fe7aa72",
+    "size": 18878319
+  }
+}

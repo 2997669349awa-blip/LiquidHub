@@ -119,6 +119,7 @@ jobs:
           cp website/index.html website/install.sh website/.nojekyll ../pages/ 2>/dev/null || true
           cp website/likkahub-cli.tgz ../pages/ 2>/dev/null || true
           cp dist/*.apk ../pages/
+          python3 website/scripts/write-checksums.py ../pages
           python3 website/scripts/update-manifest.py \
             --pages ../pages \
             --version "$VERSION" \
