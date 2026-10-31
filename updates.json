@@ -22,14 +22,24 @@
     ]
   },
   "stable": {
-    "version": "1.0.5",
-    "publishedAt": "2026-10-04T19:12:00Z",
-    "changelog": "LiquidHub 1.0.5",
+    "version": "1.0.7",
+    "publishedAt": "2026-10-31T04:51:51Z",
+    "changelog": "LiquidHub 1.0.7\n\n- 同步上游 RikkaHub 3.1.1（207 个提交）\n- 新增工作区环境模板：Python / Node.js 一键安装，自定义模板可保存复用\n- 新增后台任务：workspace_shell 支持 background，//bg、//logs，通知栏聚合进度\n- 新增本地知识库：索引上传文档与工作区文件，离线检索\n- 新增屏幕理解：快捷磁贴「问屏幕」，通知读取与摘要\n- 新增主动任务：定时 / 充电 / 低电量自动执行提示词\n- 服务商支持 ChatGPT / Grok 账号登录与余额查询\n- 移除音乐、DSH、Pro 插件\n- 网站性能优化：移除大面积模糊滤镜，下载改由本站托管",
     "downloads": [
       {
-        "name": "liquidhub-release-1004-1912.apk",
-        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-release-1004-1912.apk",
-        "size": "约 54 MB"
+        "name": "liquidhub-1.0.7-arm64-v8a.apk",
+        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-1.0.7-arm64-v8a.apk",
+        "size": "约 18 MB"
+      },
+      {
+        "name": "liquidhub-1.0.7-universal.apk",
+        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-1.0.7-universal.apk",
+        "size": "约 21 MB"
+      },
+      {
+        "name": "liquidhub-1.0.7-x86_64.apk",
+        "url": "https://2997669349awa-blip.github.io/LiquidHub/liquidhub-1.0.7-x86_64.apk",
+        "size": "约 18 MB"
       }
     ]
   }
