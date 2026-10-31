@@ -20,3 +20,5 @@ signature/
 app/google-services.json
 # 含个人 Cookie，勿提交
 音乐插件/
+
+.signing/

@@ -1,0 +1,133 @@
+name: Release
+
+# 打正式标签 vX.Y.Z 触发；标签含 preview 时发布为预览版（GitHub prerelease + 站内预览通道）
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'jetbrains'
+          java-version: '21'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web-ui/pnpm-lock.yaml
+
+      - name: Install web-ui dependencies
+        working-directory: web-ui
+        run: pnpm install --frozen-lockfile
+
+      - name: Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+
+      - name: Prepare build files
+        run: |
+          echo "${{ secrets.KEY_BASE64 }}" | base64 -d > app/app.key
+          echo "${{ secrets.SIGNING_CONFIG }}" > local.properties
+          echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
+
+      - name: Gradle Build
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleGithubRelease
+
+      - name: Prepare release artifacts
+        id: artifacts
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '[:space:]' < version.txt)"
+          TAG="${GITHUB_REF_NAME:-manual}"
+          CHANNEL="stable"
+          case "$TAG" in
+            *preview*|*Preview*|*PREVIEW*) CHANNEL="preview" ;;
+          esac
+          mkdir -p dist
+          SRC=app/build/outputs/apk/github/release
+          for apk in "$SRC"/*.apk; do
+            name="$(basename "$apk")"
+            case "$name" in
+              *universal*) out="liquidhub-${VERSION}-universal.apk" ;;
+              *arm64-v8a*) out="liquidhub-${VERSION}-arm64-v8a.apk" ;;
+              *x86_64*)    out="liquidhub-${VERSION}-x86_64.apk" ;;
+              *)           out="liquidhub-${VERSION}-${name}" ;;
+            esac
+            cp "$apk" "dist/$out"
+          done
+          cp app/build/outputs/mapping/githubRelease/mapping.txt dist/ 2>/dev/null || true
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          ls -lh dist
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: LiquidHub ${{ steps.artifacts.outputs.version }}
+          prerelease: ${{ steps.artifacts.outputs.channel == 'preview' }}
+          body_path: website/release-notes/${{ steps.artifacts.outputs.version }}.md
+          files: dist/*.apk
+          fail_on_unmatched_files: true
+
+      - name: Publish APKs and site to gh-pages
+        env:
+          VERSION: ${{ steps.artifacts.outputs.version }}
+          CHANNEL: ${{ steps.artifacts.outputs.channel }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin gh-pages
+          rm -rf ../pages
+          git worktree add ../pages origin/gh-pages
+          cp website/index.html website/install.sh website/.nojekyll ../pages/ 2>/dev/null || true
+          cp website/likkahub-cli.tgz ../pages/ 2>/dev/null || true
+          cp dist/*.apk ../pages/
+          python3 website/scripts/update-manifest.py \
+            --pages ../pages \
+            --version "$VERSION" \
+            --channel "$CHANNEL" \
+            --notes "website/release-notes/$VERSION.md"
+          cd ../pages
+          git add -A
+          if git diff --cached --quiet; then
+            echo "gh-pages already up to date"
+          else
+            git commit -m "release: LiquidHub ${VERSION} (${CHANNEL})"
+            git push origin HEAD:gh-pages
+          fi
