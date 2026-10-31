@@ -33,9 +33,17 @@ def main() -> None:
     else:
         changelog = f"LiquidHub {args.version}"
 
+    def apk_rank(path: pathlib.Path) -> int:
+        name = path.name
+        if "universal" in name:
+            return 0
+        if "arm64" in name:
+            return 1
+        return 2
+
     apks = sorted(
-        p for p in pages.glob("*.apk")
-        if p.name.startswith(f"liquidhub-{args.version}-")
+        (p for p in pages.glob("*.apk") if p.name.startswith(f"liquidhub-{args.version}-")),
+        key=apk_rank,
     )
     downloads = []
     for path in apks:
@@ -48,6 +56,18 @@ def main() -> None:
     if not downloads:
         raise SystemExit(f"no APK found for version {args.version} in {pages}")
 
+    def version_key(value: str):
+        parts = []
+        for token in value.replace("-", ".").split("."):
+            parts.append(int(token) if token.isdigit() else token)
+        return parts
+
+    if args.channel == "stable":
+        preview = data.get("preview")
+        if preview and version_key(preview.get("version", "0")) <= version_key(args.version):
+            # 正式版已经追平或超过旧预览版，预览通道应显示“暂无”
+            data["preview"] = None
+
     data[args.channel] = {
         "version": args.version,
         "publishedAt": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -56,6 +76,9 @@ def main() -> None:
     }
     data.setdefault("stable", None)
     data.setdefault("preview", None)
+    # 清理旧版扁平字段，避免旧客户端读取到过期版本
+    for legacy in ("version", "publishedAt", "changelog", "downloads"):
+        data.pop(legacy, None)
     updates_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
     print(updates_path.read_text())
 
